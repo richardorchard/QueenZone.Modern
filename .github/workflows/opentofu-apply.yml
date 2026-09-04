@@ -30,7 +30,11 @@ permissions:
 
 # Issue #625, step 8 of epic #615. Structurally separate from
 # .github/workflows/deploy.yml (application releases) and from
-# opentofu-plan.yml (the PR-time check). Three jobs:
+# opentofu-plan.yml (the PR-time check). The production and dev applies are
+# deliberately separate: a dev managed certificate cannot be created until the
+# production-root Cloudflare CNAME has been applied and propagated. For an
+# automatic/all-root run, the workflow is plan → production apply → CNAME wait
+# → dev apply. A deliberate dev-only dispatch remains available for recovery.
 #   plan  - opentofu-plan environment (Reader identity; cannot apply).
 #           Produces the plan artifact that apply below applies verbatim,
 #           and fails closed on any destroy/replace before a human is ever
@@ -143,20 +147,17 @@ jobs:
           path: infra/environments/${{ matrix.root }}/tfplan
           retention-days: 1
 
-  apply:
-    strategy:
-      fail-fast: false
-      matrix:
-        root: ${{ fromJSON(inputs.root == 'dev' && '["dev"]' || inputs.root == 'production' && '["production"]' || '["production","dev"]') }}
-    name: ${{ matrix.root }} apply
+  apply-production:
+    name: production apply
     needs: plan
+    if: inputs.root != 'dev'
     runs-on: ubuntu-latest
     # GitHub pauses here for the opentofu-apply environment's required
     # reviewer. The reviewer can read the plan job's step summary (posted
     # above) before approving.
     environment: opentofu-apply
     concurrency:
-      group: opentofu-apply-${{ matrix.root }}
+      group: opentofu-apply-production
       # Never cancel an in-flight (or approval-pending) apply — same
       # reasoning as deploy.yml: cancelling mid-apply can leave
       # Azure/Cloudflare state half-updated. The AzureRM backend's blob
@@ -186,7 +187,6 @@ jobs:
           tofu_wrapper: false
 
       - name: Fetch Bitwarden OpenTofu apply secrets
-        if: matrix.root == 'production'
         id: bitwarden-secrets
         uses: bitwarden/sm-action@v3.0.1
         with:
@@ -194,7 +194,6 @@ jobs:
           secrets: ${{ vars.BITWARDEN_OPENTOFU_APPLY_SECRETS }}
 
       - name: Verify Cloudflare apply token is configured
-        if: matrix.root == 'production'
         env:
           CLOUDFLARE_API_TOKEN: ${{ steps.bitwarden-secrets.outputs.CLOUDFLARE_API_TOKEN }}
         run: |
@@ -205,7 +204,7 @@ jobs:
 
       # actions/upload-artifact does NOT preserve the uploader's relative
       # path for a single explicit file — it flattens
-      # infra/environments/${{ matrix.root }}/tfplan to just tfplan at the
+      # infra/environments/production/tfplan to just tfplan at the
       # artifact's root (confirmed the hard way: run 33713676359's first
       # real apply failed on "stat tfplan: no such file or directory"
       # because it downloaded to the repo root instead). Download straight
@@ -214,26 +213,95 @@ jobs:
       - name: Download plan artifact
         uses: actions/download-artifact@v8
         with:
-          name: opentofu-${{ matrix.root }}-plan-${{ github.run_id }}
-          path: infra/environments/${{ matrix.root }}
+          name: opentofu-production-plan-${{ github.run_id }}
+          path: infra/environments/production
 
       - name: OpenTofu init
-        working-directory: infra/environments/${{ matrix.root }}
-        run: tofu init -input=false -reconfigure -backend-config=../../backend/${{ matrix.root }}.backend.hcl
+        working-directory: infra/environments/production
+        run: tofu init -input=false -reconfigure -backend-config=../../backend/production.backend.hcl
 
       # Applies the exact binary plan produced (and safety-checked) by the
       # job above — not a freshly generated plan — so a human never approves
       # one thing and gets another applied.
       - name: OpenTofu apply
-        working-directory: infra/environments/${{ matrix.root }}
+        working-directory: infra/environments/production
         env:
           CLOUDFLARE_API_TOKEN: ${{ steps.bitwarden-secrets.outputs.CLOUDFLARE_API_TOKEN }}
+        run: tofu apply -input=false tfplan
+
+  wait-for-dev-dns:
+    name: Wait for dev CNAME propagation
+    needs: apply-production
+    if: inputs.root != 'dev' && inputs.root != 'production'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Confirm public CNAME target
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="queenzone-devbox.azurewebsites.net"
+          for attempt in {1..60}; do
+            actual=$(dig +short CNAME dev.queenzone.org @1.1.1.1 | sed 's/\.$//')
+            if [ "$actual" = "$expected" ]; then
+              echo "dev.queenzone.org resolves to $expected"
+              exit 0
+            fi
+            echo "Attempt $attempt: expected $expected, got ${actual:-no CNAME}."
+            sleep 15
+          done
+          echo "::error::dev.queenzone.org did not resolve to $expected within 15 minutes."
+          exit 1
+
+  apply-dev:
+    name: dev apply
+    needs: [plan, apply-production, wait-for-dev-dns]
+    if: >-
+      always() && inputs.root != 'production' &&
+      (inputs.root == 'dev' ||
+      (needs.apply-production.result == 'success' && needs.wait-for-dev-dns.result == 'success'))
+    runs-on: ubuntu-latest
+    environment: opentofu-apply
+    concurrency:
+      group: opentofu-apply-dev
+      cancel-in-progress: false
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      ARM_CLIENT_ID: ${{ vars.ARM_CLIENT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ vars.ARM_SUBSCRIPTION_ID }}
+      ARM_TENANT_ID: ${{ vars.ARM_TENANT_ID }}
+      ARM_USE_AZUREAD: "true"
+      ARM_USE_OIDC: "true"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup OpenTofu
+        uses: opentofu/setup-opentofu@v2
+        with:
+          tofu_version: 1.12.5
+          tofu_wrapper: false
+
+      - name: Download plan artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: opentofu-dev-plan-${{ github.run_id }}
+          path: infra/environments/dev
+
+      - name: OpenTofu init
+        working-directory: infra/environments/dev
+        run: tofu init -input=false -reconfigure -backend-config=../../backend/dev.backend.hcl
+
+      - name: OpenTofu apply
+        working-directory: infra/environments/dev
         run: tofu apply -input=false tfplan
 
   post-apply-smoke:
     name: Post-apply smoke
     if: inputs.root != 'dev'
-    needs: apply
+    needs: apply-production
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -247,7 +315,7 @@ jobs:
   dev-post-apply-smoke:
     name: Dev custom-domain HTTPS
     if: inputs.root != 'production'
-    needs: apply
+    needs: apply-dev
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
