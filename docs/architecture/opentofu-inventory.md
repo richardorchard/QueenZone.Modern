@@ -11,6 +11,23 @@ Issue: [#624](https://github.com/richardorchard/QueenZone.Modern/issues/624) (Op
 
 Sanitised machine-readable IDs and import hints live under [`infra/import/`](../../infra/import/).
 
+## Dev environment declaration (Phase 1)
+
+Issue #1265 adds `infra/environments/dev` with a separate `dev.tfstate`.
+These resources are **declared, not yet verified provisioned** in `australiaeast`:
+
+| Resource | Name |
+| --- | --- |
+| Resource group | `Queenzone-Dev-RG` |
+| Linux B1 plan, one worker | `ASP-Queenzone-Dev` |
+| Always-on web app | `queenzone-devbox` |
+| Log Analytics | `queenzone-devbox-law` |
+| Application Insights | `queenzone-devbox-ai` |
+
+Production's `queenzone-dev` App Service remains separate. SQL/storage belong
+to Phase 2; DNS/managed TLS to Phase 3. See the
+[dev provisioning runbook](opentofu-dev-environment.md) for permissions and apply verification.
+
 ## Scope boundaries
 
 | In scope for OpenTofu adoption | Out of scope / never OpenTofu |

@@ -43,11 +43,10 @@ variable "custom_hostnames" {
   }
 
   validation {
-    condition = (
-      length(setsubtract(toset(keys(var.custom_hostnames)), toset(["queenzone.org", "www.queenzone.org"]))) == 0 &&
-      length(setsubtract(toset(["queenzone.org", "www.queenzone.org"]), toset(keys(var.custom_hostnames)))) == 0
-    )
-    error_message = "Production must retain the apex and www custom hostnames."
+    condition = var.environment_name == "production" ? (
+      toset(keys(var.custom_hostnames)) == toset(["queenzone.org", "www.queenzone.org"])
+    ) : alltrue([for hostname in keys(var.custom_hostnames) : hostname == "dev.queenzone.org"])
+    error_message = "Production retains apex/www; dev may bind only dev.queenzone.org."
   }
 }
 
@@ -70,5 +69,38 @@ variable "worker_count" {
   validation {
     condition     = var.worker_count == 1
     error_message = "The accepted production topology is single-instance."
+  }
+}
+
+variable "environment_name" {
+  description = "Selects production safeguards; existing callers remain production."
+  type        = string
+  default     = "production"
+  validation {
+    condition     = contains(["production", "dev"], var.environment_name)
+    error_message = "Use production or dev."
+  }
+}
+
+variable "allow_direct_access" {
+  description = "Dev bootstrap only: allow HTTPS verification before DNS cutover."
+  type        = bool
+  default     = false
+  validation {
+    condition     = !var.allow_direct_access || var.environment_name == "dev"
+    error_message = "Production must retain Cloudflare-only ingress."
+  }
+}
+
+variable "managed_hostnames" {
+  description = "Dev hostnames with Azure-managed TLS; enable only after DNS validation is ready."
+  type        = set(string)
+  default     = []
+  validation {
+    condition = alltrue([
+      for hostname in var.managed_hostnames :
+      var.environment_name == "dev" && hostname == "dev.queenzone.org" && !contains(keys(var.custom_hostnames), hostname)
+    ])
+    error_message = "Only dev.queenzone.org may use managed TLS, without an uploaded-certificate binding."
   }
 }
