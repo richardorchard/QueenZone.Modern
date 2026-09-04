@@ -11,6 +11,7 @@ public sealed class SubmissionStatusPresentationTests
     [InlineData(PhotoSubmissionStatus.NeedsInfo, "attention", "Needs info")]
     [InlineData(PhotoSubmissionStatus.Approved, "success", "Approved")]
     [InlineData(PhotoSubmissionStatus.Rejected, "danger", "Rejected")]
+    [InlineData(FanPerformanceSubmissionStatus.Withdrawn, "neutral", "Withdrawn")]
     [InlineData(NewsSuggestionStatus.Promoted, "success", "Promoted")]
     [InlineData(NewsSuggestionStatus.Duplicate, "danger", "Duplicate")]
     [InlineData(ArticleSubmissionStatus.Draft, "pending", "Draft")]

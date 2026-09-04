@@ -78,11 +78,13 @@ public sealed partial class MySubmissionsPageTests : IClassFixture<WebApplicatio
         await SubmitNewsAsync(owner, "https://example.com/owner-exclusive-news-story", "Owner news");
         await SubmitArticleAsync(owner, "Owner exclusive article");
         await SubmitTriviaAsync(owner, "Owner exclusive trivia fact about Queen.");
+        await SubmitFanPerformanceAsync(owner, "Owner exclusive performance");
 
         await SubmitPhotoAsync(other, "Other member photo secret");
         await SubmitNewsAsync(other, "https://example.com/other-member-news-secret", "Other news");
         await SubmitArticleAsync(other, "Other member article secret");
         await SubmitTriviaAsync(other, "Other member trivia secret about a rumour.");
+        await SubmitFanPerformanceAsync(other, "Other member performance secret");
 
         var ownerPhotos = await owner.GetStringAsync("/account/my-submissions?tab=photos");
         Assert.Contains("Owner exclusive photo", ownerPhotos);
@@ -101,6 +103,11 @@ public sealed partial class MySubmissionsPageTests : IClassFixture<WebApplicatio
         var ownerTrivia = await owner.GetStringAsync("/account/my-submissions?tab=trivia");
         Assert.Contains("Owner exclusive trivia fact about Queen.", ownerTrivia);
         Assert.DoesNotContain("Other member trivia secret about a rumour.", ownerTrivia);
+
+        var ownerPerformances = await owner.GetStringAsync("/account/my-submissions?tab=performances");
+        Assert.Contains("Owner exclusive performance", ownerPerformances);
+        Assert.DoesNotContain("Other member performance secret", ownerPerformances);
+        Assert.Contains("/submit/fan-performance", ownerPerformances);
 
         var otherPhotos = await other.GetStringAsync("/account/my-submissions?tab=photos");
         Assert.Contains("Other member photo secret", otherPhotos);
@@ -173,6 +180,25 @@ public sealed partial class MySubmissionsPageTests : IClassFixture<WebApplicatio
         });
 
         var response = await client.PostAsync("/submit/trivia", content);
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+    }
+
+    private async Task SubmitFanPerformanceAsync(HttpClient client, string title)
+    {
+        var formPage = await client.GetStringAsync("/submit/fan-performance");
+        using var content = new MultipartFormDataContent();
+        content.Add(new StringContent(ExtractAntiforgeryToken(formPage)), "__RequestVerificationToken");
+        content.Add(new StringContent(title), "Title");
+        content.Add(new StringContent("Bohemian Rhapsody"), "CoveredSong");
+        content.Add(new StringContent("Owner Fan"), "PerformedBy");
+        content.Add(new StringContent("true"), "RightsDeclarationAccepted");
+        var bytes = new byte[200];
+        Mp3DurationTests.CreateMpeg1Layer3Header(9).CopyTo(bytes.AsSpan());
+        var fileContent = new StreamContent(new MemoryStream(bytes));
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue("audio/mpeg");
+        content.Add(fileContent, "AudioFile", "cover.mp3");
+
+        var response = await client.PostAsync("/submit/fan-performance", content);
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
     }
 

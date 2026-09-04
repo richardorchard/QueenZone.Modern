@@ -1,0 +1,68 @@
+@page "/submit/fan-performance"
+@model FanPerformanceModel
+
+<partial name="_PageHero" model='@(("Community", "Submit a fan performance", "Share your Queen cover for the Fan Performances archive.", ""))' />
+
+<section class="qz-section">
+  <div class="qz-container qz-prose">
+    <p>
+      Submissions are reviewed by editors before they appear in Fan Performances.
+      Audio stays private until an editor publishes it.
+      <a href="/account/my-submissions?tab=performances">View your submissions</a>
+    </p>
+
+    <div asp-validation-summary="ModelOnly" class="qz-account-notice qz-account-notice--error"></div>
+
+    <form method="post"
+          enctype="multipart/form-data"
+          class="qz-account-form"
+          data-busy-submit
+          data-busy-label="Uploading…">
+      @Html.AntiForgeryToken()
+
+      <label class="qz-account-form__field">
+        <span>Title</span>
+        <input asp-for="Title" maxlength="200" required />
+        <span asp-validation-for="Title" class="qz-account-form__field-error"></span>
+      </label>
+
+      <label class="qz-account-form__field">
+        <span>Queen song covered</span>
+        <input asp-for="CoveredSong" maxlength="200" required />
+        <span asp-validation-for="CoveredSong" class="qz-account-form__field-error"></span>
+      </label>
+
+      <label class="qz-account-form__field">
+        <span>Performed by</span>
+        <input asp-for="PerformedBy" maxlength="200" required />
+        <span asp-validation-for="PerformedBy" class="qz-account-form__field-error"></span>
+      </label>
+
+      <label class="qz-account-form__field">
+        <span>Description <span class="qz-account-form__optional">(optional)</span></span>
+        <textarea asp-for="Description" rows="4" maxlength="2000"></textarea>
+        <span asp-validation-for="Description" class="qz-account-form__field-error"></span>
+      </label>
+
+      <label class="qz-account-form__field">
+        <span>Audio file</span>
+        <input asp-for="AudioFile"
+               type="file"
+               accept="audio/mpeg,audio/mp3,audio/flac,.mp3,.flac"
+               required />
+        <span asp-validation-for="AudioFile" class="qz-account-form__field-error"></span>
+        <span class="qz-account-form__help">
+          MP3 or FLAC. Max 25&nbsp;MB.
+        </span>
+      </label>
+
+      <label class="qz-account-form__checkbox">
+        <input asp-for="RightsDeclarationAccepted" type="checkbox" required />
+        <span>@FanPerformanceModel.RightsDeclarationCopy</span>
+      </label>
+      <span asp-validation-for="RightsDeclarationAccepted" class="qz-account-form__field-error"></span>
+
+      <button type="submit" class="qz-button">Submit for review</button>
+    </form>
+  </div>
+</section>
