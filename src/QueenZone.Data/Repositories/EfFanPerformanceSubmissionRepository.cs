@@ -117,9 +117,28 @@ public sealed class EfFanPerformanceSubmissionRepository(QueenZoneDbContext dbCo
         Guid id,
         CancellationToken cancellationToken = default)
     {
-        var rows = await dbContext.FanPerformanceSubmissionAuditLogs
+        var query = dbContext.FanPerformanceSubmissionAuditLogs
             .AsNoTracking()
-            .Where(log => log.FanPerformanceSubmissionId == id)
+            .Where(log => log.FanPerformanceSubmissionId == id);
+
+        if (IsSqliteDatabase())
+        {
+            var sqliteRows = await query
+                .Select(log => new FanPerformanceSubmissionAuditEntry(
+                    log.Id,
+                    log.Action,
+                    log.ActorEmail,
+                    log.OccurredAt,
+                    log.Details))
+                .ToListAsync(cancellationToken);
+
+            return sqliteRows
+                .OrderByDescending(log => log.OccurredAt)
+                .ThenByDescending(log => log.Id)
+                .ToList();
+        }
+
+        return await query
             .OrderByDescending(log => log.OccurredAt)
             .ThenByDescending(log => log.Id)
             .Select(log => new FanPerformanceSubmissionAuditEntry(
@@ -129,8 +148,6 @@ public sealed class EfFanPerformanceSubmissionRepository(QueenZoneDbContext dbCo
                 log.OccurredAt,
                 log.Details))
             .ToListAsync(cancellationToken);
-
-        return rows;
     }
 
     public async Task<SubmissionListPage<FanPerformanceSubmission>> GetBySubmitterAsync(
