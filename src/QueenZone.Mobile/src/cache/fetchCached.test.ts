@@ -112,7 +112,7 @@ describe('fetchJsonWithOfflineCache', () => {
 
   it('does not share in-flight fetches across different cacheKeys', async () => {
     const cache = new ContentCache({ storage: createMemoryStorage() });
-    const releases: Array<(value: { id: number }) => void> = [];
+    const releases: ((value: { id: number }) => void)[] = [];
     fetchJsonMock.mock.mockImplementation(
       () =>
         new Promise((resolve) => {
