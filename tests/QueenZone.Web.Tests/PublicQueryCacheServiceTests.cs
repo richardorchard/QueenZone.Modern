@@ -393,6 +393,38 @@ public sealed class PublicQueryCacheServiceTests
     }
 
     [Fact]
+    public async Task FanPerformancePagesAreCachedUntilInvalidated()
+    {
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var fanPerformanceRepository = new CountingFanPerformanceRepository();
+        var service = CreateService(memoryCache, fanPerformanceRepository: fanPerformanceRepository);
+
+        var firstPage = await service.GetFanPerformancePageAsync(1, 20);
+        var secondPage = await service.GetFanPerformancePageAsync(1, 20);
+        var firstCount = await service.GetFanPerformanceVisibleCountAsync();
+        var secondCount = await service.GetFanPerformanceVisibleCountAsync();
+        var firstDetail = await service.GetFanPerformanceByIdAsync(187);
+        var secondDetail = await service.GetFanPerformanceByIdAsync(187);
+
+        Assert.Same(firstPage, secondPage);
+        Assert.Equal(firstCount, secondCount);
+        Assert.Same(firstDetail, secondDetail);
+        Assert.Equal(1, fanPerformanceRepository.PageCallCount);
+        Assert.Equal(1, fanPerformanceRepository.CountCallCount);
+        Assert.Equal(1, fanPerformanceRepository.ByIdCallCount);
+
+        service.InvalidateFanPerformanceCache();
+
+        _ = await service.GetFanPerformancePageAsync(1, 20);
+        _ = await service.GetFanPerformanceVisibleCountAsync();
+        _ = await service.GetFanPerformanceByIdAsync(187);
+
+        Assert.Equal(2, fanPerformanceRepository.PageCallCount);
+        Assert.Equal(2, fanPerformanceRepository.CountCallCount);
+        Assert.Equal(2, fanPerformanceRepository.ByIdCallCount);
+    }
+
+    [Fact]
     public async Task LiveActivityCountIsCachedForTheConfiguredDuration()
     {
         using var memoryCache = new MemoryCache(new MemoryCacheOptions());
@@ -423,6 +455,7 @@ public sealed class PublicQueryCacheServiceTests
         IQueenHistoryRepository? historyRepository = null,
         IPhotoRepository? photoRepository = null,
         ILiveActivityQueryService? liveActivityQuery = null,
+        IFanPerformanceRepository? fanPerformanceRepository = null,
         PublicQueryCacheOptions? options = null) =>
         new(
             memoryCache,
@@ -432,7 +465,8 @@ public sealed class PublicQueryCacheServiceTests
             forumRepository ?? new CountingForumRepository(),
             historyRepository ?? new CountingQueenHistoryRepository(),
             photoRepository ?? new CountingPhotoRepository(),
-            liveActivityQuery ?? new CountingLiveActivityQueryService());
+            liveActivityQuery ?? new CountingLiveActivityQueryService(),
+            fanPerformanceRepository ?? new CountingFanPerformanceRepository());
 
     private class CountingLiveActivityQueryService : ILiveActivityQueryService
     {
@@ -683,6 +717,36 @@ public sealed class PublicQueryCacheServiceTests
                 "cached-history",
                 null,
                 true);
+    }
+
+    private sealed class CountingFanPerformanceRepository : IFanPerformanceRepository
+    {
+        public int PageCallCount { get; private set; }
+
+        public int CountCallCount { get; private set; }
+
+        public int ByIdCallCount { get; private set; }
+
+        public Task<IReadOnlyList<FanPerformance>> GetPageAsync(
+            int page,
+            int pageSize,
+            CancellationToken cancellationToken = default)
+        {
+            PageCallCount++;
+            return Task.FromResult<IReadOnlyList<FanPerformance>>(SampleFanPerformanceData.CreateSeedPerformances());
+        }
+
+        public Task<int> GetVisibleCountAsync(CancellationToken cancellationToken = default)
+        {
+            CountCallCount++;
+            return Task.FromResult(4);
+        }
+
+        public Task<FanPerformance?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
+        {
+            ByIdCallCount++;
+            return Task.FromResult(SampleFanPerformanceData.CreateSeedPerformances().FirstOrDefault(item => item.Id == id));
+        }
     }
 
     private class CountingPhotoRepository : IPhotoRepository

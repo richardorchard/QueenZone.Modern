@@ -4,7 +4,7 @@ using QueenZone.Data;
 
 namespace QueenZone.Web.Pages.FanPerformances;
 
-public abstract class FanPerformanceArchivePageModel(IFanPerformanceRepository fanPerformanceRepository) : PageModel
+public abstract class FanPerformanceArchivePageModel(PublicQueryCacheService publicQueryCache) : PageModel
 {
     public FanPerformanceListViewModel PerformanceList { get; private set; } = FanPerformanceListViewModel.Empty;
 
@@ -21,8 +21,8 @@ public abstract class FanPerformanceArchivePageModel(IFanPerformanceRepository f
             return NotFound();
         }
 
-        var visibleCount = await fanPerformanceRepository.GetVisibleCountAsync(cancellationToken);
-        var items = await fanPerformanceRepository.GetPageAsync(page, FanPerformanceRoutes.PageSize, cancellationToken);
+        var visibleCount = await publicQueryCache.GetFanPerformanceVisibleCountAsync(cancellationToken);
+        var items = await publicQueryCache.GetFanPerformancePageAsync(page, FanPerformanceRoutes.PageSize, cancellationToken);
         var totalPages = FanPerformanceRoutes.ResolveTotalPages(
             page,
             items.Count,
@@ -83,7 +83,7 @@ public abstract class FanPerformanceArchivePageModel(IFanPerformanceRepository f
             var catalogSource = items;
             if (page != 1 || items.Count < visibleCount)
             {
-                catalogSource = await fanPerformanceRepository.GetPageAsync(1, visibleCount, cancellationToken);
+                catalogSource = await publicQueryCache.GetFanPerformancePageAsync(1, visibleCount, cancellationToken);
             }
 
             catalog = FanPerformanceListViewModel.CreateCatalog(catalogSource);

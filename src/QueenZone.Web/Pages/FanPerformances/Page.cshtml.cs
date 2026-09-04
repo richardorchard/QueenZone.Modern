@@ -1,11 +1,10 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
-using QueenZone.Data;
 
 namespace QueenZone.Web.Pages.FanPerformances;
 
 [EnableRateLimiting(FanPerformanceRateLimitingOptions.BrowsePolicy)]
-public sealed class ArchivePageModel(IFanPerformanceRepository fanPerformanceRepository) : FanPerformanceArchivePageModel(fanPerformanceRepository)
+public sealed class ArchivePageModel(PublicQueryCacheService publicQueryCache) : FanPerformanceArchivePageModel(publicQueryCache)
 {
     [BindProperty(SupportsGet = true)]
     public int PageNumber { get; set; }
