@@ -1,4 +1,5 @@
 using QueenZone.Data;
+using QueenZone.Data.Entities;
 using QueenZone.Web;
 
 namespace QueenZone.Web.Tests;

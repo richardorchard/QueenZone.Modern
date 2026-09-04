@@ -395,6 +395,11 @@ public sealed class FanPerformanceSubmissionPromotionServiceTests
 
         public Task ClearPendingBlobPathAsync(Guid id, CancellationToken cancellationToken = default) =>
             inner.ClearPendingBlobPathAsync(id, cancellationToken);
+
+        public Task<IReadOnlyDictionary<int, FanPerformanceContributorCredit>> GetApprovedContributorCreditsAsync(
+            IReadOnlyCollection<int> stageIds,
+            CancellationToken cancellationToken = default) =>
+            inner.GetApprovedContributorCreditsAsync(stageIds, cancellationToken);
     }
 
     private sealed class ConcurrentApproveLoserSubmissionRepository : IFanPerformanceSubmissionRepository
@@ -467,5 +472,10 @@ public sealed class FanPerformanceSubmissionPromotionServiceTests
 
         public Task ClearPendingBlobPathAsync(Guid id, CancellationToken cancellationToken = default) =>
             inner.ClearPendingBlobPathAsync(id, cancellationToken);
+
+        public Task<IReadOnlyDictionary<int, FanPerformanceContributorCredit>> GetApprovedContributorCreditsAsync(
+            IReadOnlyCollection<int> stageIds,
+            CancellationToken cancellationToken = default) =>
+            inner.GetApprovedContributorCreditsAsync(stageIds, cancellationToken);
     }
 }

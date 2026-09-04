@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using QueenZone.Data;
+using QueenZone.Data.Entities;
 using QueenZone.Storage;
 
 namespace QueenZone.Web.Tests;
@@ -322,7 +323,7 @@ public sealed class FanPerformancesPageTests : IClassFixture<WebApplicationFacto
     {
         var match = System.Text.RegularExpressions.Regex.Match(
             html,
-            """name="__RequestVerificationToken"[^>]*value="(?<token>[^"]+)"""",
+            "name=\"__RequestVerificationToken\"[^>]*value=\"(?<token>[^\"]+)\"",
             System.Text.RegularExpressions.RegexOptions.IgnoreCase);
         Assert.True(match.Success, "Antiforgery token was missing.");
         return match.Groups["token"].Value;

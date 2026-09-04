@@ -3,6 +3,7 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using QueenZone.Data;
+using QueenZone.Data.Entities;
 using QueenZone.Search.Shared;
 using QueenZone.Web;
 using QueenZone.Web.Sitemap;

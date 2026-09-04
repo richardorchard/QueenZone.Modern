@@ -6,6 +6,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using QueenZone.Data;
+using QueenZone.Data.Entities;
 using QueenZone.Storage;
 
 namespace QueenZone.Web.Tests;
