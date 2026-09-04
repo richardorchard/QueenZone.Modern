@@ -45,7 +45,7 @@ public sealed class FanPerformanceSubmissionEntity
 
     public string RightsDeclarationVersion { get; set; } = FanPerformanceSubmissionRights.DeclarationVersion;
 
-    /// <summary>Q_STAGE_T id created when this submission is published.</summary>
+    /// <summary>Q_STAGE_T id created when this submission is published. Filled in #1294.</summary>
     public int? PromotedStageId { get; set; }
 
     public MemberAccount? Submitter { get; set; }
