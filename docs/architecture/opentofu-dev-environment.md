@@ -7,6 +7,27 @@ No production resource or import address moves. Resource labels inside the
 shared web module still say `production` to preserve existing state addresses;
 the dev root's separate state and explicit names determine the actual target.
 
+## Provisioning evidence: 2026-09-04
+
+[PR #1300](https://github.com/richardorchard/QueenZone.Modern/pull/1300) merged
+with required checks passing. After the maintainer approved the names and scoped
+CI access, an operator applied the one-resource dev group bootstrap. The
+[dev-only workflow](https://github.com/richardorchard/QueenZone.Modern/actions/runs/33847788695)
+then planned four creates, applied that exact reviewed artifact through the
+existing approval gate, and passed its HTTPS smoke check.
+
+Azure CLI verified `queenzone-devbox` is Running on `ASP-Queenzone-Dev` in
+`Queenzone-Dev-RG`, Australia East: B1, one worker, Always On, .NET 10,
+TLS 1.2 and HTTPS-only. A direct HTTPS request returned HTTP 200 and the
+Microsoft Azure App Service welcome page. A fresh dev plan against remote state
+returned exit code 0: no creates, updates, deletes or replacements.
+
+Production remained Running on `ASP-Queenzone` in `Queenzone-RG`, B1/one worker.
+The duplicate all-roots push workflow was cancelled before apply, so the deleted
+DNS record was not recreated. Custom DNS/TLS, data/storage and application
+deployment remain with their later epic phases; this proves infrastructure
+provisioning, not application release readiness.
+
 ## Resources and boundaries
 
 All five resources are new, in Australia East:
@@ -57,9 +78,10 @@ an independently reviewed dev plan/apply without applying production drift.
 
 ## First-use permissions and approval
 
-Live RBAC inspection on 2026-09-04 found both existing CI identities scoped to
-`Queenzone-RG` only (besides their state-container access). Neither can currently
-manage `Queenzone-Dev-RG`. Do not grant subscription-wide Contributor to solve this.
+Initial RBAC inspection on 2026-09-04 found both CI identities scoped to
+production only. The approved bootstrap below has now been completed: the dev
+group exists and both identities have the listed dev-scoped roles. Do not repeat
+the bootstrap for routine applies or grant subscription-wide Contributor.
 
 Because a resource group must exist before resource-group-scoped assignments
 can be made, the first bootstrap needs an authorised operator:
@@ -87,7 +109,8 @@ can be made, the first bootstrap needs an authorised operator:
 4. Regenerate the full plan through `opentofu-apply.yml`, choosing `root: dev`
    when production drift remains. Review the four remaining creates and approve
    the protected `opentofu-apply` job. The exact checked plan artifact is applied.
-   No role changes or bootstrap have been performed by this PR.
+   These bootstrap steps were completed on 2026-09-04 after maintainer approval;
+   routine applies now use the existing resource group and assignments.
 
 The PR plan uses `pull_request_target`, whose workflow definition comes from
 main. Therefore this PR cannot automatically exercise its new dev matrix until
