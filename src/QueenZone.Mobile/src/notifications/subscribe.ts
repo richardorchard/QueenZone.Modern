@@ -1,7 +1,19 @@
 import * as Notifications from 'expo-notifications';
-import { noteNewsListPush } from './newsListEpoch';
-import { notePmUnreadPush } from './pmUnreadEpoch';
+import { invalidate } from '../cache/externalStore';
+import { NEWS_LIST_CACHE_KEY, PM_UNREAD_CACHE_KEY } from '../cache/keys';
 import { fallbackNoticeCopy, parseNotificationData, type NotificationDestination } from './payload';
+
+function noteNewsListPush(destination: NotificationDestination): void {
+  if (destination.category === 'news') {
+    invalidate(NEWS_LIST_CACHE_KEY);
+  }
+}
+
+function notePmUnreadPush(destination: NotificationDestination): void {
+  if (destination.category === 'privateMessage') {
+    invalidate(PM_UNREAD_CACHE_KEY);
+  }
+}
 
 export type NotificationTap = {
   identifier: string;

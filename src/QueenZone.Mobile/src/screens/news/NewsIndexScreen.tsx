@@ -5,10 +5,11 @@ import { memo, useCallback, useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, View, type ListRenderItem } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { fetchNewsPage, fetchNewsYearRange, formatPublishedDate, type NewsListItem, type NewsYearRange } from '../../api';
+import { NEWS_LIST_CACHE_KEY } from '../../cache/keys';
+import { useStoreRefresh } from '../../cache/useExternalStore';
 import { getAppConfig } from '../../config';
 import { newsArticleListImageSource, newsArticlePlaceholder } from '../../content/newsArticleImage';
 import { newsDecades } from '../../content/newsDecades';
-import { useNewsListEpochRefresh } from '../../hooks/useNewsListEpochRefresh';
 import { usePagedContent } from '../../hooks/usePagedContent';
 import type { NewsStackParamList, RootTabParamList } from '../../navigation/types';
 import { radius, space, useTheme } from '../../theme';
@@ -127,7 +128,7 @@ export function NewsIndexScreen({ navigation, route }: Props) {
     20,
     newsListResetKey(selectedYear === null ? decade.label : `year-${selectedYear}`, refreshAt),
   );
-  useNewsListEpochRefresh(paged.refresh);
+  useStoreRefresh(NEWS_LIST_CACHE_KEY, paged.refresh);
 
   const selectDecade = useCallback((option: (typeof newsDecades)[number]) => {
     setSelectedYear(null);

@@ -1,16 +1,17 @@
 import { useCallback, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { fetchUnreadConversationCount } from '../../api/messages';
-import { subscribePmUnreadEpoch } from '../../notifications/pmUnreadEpoch';
+import { subscribe } from '../../cache/externalStore';
+import { PM_UNREAD_CACHE_KEY } from '../../cache/keys';
 import { useSession } from '../../session/SessionContext';
 
 /**
  * Masthead-style unread conversation count. Fails soft (0) when signed out
  * or when the request fails, matching the website header.
  *
- * Refetches on focus and when a privateMessage receive bumps the PM epoch
- * while this hook is focused/mounted. Unfocused and unmounted screens skip
- * the network; the next focus/mount fetches.
+ * Refetches on focus and when a privateMessage receive invalidates
+ * {@link PM_UNREAD_CACHE_KEY} while this hook is focused/mounted. Unfocused
+ * and unmounted screens skip the network; the next focus/mount fetches.
  */
 export function useUnreadConversationCount(): number {
   const { isSignedIn, accessToken } = useSession();
@@ -40,7 +41,7 @@ export function useUnreadConversationCount(): number {
       }
 
       load();
-      const unsubscribe = subscribePmUnreadEpoch(load);
+      const unsubscribe = subscribe(PM_UNREAD_CACHE_KEY, load);
 
       return () => {
         controller?.abort();

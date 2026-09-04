@@ -35,3 +35,39 @@ export function privateMemberCachePrefix(memberId: string): string {
 
 /** All member-scoped private snapshots. */
 export const PRIVATE_CACHE_KEY_PREFIX = 'messages:member:';
+
+/**
+ * Public news-list invalidation key (ADR 0018 decision 3). Not a ContentCache
+ * entry — Home news and NewsIndex subscribe to this key.
+ */
+export const NEWS_LIST_CACHE_KEY = 'news:list';
+
+/** Prefix for public news invalidation keys. Survives sign-out. */
+export const NEWS_CACHE_KEY_PREFIX = 'news:';
+
+/**
+ * Process-wide private-message unread signal. Lives under
+ * {@link PRIVATE_CACHE_KEY_PREFIX} so `SessionContext.clearLocal` /
+ * `purgePrivateContentCache` prefix-invalidates it with other member data.
+ */
+export const PM_UNREAD_CACHE_KEY = `${PRIVATE_CACHE_KEY_PREFIX}unread`;
+
+/**
+ * #927 download-manifest UI lifecycle (`queued` / `downloading` /
+ * `downloaded` / `failed` / `removing`) belongs on `externalStore` under
+ * this prefix so listing / detail / Play All share one subscription.
+ *
+ * Binary files and the durable download manifest are a **sibling store**
+ * beside ContentCache (ADR 0018 decision 4) — do not put bytes here, and
+ * do not merge that store into ContentCache. This tree is the seam only;
+ * #927 implements the states.
+ */
+export const DOWNLOAD_UI_CACHE_KEY_PREFIX = 'downloads:member:';
+
+export function downloadUiCachePrefix(memberId: string): string {
+  return `${DOWNLOAD_UI_CACHE_KEY_PREFIX}${memberId}:`;
+}
+
+export function downloadUiCacheKey(memberId: string, performanceId: string): string {
+  return `${downloadUiCachePrefix(memberId)}performance:${performanceId}`;
+}

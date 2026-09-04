@@ -11,10 +11,11 @@ import {
   fetchRandomQuote,
   voteHomePoll,
 } from '../../api';
+import { invalidate } from '../../cache/externalStore';
+import { NEWS_LIST_CACHE_KEY } from '../../cache/keys';
 import { deferred, forumRecentThreadFixture, newsItemFixture, pagedResponse } from '../../test/fixtures';
 import { createMockSession } from '../../test/mockSession';
 import { fakeNavigation, flushVirtualizedList, renderWithProviders } from '../../test/render';
-import { bumpNewsListEpoch } from '../../notifications/newsListEpoch';
 import { testIds } from '../../test/testIds';
 import { HomeScreen } from './HomeScreen';
 
@@ -162,7 +163,7 @@ describe('HomeScreen', () => {
     expect(screen.queryByText('Join the discussion')).toBeNull();
   });
 
-  it('refreshes only the news section when a news push bumps the list epoch', async () => {
+  it('refreshes only the news section when a news push invalidates the list', async () => {
     renderHome();
     await waitFor(() => expect(screen.getByRole('button', { name: 'Live Aid remembered' })).toBeOnTheScreen());
     const newsCalls = fetchNews.mock.calls.length;
@@ -181,7 +182,7 @@ describe('HomeScreen', () => {
     );
 
     await act(async () => {
-      bumpNewsListEpoch();
+      invalidate(NEWS_LIST_CACHE_KEY);
     });
 
     await waitFor(() => expect(screen.getByText('Brand new headline')).toBeOnTheScreen());
@@ -198,7 +199,7 @@ describe('HomeScreen', () => {
     unmount();
 
     await act(async () => {
-      bumpNewsListEpoch();
+      invalidate(NEWS_LIST_CACHE_KEY);
     });
 
     expect(fetchNews.mock.calls.length).toBe(newsCalls);

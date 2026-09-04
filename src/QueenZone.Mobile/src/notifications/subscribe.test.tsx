@@ -1,6 +1,6 @@
 import * as Notifications from 'expo-notifications';
-import { getNewsListEpoch } from './newsListEpoch';
-import { getPmUnreadEpoch } from './pmUnreadEpoch';
+import { getStoreVersion } from '../cache/externalStore';
+import { NEWS_LIST_CACHE_KEY, PM_UNREAD_CACHE_KEY } from '../cache/keys';
 import {
   isDefaultNotificationTap,
   noticeFromNotification,
@@ -301,49 +301,49 @@ describe('subscribeNotificationEvents', () => {
     });
   });
 
-  it('increments the PM epoch on a privateMessage receive only', async () => {
+  it('invalidates the PM unread key on a privateMessage receive only', async () => {
     subscribeNotificationEvents({ onTap: jest.fn(), onForeground: jest.fn() });
     await Promise.resolve();
-    const newsStart = getNewsListEpoch();
-    const pmStart = getPmUnreadEpoch();
+    const newsStart = getStoreVersion(NEWS_LIST_CACHE_KEY);
+    const pmStart = getStoreVersion(PM_UNREAD_CACHE_KEY);
 
     receivedListener?.(notification({ category: 'news', articleId: '1003' }, 'fg-news-for-pm'));
     receivedListener?.(notification({ category: 'forumReply', topicId: '1002' }, 'fg-forum-for-pm'));
-    expect(getPmUnreadEpoch()).toBe(pmStart);
-    expect(getNewsListEpoch()).toBe(newsStart + 1);
+    expect(getStoreVersion(PM_UNREAD_CACHE_KEY)).toBe(pmStart);
+    expect(getStoreVersion(NEWS_LIST_CACHE_KEY)).toBe(newsStart + 1);
 
     receivedListener?.(notification({ category: 'privateMessage', conversationId }, 'fg-pm-epoch'));
-    expect(getPmUnreadEpoch()).toBe(pmStart + 1);
-    expect(getNewsListEpoch()).toBe(newsStart + 1);
+    expect(getStoreVersion(PM_UNREAD_CACHE_KEY)).toBe(pmStart + 1);
+    expect(getStoreVersion(NEWS_LIST_CACHE_KEY)).toBe(newsStart + 1);
 
     responseListener?.(response({ category: 'privateMessage', conversationId }, 'tap-pm-epoch'));
-    expect(getPmUnreadEpoch()).toBe(pmStart + 1);
+    expect(getStoreVersion(PM_UNREAD_CACHE_KEY)).toBe(pmStart + 1);
   });
 
-  it('increments the news epoch on a news receive and tap, but not on other categories', async () => {
+  it('invalidates the news list key on a news receive and tap, but not on other categories', async () => {
     subscribeNotificationEvents({ onTap: jest.fn(), onForeground: jest.fn() });
     await Promise.resolve();
-    const start = getNewsListEpoch();
+    const start = getStoreVersion(NEWS_LIST_CACHE_KEY);
 
     receivedListener?.(notification({ category: 'forumReply', topicId: '1002' }, 'fg-forum'));
     receivedListener?.(notification({ category: 'privateMessage', conversationId }, 'fg-pm'));
-    expect(getNewsListEpoch()).toBe(start);
+    expect(getStoreVersion(NEWS_LIST_CACHE_KEY)).toBe(start);
 
     receivedListener?.(notification({ category: 'news', articleId: '1003' }, 'fg-news'));
-    expect(getNewsListEpoch()).toBe(start + 1);
+    expect(getStoreVersion(NEWS_LIST_CACHE_KEY)).toBe(start + 1);
 
     receivedListener?.(iosNotification({ category: 'news' }, 'fg-news-list'));
-    expect(getNewsListEpoch()).toBe(start + 2);
+    expect(getStoreVersion(NEWS_LIST_CACHE_KEY)).toBe(start + 2);
 
     responseListener?.(response({ category: 'forumReply', topicId: '1002' }, 'tap-forum'));
     responseListener?.(response({ category: 'privateMessage', conversationId }, 'tap-pm'));
-    expect(getNewsListEpoch()).toBe(start + 2);
+    expect(getStoreVersion(NEWS_LIST_CACHE_KEY)).toBe(start + 2);
 
     responseListener?.(response({ category: 'news', articleId: '1003' }, 'tap-news'));
-    expect(getNewsListEpoch()).toBe(start + 3);
+    expect(getStoreVersion(NEWS_LIST_CACHE_KEY)).toBe(start + 3);
 
     responseListener?.(iosResponse({ category: 'news' }, 'tap-news-list'));
-    expect(getNewsListEpoch()).toBe(start + 4);
+    expect(getStoreVersion(NEWS_LIST_CACHE_KEY)).toBe(start + 4);
   });
 
   it('does not handle a last response after unsubscribe', async () => {
