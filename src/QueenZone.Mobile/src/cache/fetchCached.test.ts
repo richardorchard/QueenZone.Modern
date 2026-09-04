@@ -31,7 +31,7 @@ register(
 
 const { ContentCache } = await import('./contentCache.ts');
 const { createMemoryStorage } = await import('./storage.ts');
-const { fetchJsonWithOfflineCache } = await import('./fetchCached.ts');
+const { fetchJsonWithOfflineCache, fetchJsonWithOfflineCacheResult } = await import('./fetchCached.ts');
 
 describe('fetchJsonWithOfflineCache', () => {
   afterEach(() => {
@@ -83,5 +83,101 @@ describe('fetchJsonWithOfflineCache', () => {
     });
 
     assert.deepEqual(result, { id: 42, title: 'cached' });
+  });
+
+  it('shares one in-flight promise across concurrent callers with the same cacheKey', async () => {
+    const cache = new ContentCache({ storage: createMemoryStorage() });
+    let release!: (value: { id: number; title: string }) => void;
+    fetchJsonMock.mock.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          release = resolve;
+        }),
+    );
+
+    const first = fetchJsonWithOfflineCache('/content/news/42', { cacheKey: 'news:42', cache });
+    const second = fetchJsonWithOfflineCache('/content/news/42', { cacheKey: 'news:42', cache });
+    const viaResult = fetchJsonWithOfflineCacheResult('/content/news/42', { cacheKey: 'news:42', cache });
+
+    assert.equal(fetchJsonMock.mock.calls.length, 1);
+
+    release({ id: 42, title: 'shared' });
+    const [fromFirst, fromSecond, fromResult] = await Promise.all([first, second, viaResult]);
+
+    assert.deepEqual(fromFirst, { id: 42, title: 'shared' });
+    assert.deepEqual(fromSecond, { id: 42, title: 'shared' });
+    assert.deepEqual(fromResult.data, { id: 42, title: 'shared' });
+    assert.equal(fetchJsonMock.mock.calls.length, 1);
+  });
+
+  it('does not share in-flight fetches across different cacheKeys', async () => {
+    const cache = new ContentCache({ storage: createMemoryStorage() });
+    const releases: Array<(value: { id: number }) => void> = [];
+    fetchJsonMock.mock.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          releases.push(resolve);
+        }),
+    );
+
+    const first = fetchJsonWithOfflineCache('/content/news/42', { cacheKey: 'news:42', cache });
+    const second = fetchJsonWithOfflineCache('/content/news/43', { cacheKey: 'news:43', cache });
+
+    assert.equal(fetchJsonMock.mock.calls.length, 2);
+    releases[0]!({ id: 42 });
+    releases[1]!({ id: 43 });
+    assert.deepEqual(await Promise.all([first, second]), [{ id: 42 }, { id: 43 }]);
+  });
+
+  it('clears a completed entry so a later call refetches', async () => {
+    const cache = new ContentCache({ storage: createMemoryStorage() });
+    fetchJsonMock.mock.mockImplementation(async () => ({ id: 42, title: 'fresh' }));
+
+    await fetchJsonWithOfflineCache('/content/news/42', { cacheKey: 'news:42', cache });
+    await fetchJsonWithOfflineCache('/content/news/42', { cacheKey: 'news:42', cache });
+
+    assert.equal(fetchJsonMock.mock.calls.length, 2);
+  });
+
+  it('clears a failed entry so a later call can refetch', async () => {
+    const cache = new ContentCache({ storage: createMemoryStorage() });
+    fetchJsonMock.mock.mockImplementation(async () => {
+      throw ApiError.http(500, 'The server had a problem.');
+    });
+
+    await assert.rejects(
+      () => fetchJsonWithOfflineCache('/content/news/42', { cacheKey: 'news:42', cache }),
+      (err: unknown) => err instanceof ApiError && err.status === 500,
+    );
+
+    fetchJsonMock.mock.mockImplementation(async () => ({ id: 42, title: 'recovered' }));
+    const result = await fetchJsonWithOfflineCache('/content/news/42', { cacheKey: 'news:42', cache });
+
+    assert.deepEqual(result, { id: 42, title: 'recovered' });
+    assert.equal(fetchJsonMock.mock.calls.length, 2);
+  });
+
+  it('shares one rejected in-flight promise, then allows a later refetch', async () => {
+    const cache = new ContentCache({ storage: createMemoryStorage() });
+    let rejectFetch!: (err: ApiError) => void;
+    fetchJsonMock.mock.mockImplementation(
+      () =>
+        new Promise((_, reject) => {
+          rejectFetch = reject;
+        }),
+    );
+
+    const first = fetchJsonWithOfflineCache('/content/news/42', { cacheKey: 'news:42', cache });
+    const second = fetchJsonWithOfflineCache('/content/news/42', { cacheKey: 'news:42', cache });
+    assert.equal(fetchJsonMock.mock.calls.length, 1);
+
+    rejectFetch(ApiError.http(503, 'Unavailable.'));
+    await assert.rejects(first, (err: unknown) => err instanceof ApiError && err.status === 503);
+    await assert.rejects(second, (err: unknown) => err instanceof ApiError && err.status === 503);
+
+    fetchJsonMock.mock.mockImplementation(async () => ({ id: 42, title: 'retry' }));
+    const retried = await fetchJsonWithOfflineCache('/content/news/42', { cacheKey: 'news:42', cache });
+    assert.deepEqual(retried, { id: 42, title: 'retry' });
+    assert.equal(fetchJsonMock.mock.calls.length, 2);
   });
 });
