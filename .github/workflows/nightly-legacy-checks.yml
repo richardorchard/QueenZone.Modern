@@ -94,7 +94,7 @@ jobs:
     # workflow_dispatch's skip_sync input lets an on-demand run reuse the
     # existing mirror instead of paying the 3-5 minute sqlpackage extract/publish.
     if: github.event_name != 'workflow_dispatch' || inputs.skip_sync != true
-    timeout-minutes: 15
+    timeout-minutes: 45
     environment: dev
 
     steps:
