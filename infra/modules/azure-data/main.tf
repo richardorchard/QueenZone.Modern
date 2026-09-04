@@ -1,4 +1,11 @@
+locals {
+  sql_server_id   = var.existing_sql_server_id != null ? var.existing_sql_server_id : azapi_resource.sql_server[0].id
+  blob_service_id = var.manage_blob_service ? azapi_resource.blob_service[0].id : "${azapi_resource.storage_account.id}/blobServices/default"
+}
+
 resource "azapi_resource" "sql_server" {
+  count = var.existing_sql_server_id == null ? 1 : 0
+
   type      = "Microsoft.Sql/servers@2025-02-01-preview"
   name      = var.sql_server_name
   parent_id = var.resource_group_id
@@ -40,8 +47,10 @@ resource "azapi_resource" "sql_server" {
 }
 
 resource "azurerm_mssql_firewall_rule" "azure_services" {
+  count = var.create_azure_services_firewall_rule ? 1 : 0
+
   name             = "AllowAllWindowsAzureIps"
-  server_id        = azapi_resource.sql_server.id
+  server_id        = local.sql_server_id
   start_ip_address = "0.0.0.0"
   end_ip_address   = "0.0.0.0"
 
@@ -52,10 +61,10 @@ resource "azurerm_mssql_firewall_rule" "azure_services" {
 
 resource "azurerm_mssql_database" "production" {
   name      = var.sql_database_name
-  server_id = azapi_resource.sql_server.id
+  server_id = local.sql_server_id
 
-  sku_name                            = "S0"
-  max_size_gb                         = 10
+  sku_name                            = var.sql_database_sku_name
+  max_size_gb                         = var.sql_database_max_size_gb
   collation                           = "SQL_Latin1_General_CP1_CI_AS"
   storage_account_type                = "Local"
   zone_redundant                      = false
@@ -81,7 +90,9 @@ resource "azurerm_mssql_database" "production" {
 }
 
 resource "azurerm_mssql_server_extended_auditing_policy" "production" {
-  server_id              = azapi_resource.sql_server.id
+  count = var.create_server_extended_auditing_policy ? 1 : 0
+
+  server_id              = local.sql_server_id
   enabled                = false
   log_monitoring_enabled = false
   retention_in_days      = 0
@@ -116,7 +127,7 @@ resource "azapi_resource" "storage_account" {
     sku = {
       name = "Standard_LRS"
     }
-    properties = {
+    properties = merge({
       accessTier                   = "Hot"
       allowBlobPublicAccess        = true
       allowCrossTenantReplication  = false
@@ -129,9 +140,6 @@ resource "azapi_resource" "storage_account" {
       minimumTlsVersion        = "TLS1_2"
       publicNetworkAccess      = "Enabled"
       supportsHttpsTrafficOnly = true
-      customDomain = {
-        name = "cdn.queenzone.org"
-      }
       encryption = {
         keySource                       = "Microsoft.Storage"
         requireInfrastructureEncryption = false
@@ -153,7 +161,11 @@ resource "azapi_resource" "storage_account" {
         ipv6Rules           = []
         virtualNetworkRules = []
       }
-    }
+      }, var.storage_custom_domain_name == null ? {} : {
+      customDomain = {
+        name = var.storage_custom_domain_name
+      }
+    })
   }
 
   response_export_values = []
@@ -164,6 +176,8 @@ resource "azapi_resource" "storage_account" {
 }
 
 resource "azapi_resource" "blob_service" {
+  count = var.manage_blob_service ? 1 : 0
+
   type      = "Microsoft.Storage/storageAccounts/blobServices@2026-04-01"
   name      = "default"
   parent_id = azapi_resource.storage_account.id
@@ -200,7 +214,7 @@ resource "azapi_resource" "container" {
 
   type      = "Microsoft.Storage/storageAccounts/blobServices/containers@2026-04-01"
   name      = each.key
-  parent_id = azapi_resource.blob_service.id
+  parent_id = local.blob_service_id
 
   body = {
     properties = {
