@@ -65,6 +65,11 @@ public sealed class QueenZoneDbContext : DbContext
 
     public DbSet<PhotoSubmissionAuditLogEntity> PhotoSubmissionAuditLogs => Set<PhotoSubmissionAuditLogEntity>();
 
+    public DbSet<FanPerformanceSubmissionEntity> FanPerformanceSubmissions => Set<FanPerformanceSubmissionEntity>();
+
+    public DbSet<FanPerformanceSubmissionAuditLogEntity> FanPerformanceSubmissionAuditLogs =>
+        Set<FanPerformanceSubmissionAuditLogEntity>();
+
     public DbSet<PhotoAdminAuditLogEntity> PhotoAdminAuditLogs => Set<PhotoAdminAuditLogEntity>();
 
     public DbSet<ArticleSubmissionEntity> ArticleSubmissions => Set<ArticleSubmissionEntity>();
@@ -882,6 +887,60 @@ public sealed class QueenZoneDbContext : DbContext
                 .HasDatabaseName("UX_SearchReindexRunRequests_ActiveKey");
             entity.HasIndex(request => new { request.Status, request.RequestedAtUtc })
                 .HasDatabaseName("IX_SearchReindexRunRequests_Status_RequestedAtUtc");
+        });
+
+        modelBuilder.Entity<FanPerformanceSubmissionEntity>(entity =>
+        {
+            entity.ToTable("FanPerformanceSubmissions");
+            entity.HasKey(submission => submission.Id);
+
+            entity.Property(submission => submission.Title).HasMaxLength(200).IsRequired();
+            entity.Property(submission => submission.CoveredSong).HasMaxLength(200).IsRequired();
+            entity.Property(submission => submission.PerformedBy).HasMaxLength(200).IsRequired();
+            entity.Property(submission => submission.Description).HasMaxLength(2000);
+            entity.Property(submission => submission.BlobPath).HasMaxLength(512).IsRequired();
+            entity.Property(submission => submission.OriginalFileName).HasMaxLength(255).IsRequired();
+            entity.Property(submission => submission.MimeType).HasMaxLength(100).IsRequired();
+            entity.Property(submission => submission.Status).HasMaxLength(50).IsRequired();
+            entity.Property(submission => submission.SubmittedAt).IsRequired();
+            entity.Property(submission => submission.ReviewerEmail).HasMaxLength(256);
+            entity.Property(submission => submission.ReviewNotes).HasMaxLength(500);
+            entity.Property(submission => submission.RejectionReason).HasMaxLength(500);
+            entity.Property(submission => submission.RightsDeclaredAt).IsRequired();
+            entity.Property(submission => submission.RightsDeclarationVersion).HasMaxLength(32).IsRequired();
+
+            entity.HasIndex(submission => new { submission.Status, submission.SubmittedAt })
+                .IsDescending(false, true)
+                .HasDatabaseName("IX_FanPerformanceSubmissions_Status_SubmittedAt");
+
+            entity.HasIndex(submission => new { submission.SubmitterMemberId, submission.SubmittedAt })
+                .IsDescending(false, true)
+                .HasDatabaseName("IX_FanPerformanceSubmissions_Submitter_SubmittedAt");
+
+            entity.HasOne(submission => submission.Submitter)
+                .WithMany()
+                .HasForeignKey(submission => submission.SubmitterMemberId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<FanPerformanceSubmissionAuditLogEntity>(entity =>
+        {
+            entity.ToTable("FanPerformanceSubmissionAuditLog");
+            entity.HasKey(log => log.Id);
+
+            entity.Property(log => log.Action).HasMaxLength(50).IsRequired();
+            entity.Property(log => log.ActorEmail).HasMaxLength(256).IsRequired();
+            entity.Property(log => log.OccurredAt).IsRequired();
+            entity.Property(log => log.Details).HasMaxLength(2000);
+
+            entity.HasIndex(log => new { log.FanPerformanceSubmissionId, log.OccurredAt })
+                .IsDescending(false, true)
+                .HasDatabaseName("IX_FanPerformanceSubmissionAuditLog_Submission_OccurredAt");
+
+            entity.HasOne(log => log.Submission)
+                .WithMany(submission => submission.AuditLogs)
+                .HasForeignKey(log => log.FanPerformanceSubmissionId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<PhotoSubmissionAuditLogEntity>(entity =>

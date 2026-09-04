@@ -33,6 +33,7 @@ public static class SubmissionStatusPresentation
                 or ArticleSubmissionStatus.Rejected
                 or HelpRequestStatus.Spam
                 or PrivateMessageReportStatus.Actioned => "danger",
+            FanPerformanceSubmissionStatus.Withdrawn => "neutral",
             _ => "neutral",
         };
 
@@ -44,6 +45,7 @@ public static class SubmissionStatusPresentation
                 or ArticleSubmissionStatus.UnderReview => "Under review",
             HelpRequestStatus.InProgress => "In progress",
             PhotoSubmissionStatus.NeedsInfo => "Needs info",
+            FanPerformanceSubmissionStatus.Withdrawn => "Withdrawn",
             ArticleSubmissionStatus.RequiresRevision => "Requires revision",
             ArticleSubmissionStatus.ApprovedForPublishing => "Approved for publishing",
             var known when !string.IsNullOrEmpty(known) => known,
