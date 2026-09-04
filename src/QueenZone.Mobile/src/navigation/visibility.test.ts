@@ -54,6 +54,7 @@ describe('shouldHideTabBar', () => {
     for (const name of [
       'Story',
       'Quote',
+      'TimelineEvent',
       'BiographyChapter',
       'Album',
       'Thread',

@@ -32,6 +32,7 @@ export const publicScreenNames = [
   'Discography',
   'Album',
   'Timeline',
+  'TimelineEvent',
   'FreddieTribute',
   'FanPerformances',
   'FanPerformanceDetail',
@@ -85,6 +86,7 @@ export function isMemberOnlyScreen(name: string): boolean {
 export const detailScreenNames = [
   'Story',
   'Quote',
+  'TimelineEvent',
   'BiographyChapter',
   'Album',
   'PhotoViewer',

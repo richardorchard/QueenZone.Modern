@@ -114,6 +114,11 @@ export function fetchTimelinePage(
   return fetchJson('/content/timeline', { query: pageParams(query), signal: query.signal });
 }
 
+/** A published timeline event by id. 404 when missing or unpublished. */
+export function fetchTimelineEventById(id: number, signal?: AbortSignal): Promise<TimelineEvent> {
+  return fetchJson(`/content/timeline/${id}`, { signal });
+}
+
 /** The single most notable history event for today's date, or null when there is none. */
 export function fetchOnThisDay(signal?: AbortSignal): Promise<TimelineEvent | null> {
   return fetchJson('/content/on-this-day', { signal });

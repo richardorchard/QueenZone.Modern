@@ -100,15 +100,26 @@ describe('widgetDeepLink', () => {
     openWidgetDestination({ navigate: navigate as never }, 'queenzone://quotes/9');
   });
 
-  it('navigates a day-face URL onto Archive Timeline with that focusId', () => {
+  it('navigates a day-face URL onto Archive TimelineEvent by id', () => {
     const navigate = (name: string, params: unknown) => {
       assert.equal(name, 'Tabs');
       assert.deepEqual(params, {
         screen: 'ArchiveTab',
-        params: { screen: 'Timeline', params: { focusId: 12 }, initial: false },
+        params: { screen: 'TimelineEvent', params: { id: 12 }, initial: false },
       });
     };
     openWidgetDestination({ navigate: navigate as never }, 'queenzone://timeline/12');
+  });
+
+  it('navigates a deep off-page day-face id onto TimelineEvent, not list focusId', () => {
+    const navigate = (name: string, params: unknown) => {
+      assert.equal(name, 'Tabs');
+      assert.deepEqual(params, {
+        screen: 'ArchiveTab',
+        params: { screen: 'TimelineEvent', params: { id: 9999 }, initial: false },
+      });
+    };
+    openWidgetDestination({ navigate: navigate as never }, 'queenzone://timeline/9999');
   });
 
   it('navigates a trivia URL onto Archive Trivia', () => {

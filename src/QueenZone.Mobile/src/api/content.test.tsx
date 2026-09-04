@@ -13,6 +13,7 @@ import {
   fetchNewsDetail,
   fetchNewsPage,
   fetchOnThisDay,
+  fetchTimelineEventById,
   fetchPhotoCategories,
   fetchPhotoCategory,
   fetchPhotoCategoryItems,
@@ -115,6 +116,26 @@ describe('fetchTimelinePage and fetchOnThisDay', () => {
     const event = await fetchOnThisDay();
     expect(lastUrl()).toBe('http://qz.test/api/v1/content/on-this-day');
     expect(event).toBeNull();
+  });
+});
+
+describe('fetchTimelineEventById', () => {
+  it('requests a published event by id, including deep off-page ids', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        id: 9999,
+        title: 'Deep off-page event',
+        summary: 'Would sit many pages down the chronological list.',
+        eventDate: '1985-07-13T00:00:00Z',
+        formattedDate: '13 July 1985',
+        category: 'live',
+        categoryLabel: 'Live',
+        sourceUrl: null,
+      }),
+    );
+    const event = await fetchTimelineEventById(9999);
+    expect(lastUrl()).toBe('http://qz.test/api/v1/content/timeline/9999');
+    expect(event).toMatchObject({ id: 9999, title: 'Deep off-page event' });
   });
 });
 
