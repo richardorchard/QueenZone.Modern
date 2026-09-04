@@ -163,6 +163,12 @@ public sealed class EfFanPerformanceSubmissionRepository(QueenZoneDbContext dbCo
         }
 
         var next = FanPerformanceSubmissionStatus.Normalize(status);
+        var normalizedRejection = NormalizeOptional(rejectionReason, 500);
+        if (next == FanPerformanceSubmissionStatus.Rejected && normalizedRejection is null)
+        {
+            throw new InvalidOperationException("A rejection reason is required.");
+        }
+
         entity.Status = next;
         entity.ReviewedAt = DateTimeOffset.UtcNow;
         if (!string.IsNullOrWhiteSpace(actorEmail))
@@ -177,12 +183,11 @@ public sealed class EfFanPerformanceSubmissionRepository(QueenZoneDbContext dbCo
 
         if (next == FanPerformanceSubmissionStatus.Rejected)
         {
-            entity.RejectionReason = NormalizeOptional(rejectionReason, 500)
-                ?? throw new InvalidOperationException("A rejection reason is required.");
+            entity.RejectionReason = normalizedRejection;
         }
-        else if (!string.IsNullOrWhiteSpace(rejectionReason))
+        else if (normalizedRejection is not null)
         {
-            entity.RejectionReason = NormalizeOptional(rejectionReason, 500);
+            entity.RejectionReason = normalizedRejection;
         }
 
         dbContext.FanPerformanceSubmissionAuditLogs.Add(new FanPerformanceSubmissionAuditLogEntity
