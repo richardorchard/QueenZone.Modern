@@ -60,8 +60,11 @@ that the Static Web App itself has been decommissioned.
 In Phase 3 (#1267), finish decommissioning the APK site, set the CNAME directly
 to `queenzone-devbox.azurewebsites.net`, publish Azure's ownership TXT value
 where required, and then enable the custom-domain option in committed HCL.
-That creates the hostname binding, Azure-managed certificate and SNI binding,
-and restores Cloudflare-only app ingress. Do not enable it before DNS is ready.
+That creates the hostname binding, Azure-managed certificate and SNI binding.
+Keep dev ingress direct: the CNAME must remain DNS-only for Azure-managed
+certificate issuance and renewal, so Cloudflare-only ingress is not compatible
+with this certificate choice. Production retains its Cloudflare-only ingress.
+Do not enable the hostname before DNS is ready.
 
 Managed certificates require no supplied PFX/private key, so they avoid the
 production uploaded-certificate exception. Azure requires a direct CNAME for
