@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using QueenZone.Data;
+using QueenZone.Routing;
 using QueenZone.Storage;
 using QueenZone.Web;
 using QueenZone.Web.Pages.Admin.FanPerformanceSubmissions;
@@ -165,6 +166,9 @@ public sealed partial class FanPerformanceAdminRoutesTests : IClassFixture<WebAp
         var memberHistory = await memberClient.GetStringAsync("/account/my-submissions?tab=performances");
         Assert.Contains("Not a Queen cover", memberHistory);
         Assert.Contains("Please name the song", memberHistory);
+        Assert.DoesNotContain("internal", memberHistory);
+        Assert.Contains(FanPerformanceRoutes.GetPublicPath(approved.PromotedStageId!.Value), memberHistory);
+        Assert.Contains("View live performance", memberHistory);
 
         var publicPage = await factory.CreateClient().GetStringAsync("/fan-performances");
         Assert.Contains("Published title", publicPage);

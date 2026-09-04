@@ -379,9 +379,11 @@ public sealed class FanPerformanceSubmissionPromotionServiceTests
             CancellationToken cancellationToken = default) =>
             throw new InvalidOperationException("Simulated DB write failure after blob upload.");
 
-        public Task<SubmissionTypeCounts> GetDashboardCountsAsync(
-            DateTimeOffset utcNow, CancellationToken cancellationToken = default) =>
-            inner.GetDashboardCountsAsync(utcNow, cancellationToken);
+        public Task<FanPerformanceDashboardCounts> GetDashboardCountsAsync(
+            DateTimeOffset utcNow,
+            int staleAfterDays = FanPerformanceDashboardCounts.DefaultStaleAfterDays,
+            CancellationToken cancellationToken = default) =>
+            inner.GetDashboardCountsAsync(utcNow, staleAfterDays, cancellationToken);
 
         public Task<IReadOnlyList<SubmissionContributor>> GetTopContributorsThisMonthAsync(
             DateTimeOffset monthStart, int maxCount, CancellationToken cancellationToken = default) =>
@@ -449,9 +451,11 @@ public sealed class FanPerformanceSubmissionPromotionServiceTests
             throw new InvalidOperationException("Simulated concurrent approve lost the Q_STAGE_T race.");
         }
 
-        public Task<SubmissionTypeCounts> GetDashboardCountsAsync(
-            DateTimeOffset utcNow, CancellationToken cancellationToken = default) =>
-            inner.GetDashboardCountsAsync(utcNow, cancellationToken);
+        public Task<FanPerformanceDashboardCounts> GetDashboardCountsAsync(
+            DateTimeOffset utcNow,
+            int staleAfterDays = FanPerformanceDashboardCounts.DefaultStaleAfterDays,
+            CancellationToken cancellationToken = default) =>
+            inner.GetDashboardCountsAsync(utcNow, staleAfterDays, cancellationToken);
 
         public Task<IReadOnlyList<SubmissionContributor>> GetTopContributorsThisMonthAsync(
             DateTimeOffset monthStart, int maxCount, CancellationToken cancellationToken = default) =>

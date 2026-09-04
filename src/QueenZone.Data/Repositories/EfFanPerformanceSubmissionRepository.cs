@@ -369,12 +369,13 @@ public sealed class EfFanPerformanceSubmissionRepository(QueenZoneDbContext dbCo
         return Map(entity);
     }
 
-    public Task<SubmissionTypeCounts> GetDashboardCountsAsync(
+    public Task<FanPerformanceDashboardCounts> GetDashboardCountsAsync(
         DateTimeOffset utcNow,
+        int staleAfterDays = FanPerformanceDashboardCounts.DefaultStaleAfterDays,
         CancellationToken cancellationToken = default) =>
         IsSqliteDatabase()
-            ? GetDashboardCountsInMemoryAsync(utcNow, cancellationToken)
-            : GetDashboardCountsViaSqlAggregateAsync(utcNow, cancellationToken);
+            ? GetDashboardCountsInMemoryAsync(utcNow, staleAfterDays, cancellationToken)
+            : GetDashboardCountsViaSqlAggregateAsync(utcNow, staleAfterDays, cancellationToken);
 
     public Task<IReadOnlyList<SubmissionContributor>> GetTopContributorsThisMonthAsync(
         DateTimeOffset monthStart,
@@ -473,63 +474,81 @@ public sealed class EfFanPerformanceSubmissionRepository(QueenZoneDbContext dbCo
                 row.Submitter != null ? row.Submitter.DisplayName : null,
                 row.Submitter != null ? row.Submitter.Email : null));
 
-    private async Task<SubmissionTypeCounts> GetDashboardCountsInMemoryAsync(
+    private async Task<FanPerformanceDashboardCounts> GetDashboardCountsInMemoryAsync(
         DateTimeOffset utcNow,
+        int staleAfterDays,
         CancellationToken cancellationToken)
     {
-        var monthAgo = utcNow.AddDays(-30);
-        var today = utcNow.UtcDateTime.Date;
-        var weekAgo = today.AddDays(-6);
-
         var rows = await dbContext.FanPerformanceSubmissions
             .AsNoTracking()
             .Select(row => new { row.Status, row.SubmittedAt })
             .ToListAsync(cancellationToken);
 
-        var pending = rows.Count(row =>
-            row.Status is FanPerformanceSubmissionStatus.Pending
-                or FanPerformanceSubmissionStatus.UnderReview
-                or FanPerformanceSubmissionStatus.NeedsInfo);
-        var receivedToday = rows.Count(row => row.SubmittedAt.UtcDateTime.Date >= today);
-        var receivedThisWeek = rows.Count(row => row.SubmittedAt.UtcDateTime.Date >= weekAgo);
-        var last30 = rows.Where(row => row.SubmittedAt >= monthAgo).ToList();
-        var approvedLast30 = last30.Count(row => row.Status == FanPerformanceSubmissionStatus.Approved);
-        var rejectedLast30 = last30.Count(row => row.Status == FanPerformanceSubmissionStatus.Rejected);
-        var pendingLast30 = last30.Count(row =>
-            row.Status is FanPerformanceSubmissionStatus.Pending
-                or FanPerformanceSubmissionStatus.UnderReview
-                or FanPerformanceSubmissionStatus.NeedsInfo);
-
-        return new SubmissionTypeCounts(
-            pending, receivedToday, receivedThisWeek, approvedLast30, rejectedLast30, pendingLast30);
+        return FanPerformanceDashboardCountCalculator.FromRows(
+            rows.Select(row => (row.Status, row.SubmittedAt)).ToList(),
+            utcNow,
+            staleAfterDays);
     }
 
-    private async Task<SubmissionTypeCounts> GetDashboardCountsViaSqlAggregateAsync(
+    private async Task<FanPerformanceDashboardCounts> GetDashboardCountsViaSqlAggregateAsync(
         DateTimeOffset utcNow,
+        int staleAfterDays,
         CancellationToken cancellationToken)
     {
+        staleAfterDays = FanPerformanceDashboardCountCalculator.NormalizeStaleAfterDays(staleAfterDays);
         var monthAgo = utcNow.AddDays(-30);
         var todayUtc = new DateTimeOffset(utcNow.UtcDateTime.Date, TimeSpan.Zero);
         var weekAgoUtc = todayUtc.AddDays(-6);
+        var staleCutoff = utcNow.AddDays(-staleAfterDays);
 
         var counts = await dbContext.FanPerformanceSubmissions
             .AsNoTracking()
             .GroupBy(_ => 1)
-            .Select(group => new SubmissionTypeCounts(
-                group.Count(row => row.Status == FanPerformanceSubmissionStatus.Pending
+            .Select(group => new
+            {
+                Pending = group.Count(row => row.Status == FanPerformanceSubmissionStatus.Pending
                     || row.Status == FanPerformanceSubmissionStatus.UnderReview
                     || row.Status == FanPerformanceSubmissionStatus.NeedsInfo),
-                group.Count(row => row.SubmittedAt >= todayUtc),
-                group.Count(row => row.SubmittedAt >= weekAgoUtc),
-                group.Count(row => row.SubmittedAt >= monthAgo && row.Status == FanPerformanceSubmissionStatus.Approved),
-                group.Count(row => row.SubmittedAt >= monthAgo && row.Status == FanPerformanceSubmissionStatus.Rejected),
-                group.Count(row => row.SubmittedAt >= monthAgo
+                ReceivedToday = group.Count(row => row.SubmittedAt >= todayUtc),
+                ReceivedThisWeek = group.Count(row => row.SubmittedAt >= weekAgoUtc),
+                ApprovedLast30Days = group.Count(row =>
+                    row.SubmittedAt >= monthAgo && row.Status == FanPerformanceSubmissionStatus.Approved),
+                RejectedLast30Days = group.Count(row =>
+                    row.SubmittedAt >= monthAgo && row.Status == FanPerformanceSubmissionStatus.Rejected),
+                StillPendingFromLast30Days = group.Count(row =>
+                    row.SubmittedAt >= monthAgo
                     && (row.Status == FanPerformanceSubmissionStatus.Pending
                         || row.Status == FanPerformanceSubmissionStatus.UnderReview
-                        || row.Status == FanPerformanceSubmissionStatus.NeedsInfo))))
+                        || row.Status == FanPerformanceSubmissionStatus.NeedsInfo)),
+                StalePendingCount = group.Count(row =>
+                    (row.Status == FanPerformanceSubmissionStatus.Pending
+                        || row.Status == FanPerformanceSubmissionStatus.UnderReview
+                        || row.Status == FanPerformanceSubmissionStatus.NeedsInfo)
+                    && row.SubmittedAt <= staleCutoff),
+                OldestOpenSubmittedAt = group
+                    .Where(row => row.Status == FanPerformanceSubmissionStatus.Pending
+                        || row.Status == FanPerformanceSubmissionStatus.UnderReview
+                        || row.Status == FanPerformanceSubmissionStatus.NeedsInfo)
+                    .Select(row => (DateTimeOffset?)row.SubmittedAt)
+                    .Min(),
+            })
             .SingleOrDefaultAsync(cancellationToken);
 
-        return counts ?? SubmissionTypeCounts.Empty;
+        if (counts is null)
+        {
+            return FanPerformanceDashboardCounts.Empty;
+        }
+
+        return new FanPerformanceDashboardCounts(
+            new SubmissionTypeCounts(
+                counts.Pending,
+                counts.ReceivedToday,
+                counts.ReceivedThisWeek,
+                counts.ApprovedLast30Days,
+                counts.RejectedLast30Days,
+                counts.StillPendingFromLast30Days),
+            counts.StalePendingCount,
+            FanPerformanceDashboardCountCalculator.ToOldestOpenAgeDays(utcNow, counts.OldestOpenSubmittedAt));
     }
 
     private async Task<IReadOnlyList<SubmissionContributor>> GetTopContributorsInMemoryAsync(

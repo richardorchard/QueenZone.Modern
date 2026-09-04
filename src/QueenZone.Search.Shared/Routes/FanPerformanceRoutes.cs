@@ -8,6 +8,10 @@ public static class FanPerformanceRoutes
 
     public static string GetIndexPath() => "/fan-performances";
 
+    public static string GetPublicItemAnchorId(int id) => $"fan-performance-{id}";
+
+    public static string GetPublicPath(int id) => $"{GetIndexPath()}#{GetPublicItemAnchorId(id)}";
+
     public static string GetPagePath(int page) =>
         page <= 1 ? GetIndexPath() : $"/fan-performances/page/{page}";
 

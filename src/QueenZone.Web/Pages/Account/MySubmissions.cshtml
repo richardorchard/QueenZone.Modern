@@ -110,6 +110,8 @@
           <tbody>
             @foreach (var item in Model.FanPerformanceSubmissions)
             {
+              var memberNotes = FanPerformanceSubmissionFeedback.GetMemberFacingNotes(item);
+              var publishedPath = FanPerformanceSubmissionFeedback.GetPublishedPath(item);
               <tr>
                 <td>
                   @item.Title
@@ -118,17 +120,16 @@
                 <td><partial name="_SubmissionStatusBadge" model="item.Status" /></td>
                 <td>@item.SubmittedAt.ToString("u")</td>
                 <td>
-                  @if (item.Status == FanPerformanceSubmissionStatus.Rejected
-                       && !string.IsNullOrWhiteSpace(item.RejectionReason))
+                  @if (memberNotes is not null)
                   {
-                    <span>@item.RejectionReason</span>
-                  }
-                  else if (!string.IsNullOrWhiteSpace(item.ReviewNotes))
-                  {
-                    <span>@item.ReviewNotes</span>
+                    <span>@memberNotes</span>
                   }
                 </td>
                 <td>
+                  @if (publishedPath is not null)
+                  {
+                    <a href="@publishedPath">View live performance</a>
+                  }
                   @if (FanPerformanceSubmissionWorkflow.CanMemberWithdraw(item.Status))
                   {
                     <form method="post" asp-page-handler="WithdrawFanPerformance" class="qz-account-form">

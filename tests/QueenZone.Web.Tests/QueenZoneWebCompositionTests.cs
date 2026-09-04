@@ -83,6 +83,7 @@ public sealed class QueenZoneWebCompositionTests
         Assert.Equal(60, provider.GetRequiredService<IOptions<AnalyticsOptions>>().Value.TrafficCacheMinutes);
         Assert.Null(provider.GetRequiredService<IOptions<MemberAuthenticationOptions>>().Value.Google?.ClientId);
         Assert.Equal(10, provider.GetRequiredService<IOptions<FanPerformanceRateLimitingOptions>>().Value.AudioPermitLimit);
+        Assert.Equal(7, provider.GetRequiredService<IOptions<FanPerformanceSubmissionOptions>>().Value.StaleAfterDays);
         Assert.Equal(30, provider.GetRequiredService<IOptions<AuthRateLimitingOptions>>().Value.IpPermitLimit);
         Assert.Equal(10, provider.GetRequiredService<IOptions<AuthRateLimitingOptions>>().Value.AccountPermitLimit);
         Assert.Equal(10 * 1024 * 1024, provider.GetRequiredService<IOptions<BlobUploadOptions>>().Value.DefaultMaxBytes);

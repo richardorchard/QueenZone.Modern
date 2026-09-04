@@ -54,8 +54,9 @@ public interface IFanPerformanceSubmissionRepository
         string? reviewNotes,
         CancellationToken cancellationToken = default);
 
-    Task<SubmissionTypeCounts> GetDashboardCountsAsync(
+    Task<FanPerformanceDashboardCounts> GetDashboardCountsAsync(
         DateTimeOffset utcNow,
+        int staleAfterDays = FanPerformanceDashboardCounts.DefaultStaleAfterDays,
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<SubmissionContributor>> GetTopContributorsThisMonthAsync(

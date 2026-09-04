@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using QueenZone.Data;
+using QueenZone.Routing;
 using QueenZone.Storage;
 using QueenZone.Web;
 using SixLabors.ImageSharp;
@@ -138,6 +139,88 @@ public sealed partial class MySubmissionsPageTests : IClassFixture<WebApplicatio
         Assert.Contains("Draft link target article", editPage);
     }
 
+    [Fact]
+    public async Task Get_FanPerformanceApproved_ShowsLivePublicLink_NotReviewNotes()
+    {
+        var client = await CreateSignedInMemberClientAsync(
+            email: "mysubs-approved-perf@example.com",
+            displayName: "Approved Perf Fan",
+            subject: "google-mysubs-approved-perf",
+            options: new WebApplicationFactoryClientOptions
+            {
+                HandleCookies = true,
+                AllowAutoRedirect = false,
+            });
+
+        var submissionId = await SubmitFanPerformanceAsync(client, "Approved live performance");
+        var repository = factory.Services.GetRequiredService<IFanPerformanceSubmissionRepository>();
+        await repository.PromoteAsync(submissionId, 187, "admin@test.local", "internal approve note");
+
+        var page = await client.GetStringAsync("/account/my-submissions?tab=performances");
+        Assert.Contains("Approved live performance", page);
+        Assert.Contains("View live performance", page);
+        Assert.Contains(FanPerformanceRoutes.GetPublicPath(187), page);
+        Assert.DoesNotContain("internal approve note", page);
+    }
+
+    [Fact]
+    public async Task Get_FanPerformanceRejected_ShowsRejectionReason_NotReviewNotes()
+    {
+        var client = await CreateSignedInMemberClientAsync(
+            email: "mysubs-rejected-perf@example.com",
+            displayName: "Rejected Perf Fan",
+            subject: "google-mysubs-rejected-perf",
+            options: new WebApplicationFactoryClientOptions
+            {
+                HandleCookies = true,
+                AllowAutoRedirect = false,
+            });
+
+        var submissionId = await SubmitFanPerformanceAsync(client, "Rejected live performance");
+        var repository = factory.Services.GetRequiredService<IFanPerformanceSubmissionRepository>();
+        await repository.UpdateStatusAsync(
+            submissionId,
+            FanPerformanceSubmissionStatus.Rejected,
+            "admin@test.local",
+            "internal reject note",
+            "Not a Queen cover");
+
+        var page = await client.GetStringAsync("/account/my-submissions?tab=performances");
+        Assert.Contains("Rejected live performance", page);
+        Assert.Contains("Not a Queen cover", page);
+        Assert.DoesNotContain("internal reject note", page);
+        Assert.DoesNotContain("View live performance", page);
+    }
+
+    [Fact]
+    public async Task Get_FanPerformanceNeedsInfo_ShowsReviewNotesAsk()
+    {
+        var client = await CreateSignedInMemberClientAsync(
+            email: "mysubs-needsinfo-perf@example.com",
+            displayName: "NeedsInfo Perf Fan",
+            subject: "google-mysubs-needsinfo-perf",
+            options: new WebApplicationFactoryClientOptions
+            {
+                HandleCookies = true,
+                AllowAutoRedirect = false,
+            });
+
+        var submissionId = await SubmitFanPerformanceAsync(client, "Needs info performance");
+        var repository = factory.Services.GetRequiredService<IFanPerformanceSubmissionRepository>();
+        await repository.UpdateStatusAsync(
+            submissionId,
+            FanPerformanceSubmissionStatus.NeedsInfo,
+            "admin@test.local",
+            "Please name the Queen song",
+            null);
+
+        var page = await client.GetStringAsync("/account/my-submissions?tab=performances");
+        Assert.Contains("Needs info performance", page);
+        Assert.Contains("Please name the Queen song", page);
+        Assert.Contains("Needs info", page);
+        Assert.DoesNotContain("View live performance", page);
+    }
+
     private async Task SubmitPhotoAsync(HttpClient client, string title)
     {
         var formPage = await client.GetStringAsync("/submit/photo");
@@ -183,7 +266,7 @@ public sealed partial class MySubmissionsPageTests : IClassFixture<WebApplicatio
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
     }
 
-    private async Task SubmitFanPerformanceAsync(HttpClient client, string title)
+    private async Task<Guid> SubmitFanPerformanceAsync(HttpClient client, string title)
     {
         var formPage = await client.GetStringAsync("/submit/fan-performance");
         using var content = new MultipartFormDataContent();
@@ -200,6 +283,7 @@ public sealed partial class MySubmissionsPageTests : IClassFixture<WebApplicatio
 
         var response = await client.PostAsync("/submit/fan-performance", content);
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        return Guid.Parse(response.Headers.Location!.OriginalString.Split('/').Last());
     }
 
     private async Task<Guid> SubmitArticleAsync(HttpClient client, string title)

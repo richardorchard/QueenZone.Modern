@@ -293,6 +293,62 @@ public sealed class AdminDashboardEfSubmissionQueueTests : IAsyncLifetime
         var counts = await repo.GetDashboardCountsAsync(DateTimeOffset.UtcNow);
         Assert.Equal(1, counts.Pending);
         Assert.Equal(1, counts.ReceivedToday);
+        Assert.Equal(0, counts.StalePendingCount);
+    }
+
+    [Fact]
+    public async Task EfFanPerformance_GetDashboardCounts_CountsStaleOpenItems_WithDefaultSevenDays()
+    {
+        var memberId = Guid.NewGuid();
+        dbContext.MemberAccounts.Add(new MemberAccount
+        {
+            Id = memberId,
+            Email = "fanperf-stale@example.com",
+            NormalizedEmail = "FANPERF-STALE@EXAMPLE.COM",
+            DisplayName = "Stale Fan",
+            CreatedAt = DateTime.UtcNow,
+        });
+        await dbContext.SaveChangesAsync();
+
+        var repo = new EfFanPerformanceSubmissionRepository(dbContext);
+        var utcNow = new DateTimeOffset(2026, 9, 4, 12, 0, 0, TimeSpan.Zero);
+        var fresh = await repo.CreateAsync(new NewFanPerformanceSubmission(
+            memberId,
+            "Fresh cover",
+            "Song",
+            "Stale Fan",
+            null,
+            "members/x/fresh.mp3",
+            "fresh.mp3",
+            1024,
+            "audio/mpeg",
+            60,
+            DateTimeOffset.UtcNow,
+            FanPerformanceSubmissionRights.DeclarationVersion));
+        var stale = await repo.CreateAsync(new NewFanPerformanceSubmission(
+            memberId,
+            "Stale cover",
+            "Song",
+            "Stale Fan",
+            null,
+            "members/x/stale.mp3",
+            "stale.mp3",
+            1024,
+            "audio/mpeg",
+            60,
+            DateTimeOffset.UtcNow,
+            FanPerformanceSubmissionRights.DeclarationVersion));
+
+        var freshEntity = await dbContext.FanPerformanceSubmissions.SingleAsync(row => row.Id == fresh.Id);
+        var staleEntity = await dbContext.FanPerformanceSubmissions.SingleAsync(row => row.Id == stale.Id);
+        freshEntity.SubmittedAt = utcNow.AddDays(-6);
+        staleEntity.SubmittedAt = utcNow.AddDays(-8);
+        await dbContext.SaveChangesAsync();
+
+        var counts = await repo.GetDashboardCountsAsync(utcNow);
+        Assert.Equal(2, counts.Pending);
+        Assert.Equal(1, counts.StalePendingCount);
+        Assert.Equal(8, counts.OldestOpenAgeDays);
     }
 
     private static ArticleSubmissionDraft SampleArticleDraft(Guid memberId, string title = "Test Article") =>

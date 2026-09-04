@@ -294,11 +294,25 @@
         <span class="admin-dashboard__queue-tile-sub">member suggestions</span>
       </a>
 
-      <a class="admin-dashboard__queue-tile" href="/admin/fan-performance-submissions">
+      <a class="admin-dashboard__queue-tile@(Model.SubmissionQueue.FanPerformances.StalePendingCount > 0 ? " admin-dashboard__queue-tile--warning" : null)" href="/admin/fan-performance-submissions">
         <span class="admin-dashboard__queue-tile-label">Fan performances</span>
         <span class="admin-dashboard__queue-tile-count">@Model.SubmissionQueue.FanPerformances.Pending</span>
         <span class="admin-dashboard__queue-tile-sub">pending review</span>
         <span class="admin-dashboard__queue-tile-meta">Today: @Model.SubmissionQueue.FanPerformances.ReceivedToday &nbsp;&middot;&nbsp; This week: @Model.SubmissionQueue.FanPerformances.ReceivedThisWeek</span>
+        @if (Model.SubmissionQueue.FanPerformances.StalePendingCount > 0)
+        {
+          <span class="admin-dashboard__queue-tile-stale">
+            @Model.SubmissionQueue.FanPerformances.StalePendingCount stale
+            @if (Model.SubmissionQueue.FanPerformances.OldestOpenAgeDays is int oldestDays)
+            {
+              <text> &nbsp;&middot;&nbsp; oldest waiting @oldestDays days</text>
+            }
+          </span>
+        }
+        else if (Model.SubmissionQueue.FanPerformances.OldestOpenAgeDays is int oldestWaitingDays)
+        {
+          <span class="admin-dashboard__queue-tile-meta">Oldest waiting @oldestWaitingDays days</span>
+        }
       </a>
 
     </div>

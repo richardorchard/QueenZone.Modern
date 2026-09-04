@@ -3167,6 +3167,17 @@ a.qz-forum-post__author-link:focus-visible {
   margin-top: 0.35rem;
 }
 
+.admin-dashboard__queue-tile--warning {
+  border-color: #b45309;
+  background: #fffbeb;
+}
+
+.admin-dashboard__queue-tile-stale {
+  font-size: 0.8125rem;
+  color: #92400e;
+  margin-top: 0.35rem;
+}
+
 .admin-dashboard__approval-rate {
   display: flex;
   flex-wrap: wrap;
