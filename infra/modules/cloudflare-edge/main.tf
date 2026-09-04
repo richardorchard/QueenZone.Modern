@@ -143,7 +143,7 @@ resource "cloudflare_dns_record" "dev" {
   zone_id = var.zone_id
   name    = "dev.queenzone.org"
   type    = "CNAME"
-  content = "lively-mushroom-017550800.7.azurestaticapps.net"
+  content = "queenzone-devbox.azurewebsites.net"
   ttl     = 1
   proxied = false
   comment = "Azure Static Web App mobile test-build downloads (#809)"

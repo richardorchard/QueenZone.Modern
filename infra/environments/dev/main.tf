@@ -20,7 +20,10 @@ module "azure_web" {
   worker_count                 = 1
   custom_hostnames             = {}
   managed_hostnames            = var.enable_custom_domain ? ["dev.queenzone.org"] : []
-  allow_direct_access          = !var.enable_custom_domain
+  # Azure-managed certificates require a direct CNAME for issuance and
+  # renewal. dev.queenzone.org therefore stays DNS-only and this dev-only app
+  # remains directly reachable; production retains Cloudflare-only ingress.
+  allow_direct_access = true
 }
 
 # The logical server is an existing production-owned resource in Queenzone-RG.
