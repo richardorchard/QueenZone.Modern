@@ -3,6 +3,9 @@ namespace QueenZone.Data;
 public static class FanPerformanceSubmissionRights
 {
     public const string DeclarationVersion = "2026-09-v1";
+
+    public static bool IsRecorded(DateTimeOffset declaredAt, string? version) =>
+        declaredAt != default && !string.IsNullOrWhiteSpace(version);
 }
 
 public sealed record FanPerformanceSubmission(
@@ -43,3 +46,28 @@ public sealed record NewFanPerformanceSubmission(
     DateTimeOffset RightsDeclaredAt,
     string RightsDeclarationVersion,
     Guid? Id = null);
+
+public sealed record FanPerformanceSubmissionListItem(
+    Guid Id,
+    string Title,
+    string CoveredSong,
+    string PerformedBy,
+    Guid SubmitterMemberId,
+    string SubmitterDisplayName,
+    DateTimeOffset SubmittedAt,
+    int? DurationSeconds,
+    long FileSizeBytes,
+    string Status);
+
+public sealed record FanPerformanceSubmissionAuditEntry(
+    long Id,
+    string Action,
+    string ActorEmail,
+    DateTimeOffset OccurredAt,
+    string? Details);
+
+public sealed record FanPerformanceReviewEdits(
+    string? Title,
+    string? PerformedBy,
+    string? Description,
+    string? CoveredSong);

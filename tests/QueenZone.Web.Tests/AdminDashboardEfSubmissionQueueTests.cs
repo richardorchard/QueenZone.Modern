@@ -261,6 +261,40 @@ public sealed class AdminDashboardEfSubmissionQueueTests : IAsyncLifetime
             SubmitterDisplayName: null,
             SubmitterEmail: null);
 
+    [Fact]
+    public async Task EfFanPerformance_GetDashboardCounts_CountsPending()
+    {
+        var memberId = Guid.NewGuid();
+        dbContext.MemberAccounts.Add(new MemberAccount
+        {
+            Id = memberId,
+            Email = "fanperf-dash@example.com",
+            NormalizedEmail = "FANPERF-DASH@EXAMPLE.COM",
+            DisplayName = "Dash Fan",
+            CreatedAt = DateTime.UtcNow,
+        });
+        await dbContext.SaveChangesAsync();
+
+        var repo = new EfFanPerformanceSubmissionRepository(dbContext);
+        await repo.CreateAsync(new NewFanPerformanceSubmission(
+            memberId,
+            "Dash cover",
+            "Song",
+            "Dash Fan",
+            null,
+            "members/x/cover.mp3",
+            "cover.mp3",
+            1024,
+            "audio/mpeg",
+            60,
+            DateTimeOffset.UtcNow,
+            FanPerformanceSubmissionRights.DeclarationVersion));
+
+        var counts = await repo.GetDashboardCountsAsync(DateTimeOffset.UtcNow);
+        Assert.Equal(1, counts.Pending);
+        Assert.Equal(1, counts.ReceivedToday);
+    }
+
     private static ArticleSubmissionDraft SampleArticleDraft(Guid memberId, string title = "Test Article") =>
         new(
             Id: null,

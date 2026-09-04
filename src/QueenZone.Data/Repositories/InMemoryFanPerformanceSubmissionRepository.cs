@@ -48,6 +48,64 @@ public sealed class InMemoryFanPerformanceSubmissionRepository : IFanPerformance
         }
     }
 
+    public Task<IReadOnlyList<FanPerformanceSubmissionListItem>> GetPendingAsync(
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, 100);
+
+        lock (sync)
+        {
+            IReadOnlyList<FanPerformanceSubmissionListItem> result = submissions
+                .Where(row => FanPerformanceSubmissionWorkflow.CanAdminAct(row.Status))
+                .OrderByDescending(row => row.SubmittedAt)
+                .ThenBy(row => row.Id)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(row =>
+                {
+                    var member = resolveMember?.Invoke(row.SubmitterMemberId);
+                    return new FanPerformanceSubmissionListItem(
+                        row.Id,
+                        row.Title,
+                        row.CoveredSong,
+                        row.PerformedBy,
+                        row.SubmitterMemberId,
+                        member?.DisplayName ?? "Unknown member",
+                        row.SubmittedAt,
+                        row.DurationSeconds,
+                        row.FileSizeBytes,
+                        row.Status);
+                })
+                .ToList();
+
+            return Task.FromResult(result);
+        }
+    }
+
+    public Task<IReadOnlyList<FanPerformanceSubmissionAuditEntry>> GetAuditLogsAsync(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        lock (sync)
+        {
+            IReadOnlyList<FanPerformanceSubmissionAuditEntry> result = auditLogs
+                .Where(log => log.FanPerformanceSubmissionId == id)
+                .OrderByDescending(log => log.OccurredAt)
+                .ThenByDescending(log => log.Id)
+                .Select(log => new FanPerformanceSubmissionAuditEntry(
+                    log.Id,
+                    log.Action,
+                    log.ActorEmail,
+                    log.OccurredAt,
+                    log.Details))
+                .ToList();
+            return Task.FromResult(result);
+        }
+    }
+
     public Task<SubmissionListPage<FanPerformanceSubmission>> GetBySubmitterAsync(
         Guid submitterMemberId,
         int page = 1,
@@ -91,7 +149,7 @@ public sealed class InMemoryFanPerformanceSubmissionRepository : IFanPerformance
                 return Task.FromResult<FanPerformanceSubmission?>(null);
             }
 
-            ApplyStatusChange(entity, status, actorEmail, reviewNotes, rejectionReason);
+            ApplyStatusChange(entity, status, actorEmail, reviewNotes, rejectionReason, requireNeedsInfoNotes: true);
             auditLogs.Add(new FanPerformanceSubmissionAuditLogEntity
             {
                 Id = nextAuditId++,
@@ -106,12 +164,175 @@ public sealed class InMemoryFanPerformanceSubmissionRepository : IFanPerformance
         }
     }
 
+    public Task<FanPerformanceSubmission?> UpdateReviewMetadataAsync(
+        Guid id,
+        FanPerformanceReviewEdits edits,
+        string editorEmail,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(edits);
+
+        lock (sync)
+        {
+            var entity = submissions.SingleOrDefault(row => row.Id == id);
+            if (entity is null)
+            {
+                return Task.FromResult<FanPerformanceSubmission?>(null);
+            }
+
+            ApplyReviewEdits(entity, edits);
+            auditLogs.Add(new FanPerformanceSubmissionAuditLogEntity
+            {
+                Id = nextAuditId++,
+                FanPerformanceSubmissionId = entity.Id,
+                Action = "Edited",
+                ActorEmail = NormalizeOptional(editorEmail, 256) ?? string.Empty,
+                OccurredAt = DateTimeOffset.UtcNow,
+                Details = "Updated title, performer, or description before publish.",
+            });
+
+            return Task.FromResult<FanPerformanceSubmission?>(Map(entity));
+        }
+    }
+
+    public Task<FanPerformanceSubmission?> PromoteAsync(
+        Guid id,
+        int promotedStageId,
+        string reviewerEmail,
+        string? reviewNotes,
+        CancellationToken cancellationToken = default)
+    {
+        lock (sync)
+        {
+            var entity = submissions.SingleOrDefault(row => row.Id == id);
+            if (entity is null)
+            {
+                return Task.FromResult<FanPerformanceSubmission?>(null);
+            }
+
+            if (!FanPerformanceSubmissionWorkflow.TryValidateStatusChange(
+                    entity.Status,
+                    FanPerformanceSubmissionStatus.Approved,
+                    out var error))
+            {
+                throw new InvalidOperationException(error);
+            }
+
+            entity.Status = FanPerformanceSubmissionStatus.Approved;
+            entity.PromotedStageId = promotedStageId;
+            entity.ReviewedAt = DateTimeOffset.UtcNow;
+            entity.ReviewerEmail = NormalizeOptional(reviewerEmail, 256);
+            entity.ReviewNotes = NormalizeOptional(reviewNotes, 500);
+
+            auditLogs.Add(new FanPerformanceSubmissionAuditLogEntity
+            {
+                Id = nextAuditId++,
+                FanPerformanceSubmissionId = entity.Id,
+                Action = FanPerformanceSubmissionStatus.Approved,
+                ActorEmail = entity.ReviewerEmail ?? string.Empty,
+                OccurredAt = entity.ReviewedAt.Value,
+                Details = $"Approved and published as fan performance #{promotedStageId}. Notes: {entity.ReviewNotes ?? "(none)"}",
+            });
+
+            return Task.FromResult<FanPerformanceSubmission?>(Map(entity));
+        }
+    }
+
+    public Task<SubmissionTypeCounts> GetDashboardCountsAsync(
+        DateTimeOffset utcNow,
+        CancellationToken cancellationToken = default)
+    {
+        var today = utcNow.UtcDateTime.Date;
+        var weekAgo = today.AddDays(-6);
+        var monthAgo = utcNow.AddDays(-30);
+
+        lock (sync)
+        {
+            var pending = submissions.Count(row => FanPerformanceSubmissionWorkflow.CanAdminAct(row.Status));
+            var receivedToday = submissions.Count(row => row.SubmittedAt.UtcDateTime.Date >= today);
+            var receivedThisWeek = submissions.Count(row => row.SubmittedAt.UtcDateTime.Date >= weekAgo);
+            var last30 = submissions.Where(row => row.SubmittedAt >= monthAgo).ToList();
+            var approvedLast30 = last30.Count(row => row.Status == FanPerformanceSubmissionStatus.Approved);
+            var rejectedLast30 = last30.Count(row => row.Status == FanPerformanceSubmissionStatus.Rejected);
+            var pendingLast30 = last30.Count(row => FanPerformanceSubmissionWorkflow.CanAdminAct(row.Status));
+
+            return Task.FromResult(new SubmissionTypeCounts(
+                pending, receivedToday, receivedThisWeek, approvedLast30, rejectedLast30, pendingLast30));
+        }
+    }
+
+    public Task<IReadOnlyList<SubmissionContributor>> GetTopContributorsThisMonthAsync(
+        DateTimeOffset monthStart,
+        int maxCount,
+        CancellationToken cancellationToken = default)
+    {
+        lock (sync)
+        {
+            IReadOnlyList<SubmissionContributor> result = submissions
+                .Where(row => row.SubmittedAt >= monthStart)
+                .GroupBy(row => row.SubmitterMemberId)
+                .Select(group =>
+                {
+                    var member = resolveMember?.Invoke(group.Key);
+                    return new SubmissionContributor(group.Key, member?.DisplayName ?? "Unknown member", group.Count());
+                })
+                .OrderByDescending(contributor => contributor.Count)
+                .Take(maxCount)
+                .ToList();
+
+            return Task.FromResult(result);
+        }
+    }
+
+    public Task<IReadOnlyList<FanPerformanceSubmission>> GetEligibleForPendingBlobPurgeAsync(
+        DateTimeOffset cutoffUtc,
+        CancellationToken cancellationToken = default)
+    {
+        lock (sync)
+        {
+            IReadOnlyList<FanPerformanceSubmission> result = submissions
+                .Where(row =>
+                    (row.Status == FanPerformanceSubmissionStatus.Rejected
+                        || row.Status == FanPerformanceSubmissionStatus.Withdrawn)
+                    && !string.IsNullOrWhiteSpace(row.BlobPath)
+                    && (row.ReviewedAt ?? row.SubmittedAt) <= cutoffUtc)
+                .Select(Map)
+                .ToList();
+            return Task.FromResult(result);
+        }
+    }
+
+    public Task ClearPendingBlobPathAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        lock (sync)
+        {
+            var entity = submissions.SingleOrDefault(row => row.Id == id);
+            if (entity is not null)
+            {
+                entity.BlobPath = string.Empty;
+            }
+
+            return Task.CompletedTask;
+        }
+    }
+
     /// <summary>Test helper: audit entries written for a submission.</summary>
     public IReadOnlyList<FanPerformanceSubmissionAuditLogEntity> GetAuditLogs(Guid submissionId)
     {
         lock (sync)
         {
             return auditLogs.Where(log => log.FanPerformanceSubmissionId == submissionId).ToList();
+        }
+    }
+
+    /// <summary>Test helper: backdate submitted/reviewed timestamps for purge eligibility.</summary>
+    public void SetTimestamps(Guid id, DateTimeOffset submittedAt, DateTimeOffset? reviewedAt)
+    {
+        lock (sync)
+        {
+            var entity = submissions.Single(row => row.Id == id);
+            entity.SubmittedAt = submittedAt;
+            entity.ReviewedAt = reviewedAt;
         }
     }
 
@@ -143,12 +364,52 @@ public sealed class InMemoryFanPerformanceSubmissionRepository : IFanPerformance
             RightsDeclarationVersion = submission.RightsDeclarationVersion.Trim(),
         };
 
+    internal static void ApplyReviewEdits(FanPerformanceSubmissionEntity entity, FanPerformanceReviewEdits edits)
+    {
+        if (edits.Title is not null)
+        {
+            var title = edits.Title.Trim();
+            if (title.Length == 0)
+            {
+                throw new InvalidOperationException("Title is required.");
+            }
+
+            entity.Title = title.Length <= 200 ? title : title[..200];
+        }
+
+        if (edits.PerformedBy is not null)
+        {
+            var performedBy = edits.PerformedBy.Trim();
+            if (performedBy.Length == 0)
+            {
+                throw new InvalidOperationException("Performed by is required.");
+            }
+
+            entity.PerformedBy = performedBy.Length <= 200 ? performedBy : performedBy[..200];
+        }
+
+        if (edits.Description is not null)
+        {
+            entity.Description = NormalizeOptional(edits.Description, 2000);
+        }
+
+        if (edits.CoveredSong is not null)
+        {
+            var covered = edits.CoveredSong.Trim();
+            if (covered.Length > 0)
+            {
+                entity.CoveredSong = covered.Length <= 200 ? covered : covered[..200];
+            }
+        }
+    }
+
     internal static void ApplyStatusChange(
         FanPerformanceSubmissionEntity entity,
         string status,
         string? actorEmail,
         string? reviewNotes,
-        string? rejectionReason)
+        string? rejectionReason,
+        bool requireNeedsInfoNotes = false)
     {
         if (!FanPerformanceSubmissionWorkflow.TryValidateStatusChange(entity.Status, status, out var error))
         {
@@ -160,6 +421,13 @@ public sealed class InMemoryFanPerformanceSubmissionRepository : IFanPerformance
         if (next == FanPerformanceSubmissionStatus.Rejected && normalizedRejection is null)
         {
             throw new InvalidOperationException("A rejection reason is required.");
+        }
+
+        if (requireNeedsInfoNotes
+            && next == FanPerformanceSubmissionStatus.NeedsInfo
+            && NormalizeOptional(reviewNotes, 500) is null)
+        {
+            throw new InvalidOperationException("Review notes are required when requesting more information.");
         }
 
         entity.Status = next;

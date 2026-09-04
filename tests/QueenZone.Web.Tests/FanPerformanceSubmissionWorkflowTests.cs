@@ -92,6 +92,22 @@ public sealed class FanPerformanceSubmissionWorkflowTests
     }
 
     [Fact]
+    public async Task UpdateStatusAsync_needs_info_requires_review_notes()
+    {
+        var repository = new InMemoryFanPerformanceSubmissionRepository();
+        var created = await repository.CreateAsync(NewSubmission());
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            repository.UpdateStatusAsync(
+                created.Id,
+                FanPerformanceSubmissionStatus.NeedsInfo,
+                "admin@test.local",
+                reviewNotes: "   ",
+                rejectionReason: null));
+        Assert.Contains("Review notes are required", ex.Message);
+    }
+
+    [Fact]
     public void Workflow_helpers_cover_terminal_withdraw_and_unknown_statuses()
     {
         Assert.True(FanPerformanceSubmissionWorkflow.IsTerminal(FanPerformanceSubmissionStatus.Approved));
@@ -106,6 +122,13 @@ public sealed class FanPerformanceSubmissionWorkflowTests
         Assert.False(FanPerformanceSubmissionWorkflow.CanMemberWithdraw(FanPerformanceSubmissionStatus.Rejected));
         Assert.True(FanPerformanceSubmissionWorkflow.CanMemberReplyNeedsInfo(FanPerformanceSubmissionStatus.NeedsInfo));
         Assert.False(FanPerformanceSubmissionWorkflow.CanMemberReplyNeedsInfo(FanPerformanceSubmissionStatus.Pending));
+        Assert.True(FanPerformanceSubmissionWorkflow.CanAdminAct(FanPerformanceSubmissionStatus.Pending));
+        Assert.True(FanPerformanceSubmissionWorkflow.CanAdminAct(FanPerformanceSubmissionStatus.UnderReview));
+        Assert.True(FanPerformanceSubmissionWorkflow.CanAdminAct(FanPerformanceSubmissionStatus.NeedsInfo));
+        Assert.False(FanPerformanceSubmissionWorkflow.CanAdminAct(FanPerformanceSubmissionStatus.Approved));
+        Assert.False(FanPerformanceSubmissionWorkflow.CanAdminAct(FanPerformanceSubmissionStatus.Rejected));
+        Assert.False(FanPerformanceSubmissionWorkflow.CanAdminAct(FanPerformanceSubmissionStatus.Withdrawn));
+        Assert.False(FanPerformanceSubmissionWorkflow.CanAdminAct("Nope"));
 
         Assert.False(FanPerformanceSubmissionWorkflow.CanTransition("Nope", FanPerformanceSubmissionStatus.Approved));
         Assert.False(FanPerformanceSubmissionWorkflow.TryValidateStatusChange("Nope", FanPerformanceSubmissionStatus.Approved, out var unknownCurrent));

@@ -8,10 +8,19 @@ public interface IFanPerformanceSubmissionRepository
 
     Task<FanPerformanceSubmission?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<FanPerformanceSubmissionListItem>> GetPendingAsync(
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default);
+
     Task<SubmissionListPage<FanPerformanceSubmission>> GetBySubmitterAsync(
         Guid submitterMemberId,
         int page = 1,
         int pageSize = 10,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<FanPerformanceSubmissionAuditEntry>> GetAuditLogsAsync(
+        Guid id,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -27,4 +36,36 @@ public interface IFanPerformanceSubmissionRepository
         string? rejectionReason,
         string? auditDetails = null,
         CancellationToken cancellationToken = default);
+
+    Task<FanPerformanceSubmission?> UpdateReviewMetadataAsync(
+        Guid id,
+        FanPerformanceReviewEdits edits,
+        string editorEmail,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Marks a submission as approved and promoted, recording the Q_STAGE_T id
+    /// it was published as and writing an audit log entry.
+    /// </summary>
+    Task<FanPerformanceSubmission?> PromoteAsync(
+        Guid id,
+        int promotedStageId,
+        string reviewerEmail,
+        string? reviewNotes,
+        CancellationToken cancellationToken = default);
+
+    Task<SubmissionTypeCounts> GetDashboardCountsAsync(
+        DateTimeOffset utcNow,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<SubmissionContributor>> GetTopContributorsThisMonthAsync(
+        DateTimeOffset monthStart,
+        int maxCount,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<FanPerformanceSubmission>> GetEligibleForPendingBlobPurgeAsync(
+        DateTimeOffset cutoffUtc,
+        CancellationToken cancellationToken = default);
+
+    Task ClearPendingBlobPathAsync(Guid id, CancellationToken cancellationToken = default);
 }

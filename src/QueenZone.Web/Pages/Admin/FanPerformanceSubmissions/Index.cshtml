@@ -1,0 +1,48 @@
+@page "/admin/fan-performance-submissions"
+@model IndexModel
+
+<div class="admin-shell">
+  <h1>Fan performance submissions</h1>
+  <p>
+    <a href="/admin">Back to admin</a>
+  </p>
+
+  @if (Model.Submissions.Count == 0)
+  {
+    <p>No fan performance submissions awaiting review.</p>
+  }
+  else
+  {
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>Title</th>
+          <th>Submitter</th>
+          <th>Covered song</th>
+          <th>Performed by</th>
+          <th>Duration</th>
+          <th>Size</th>
+          <th>Submitted</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @foreach (var item in Model.Submissions)
+        {
+          <tr>
+            <td>@item.Title</td>
+            <td>@item.SubmitterDisplayName</td>
+            <td>@item.CoveredSong</td>
+            <td>@item.PerformedBy</td>
+            <td>@IndexModel.FormatDuration(item.DurationSeconds)</td>
+            <td>@item.FileSizeBytes.ToString("N0") bytes</td>
+            <td>@item.SubmittedAt.ToString("u")</td>
+            <td><partial name="_SubmissionStatusBadge" model="item.Status" /></td>
+            <td><a href="/admin/fan-performance-submissions/@item.Id">Review</a></td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+</div>

@@ -91,6 +91,17 @@ public sealed class BlobUploadOptions
                     "audio/x-flac",
                 ],
             },
+            [BlobUploadContainers.SongFiles] = new()
+            {
+                MaxBytes = 25 * 1024 * 1024,
+                AllowedContentTypes =
+                [
+                    "audio/mpeg",
+                    "audio/mp3",
+                    "audio/flac",
+                    "audio/x-flac",
+                ],
+            },
         };
 
     /// <summary>

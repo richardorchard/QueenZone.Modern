@@ -1,0 +1,183 @@
+@page "/admin/fan-performance-submissions/{id:guid}"
+@model DetailModel
+@using QueenZone.Data
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+
+@{
+  var submission = Model.Submission!;
+  var token = Antiforgery.GetAndStoreTokens(ViewContext.HttpContext).RequestToken;
+  var canAct = FanPerformanceSubmissionWorkflow.CanAdminAct(submission.Status);
+  var hasPendingAudio = !string.IsNullOrWhiteSpace(submission.BlobPath);
+}
+
+<div class="admin-shell">
+  <h1>Review fan performance submission</h1>
+  <p><a href="/admin/fan-performance-submissions">Back to queue</a></p>
+
+  @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+  {
+    <p class="qz-account-notice @(Model.StatusMessageKind == "error" ? "qz-account-notice--error" : "qz-account-notice--success")" role="status">
+      @Model.StatusMessage
+    </p>
+  }
+
+  <div class="admin-review-layout">
+    <div>
+      @if (hasPendingAudio)
+      {
+        <audio controls preload="metadata" src="/admin/fan-performance-submissions/@submission.Id/audio">
+          Preview audio is available to signed-in admins only.
+        </audio>
+      }
+      else
+      {
+        <p>Pending audio is no longer available.</p>
+      }
+    </div>
+    <div>
+      <dl>
+        <dt>Title</dt>
+        <dd>@submission.Title</dd>
+        <dt>Covered song</dt>
+        <dd>@submission.CoveredSong</dd>
+        <dt>Performed by</dt>
+        <dd>@submission.PerformedBy</dd>
+        <dt>Submitter</dt>
+        <dd>@(submission.SubmitterDisplayName ?? "Unknown") @(string.IsNullOrWhiteSpace(submission.SubmitterEmail) ? "" : $"({submission.SubmitterEmail})")</dd>
+        <dt>Status</dt>
+        <dd>@submission.Status</dd>
+        <dt>Submitted</dt>
+        <dd>@submission.SubmittedAt.ToString("u")</dd>
+        <dt>Duration</dt>
+        <dd>@IndexModel.FormatDuration(submission.DurationSeconds)</dd>
+        <dt>Original file</dt>
+        <dd>@submission.OriginalFileName (@submission.FileSizeBytes.ToString("N0") bytes)</dd>
+        <dt>MIME type</dt>
+        <dd>@submission.MimeType</dd>
+        <dt>Description</dt>
+        <dd>@(submission.Description ?? "—")</dd>
+        <dt>Rights declaration</dt>
+        <dd>Version @submission.RightsDeclarationVersion at @submission.RightsDeclaredAt.ToString("u")</dd>
+        <dt>Review notes</dt>
+        <dd>@(submission.ReviewNotes ?? "—")</dd>
+        <dt>Rejection reason</dt>
+        <dd>@(submission.RejectionReason ?? "—")</dd>
+        @if (submission.PromotedStageId is int stageId)
+        {
+          <dt>Published performance</dt>
+          <dd>#@stageId</dd>
+        }
+      </dl>
+
+      @if (canAct)
+      {
+        <section>
+          <h2>Approve</h2>
+          <form method="post" action="/admin/fan-performance-submissions/@submission.Id/approve" class="admin-inline-form">
+            <input type="hidden" name="@AdminFanPerformanceSubmissionsPageModel.AntiforgeryTokenFieldName" value="@token" />
+            <label>
+              Title
+              <input name="title" value="@submission.Title" required maxlength="200" />
+            </label>
+            <label>
+              Performed by
+              <input name="performedBy" value="@submission.PerformedBy" required maxlength="200" />
+            </label>
+            <label>
+              Description
+              <textarea name="description" maxlength="2000" rows="3">@submission.Description</textarea>
+            </label>
+            <label>
+              Covered song <span class="admin-form-hint">(review context)</span>
+              <input name="coveredSong" value="@submission.CoveredSong" maxlength="200" />
+            </label>
+            <label>
+              Internal review notes
+              <input name="reviewNotes" maxlength="500" />
+            </label>
+            <button type="submit">Approve</button>
+          </form>
+        </section>
+
+        <section>
+          <h2>Reject</h2>
+          <form method="post" action="/admin/fan-performance-submissions/@submission.Id/reject" class="admin-inline-form" onsubmit="return confirm('Reject this submission?');">
+            <input type="hidden" name="@AdminFanPerformanceSubmissionsPageModel.AntiforgeryTokenFieldName" value="@token" />
+            <label>
+              Rejection reason (shown to submitter)
+              <input name="rejectionReason" required maxlength="500" />
+            </label>
+            <label>
+              Internal review notes
+              <input name="reviewNotes" maxlength="500" />
+            </label>
+            <button type="submit">Reject</button>
+          </form>
+        </section>
+
+        <section>
+          <h2>Request changes</h2>
+          <form method="post" action="/admin/fan-performance-submissions/@submission.Id/needsinfo" class="admin-inline-form">
+            <input type="hidden" name="@AdminFanPerformanceSubmissionsPageModel.AntiforgeryTokenFieldName" value="@token" />
+            <label>
+              Note for submitter / review notes
+              <input name="reviewNotes" required maxlength="500" />
+            </label>
+            <button type="submit">Mark needs info</button>
+          </form>
+        </section>
+
+        @if (submission.Status == FanPerformanceSubmissionStatus.Pending)
+        {
+          <section>
+            <h2>Start review</h2>
+            <form method="post" action="/admin/fan-performance-submissions/@submission.Id/underreview" class="admin-inline-form">
+              <input type="hidden" name="@AdminFanPerformanceSubmissionsPageModel.AntiforgeryTokenFieldName" value="@token" />
+              <label>
+                Internal review notes
+                <input name="reviewNotes" maxlength="500" />
+              </label>
+              <button type="submit">Mark under review</button>
+            </form>
+          </section>
+        }
+      }
+      else if (string.Equals(submission.Status, FanPerformanceSubmissionStatus.Withdrawn, StringComparison.OrdinalIgnoreCase))
+      {
+        <p>This submission was withdrawn by the member and is read-only.</p>
+      }
+    </div>
+  </div>
+
+  <section>
+    <h2>Audit log</h2>
+    @if (Model.AuditLog.Count == 0)
+    {
+      <p>No audit entries yet.</p>
+    }
+    else
+    {
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>When</th>
+            <th>Action</th>
+            <th>Actor</th>
+            <th>Details</th>
+          </tr>
+        </thead>
+        <tbody>
+          @foreach (var entry in Model.AuditLog)
+          {
+            <tr>
+              <td>@entry.OccurredAt.ToString("u")</td>
+              <td>@entry.Action</td>
+              <td>@(string.IsNullOrWhiteSpace(entry.ActorEmail) ? "—" : entry.ActorEmail)</td>
+              <td>@(entry.Details ?? "—")</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
+  </section>
+</div>

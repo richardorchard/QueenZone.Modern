@@ -36,6 +36,9 @@ public sealed class AdminDashboardService(IServiceScopeFactory scopeFactory)
         var articleCountsTask = RunAsync(
             sp => sp.GetRequiredService<IArticleSubmissionRepository>()
                 .GetDashboardCountsAsync(utcNowOffset, cancellationToken));
+        var fanPerformanceCountsTask = RunAsync(
+            sp => sp.GetRequiredService<IFanPerformanceSubmissionRepository>()
+                .GetDashboardCountsAsync(utcNowOffset, cancellationToken));
         var openHelpRequestsTask = RunAsync(
             sp => sp.GetRequiredService<IHelpRequestRepository>()
                 .CountOpenAsync(cancellationToken));
@@ -52,6 +55,9 @@ public sealed class AdminDashboardService(IServiceScopeFactory scopeFactory)
         var articleContributorsTask = RunAsync(
             sp => sp.GetRequiredService<IArticleSubmissionRepository>()
                 .GetTopContributorsThisMonthAsync(monthStart, 10, cancellationToken));
+        var fanPerformanceContributorsTask = RunAsync(
+            sp => sp.GetRequiredService<IFanPerformanceSubmissionRepository>()
+                .GetTopContributorsThisMonthAsync(monthStart, 10, cancellationToken));
 
         var trafficTask = RunAsync(
             sp => sp.GetRequiredService<IGoogleAnalyticsTrafficService>()
@@ -64,21 +70,25 @@ public sealed class AdminDashboardService(IServiceScopeFactory scopeFactory)
             photoCountsTask,
             newsCountsTask,
             articleCountsTask,
+            fanPerformanceCountsTask,
             openHelpRequestsTask,
             openPrivateMessageReportsTask,
             photoContributorsTask,
             newsContributorsTask,
             articleContributorsTask,
+            fanPerformanceContributorsTask,
             trafficTask).ConfigureAwait(false);
 
         var submissionQueue = new SubmissionQueueStats(
             await photoCountsTask.ConfigureAwait(false),
             await newsCountsTask.ConfigureAwait(false),
             await articleCountsTask.ConfigureAwait(false),
+            await fanPerformanceCountsTask.ConfigureAwait(false),
             CombineTopContributors(
                 await photoContributorsTask.ConfigureAwait(false),
                 await newsContributorsTask.ConfigureAwait(false),
                 await articleContributorsTask.ConfigureAwait(false),
+                await fanPerformanceContributorsTask.ConfigureAwait(false),
                 maxCount: 5));
 
         return new AdminDashboardSnapshot(
@@ -101,9 +111,10 @@ public sealed class AdminDashboardService(IServiceScopeFactory scopeFactory)
         IReadOnlyList<SubmissionContributor> photos,
         IReadOnlyList<SubmissionContributor> news,
         IReadOnlyList<SubmissionContributor> articles,
+        IReadOnlyList<SubmissionContributor> fanPerformances,
         int maxCount)
     {
-        return photos.Concat(news).Concat(articles)
+        return photos.Concat(news).Concat(articles).Concat(fanPerformances)
             .GroupBy(c => c.MemberId)
             .Select(g => new SubmissionContributor(
                 g.Key,

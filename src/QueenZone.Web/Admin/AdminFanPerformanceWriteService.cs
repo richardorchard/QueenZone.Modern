@@ -69,6 +69,13 @@ public sealed class AdminFanPerformanceWriteService(
         CancellationToken cancellationToken = default) =>
         SetVisibilityAsync(id, isVisible: false, editorEmail, expectedIsVisible, cancellationToken);
 
+    public async Task SyncPublishedAsync(int id, CancellationToken cancellationToken = default)
+    {
+        var published = await adminFanPerformanceRepository.GetByIdAsync(id, cancellationToken)
+            ?? throw new InvalidOperationException($"Fan performance {id} was not found.");
+        await AfterWriteAsync(published, cancellationToken);
+    }
+
     private async Task AfterWriteAsync(AdminFanPerformanceItem item, CancellationToken cancellationToken)
     {
         await InvalidatePublicCachesAsync(cancellationToken);
