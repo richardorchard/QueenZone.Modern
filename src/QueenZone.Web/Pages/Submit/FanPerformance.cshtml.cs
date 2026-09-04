@@ -49,7 +49,7 @@ public sealed class FanPerformanceModel(FanPerformanceSubmissionService fanPerfo
     [Display(Name = "Rights declaration")]
     public bool RightsDeclarationAccepted { get; set; }
 
-    public async Task<IActionResult> OnGetAsync()
+    public async Task<IActionResult> OnGetAsync(CancellationToken cancellationToken)
     {
         if (await GetCurrentMemberIdAsync() is null)
         {
