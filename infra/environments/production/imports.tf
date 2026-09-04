@@ -73,12 +73,12 @@ import {
 }
 
 import {
-  to = module.azure_data.azapi_resource.sql_server
+  to = module.azure_data.azapi_resource.sql_server[0]
   id = "${local.azure_sql_base_id}/servers/queenzone-sql-server"
 }
 
 import {
-  to = module.azure_data.azurerm_mssql_firewall_rule.azure_services
+  to = module.azure_data.azurerm_mssql_firewall_rule.azure_services[0]
   id = "${local.azure_sql_base_id}/servers/queenzone-sql-server/firewallRules/AllowAllWindowsAzureIps"
 }
 
@@ -88,7 +88,7 @@ import {
 }
 
 import {
-  to = module.azure_data.azurerm_mssql_server_extended_auditing_policy.production
+  to = module.azure_data.azurerm_mssql_server_extended_auditing_policy.production[0]
   id = "${local.azure_sql_base_id}/servers/queenzone-sql-server/extendedAuditingSettings/Default"
 }
 

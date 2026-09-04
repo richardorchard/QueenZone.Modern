@@ -11,7 +11,7 @@ Issue: [#624](https://github.com/richardorchard/QueenZone.Modern/issues/624) (Op
 
 Sanitised machine-readable IDs and import hints live under [`infra/import/`](../../infra/import/).
 
-## Dev environment (Phase 1, verified 2026-09-04)
+## Dev environment (Phase 1 verified; Phase 2 declared 2026-09-04)
 
 Issue #1265 adds `infra/environments/dev` with a separate `dev.tfstate`.
 These resources are **provisioned and verified** in `australiaeast`:
@@ -29,8 +29,12 @@ succeeded after the resource-group bootstrap. Azure confirmed B1, one worker,
 Always On, .NET 10 and HTTPS-only. The default Azure hostname returned HTTP 200
 with its welcome page; a fresh remote-state plan returned no changes.
 
-Production's `queenzone-dev` App Service remains separate. SQL/storage belong
-to Phase 2; DNS/managed TLS to Phase 3. See the
+Production's `queenzone-dev` App Service remains separate. Phase 2 declares
+an empty `queenzone-dev-db` database on the existing
+`queenzone-sql-server` and the separate `queenzonedev` storage account in
+the dev state. The database and account are pending the approval-gated apply;
+they are not imports and contain no production data. DNS/managed TLS remain
+Phase 3. See the
 [dev provisioning runbook](opentofu-dev-environment.md) for permissions and apply verification.
 
 ## Scope boundaries

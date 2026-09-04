@@ -13,3 +13,8 @@ output "storage_account_id" {
   description = "Managed Storage account resource ID without exporting account keys."
   value       = azapi_resource.storage_account.id
 }
+
+output "sql_database_id" {
+  description = "Managed SQL database resource ID."
+  value       = azurerm_mssql_database.production.id
+}
