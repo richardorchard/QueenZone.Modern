@@ -106,4 +106,94 @@ public sealed class BlobUploadValidatorTests
         custom.EnsureKnownContainer("custom-ugc");
         Assert.Equal(100, custom.GetMaxBytes("custom-ugc"));
     }
+
+    [Fact]
+    public void Fan_performance_container_is_25_mb_audio_only()
+    {
+        Assert.Contains(BlobUploadContainers.All, name =>
+            string.Equals(name, BlobUploadContainers.FanPerformances, StringComparison.OrdinalIgnoreCase));
+        Assert.NotEqual("songfiles", BlobUploadContainers.FanPerformances);
+
+        Assert.Equal(25 * 1024 * 1024, validator.GetMaxBytes(BlobUploadContainers.FanPerformances));
+        var allowed = validator.GetAllowedContentTypes(BlobUploadContainers.FanPerformances);
+        Assert.Equal(["audio/mpeg", "audio/mp3", "audio/flac", "audio/x-flac"], allowed);
+        Assert.DoesNotContain(allowed, type => type.Contains("mp4", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(allowed, type => type.Contains("m4a", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(allowed, type => type.Contains("aac", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void Fan_performance_oversize_is_rejected_with_clear_message()
+    {
+        var max = validator.GetMaxBytes(BlobUploadContainers.FanPerformances);
+        var ex = Assert.Throws<BlobUploadException>(() =>
+            validator.ValidateSize(max + 1, BlobUploadContainers.FanPerformances));
+        Assert.Contains("exceeds", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(BlobUploadContainers.FanPerformances, ex.Message);
+        Assert.Contains(max.ToString(), ex.Message);
+        validator.ValidateSize(max, BlobUploadContainers.FanPerformances);
+    }
+
+    [Fact]
+    public void Accepts_sniffed_mpeg_and_flac_for_fan_performances()
+    {
+        Assert.Equal(
+            "audio/mpeg",
+            validator.ResolveAndValidateContentType(
+                "cover.mp3",
+                [0xFF, 0xFB, 0x90, 0x00],
+                BlobUploadContainers.FanPerformances));
+        Assert.Equal(
+            "audio/mpeg",
+            validator.ResolveAndValidateContentType(
+                "tagged.mp3",
+                "ID3"u8.ToArray(),
+                BlobUploadContainers.FanPerformances));
+        Assert.Equal(
+            "audio/flac",
+            validator.ResolveAndValidateContentType(
+                "cover.flac",
+                "fLaC"u8.ToArray(),
+                BlobUploadContainers.FanPerformances));
+        Assert.Equal(
+            "audio/mpeg",
+            validator.ResolveAndValidateContentType(
+                "clip.mp3",
+                [0xFF, 0xFB, 0x90, 0x00],
+                BlobUploadContainers.Forum));
+    }
+
+    [Fact]
+    public void Rejects_audio_extension_with_non_audio_bytes()
+    {
+        var fake = Assert.Throws<BlobUploadException>(() =>
+            validator.ResolveAndValidateContentType(
+                "fake.mp3",
+                "not-an-mp3"u8.ToArray(),
+                BlobUploadContainers.FanPerformances));
+        Assert.Contains("not recognized as audio", fake.Message, StringComparison.OrdinalIgnoreCase);
+
+        var jpegAsMp3 = Assert.Throws<BlobUploadException>(() =>
+            validator.ResolveAndValidateContentType(
+                "photo.mp3",
+                [0xFF, 0xD8, 0xFF, 0xE0],
+                BlobUploadContainers.FanPerformances));
+        Assert.Contains("does not match extension", jpegAsMp3.Message);
+
+        var m4a = Assert.Throws<BlobUploadException>(() =>
+            validator.ResolveAndValidateContentType(
+                "clip.m4a",
+                [0x00, 0x00, 0x00, 0x20, 0x66, 0x74, 0x79, 0x70],
+                BlobUploadContainers.FanPerformances));
+        Assert.Contains("Unable to determine content type", m4a.Message);
+    }
+
+    [Fact]
+    public void Audio_mpeg_and_mp3_aliases_agree()
+    {
+        Assert.True(BlobUploadValidator.ContentTypesAgree("audio/mpeg", "audio/mp3"));
+        Assert.True(BlobUploadValidator.ContentTypesAgree("audio/flac", "audio/x-flac"));
+        Assert.False(BlobUploadValidator.ContentTypesAgree("audio/mpeg", "audio/flac"));
+        Assert.False(BlobUploadValidator.ContentTypesAgree("audio/mpeg", "audio/mp4"));
+    }
 }

@@ -16,6 +16,13 @@ public static class BlobUploadContainers
 
     public const string Articles = "ugc-articles";
 
+    /// <summary>
+    /// Pending member fan-performance audio. Never write unreviewed audio to
+    /// <c>songfiles</c> — that private container is reachable by the published
+    /// member-gated proxy.
+    /// </summary>
+    public const string FanPerformances = "ugc-fan-performances";
+
     public static readonly IReadOnlyList<string> All =
     [
         Avatars,
@@ -23,5 +30,6 @@ public static class BlobUploadContainers
         News,
         Photos,
         Articles,
+        FanPerformances,
     ];
 }

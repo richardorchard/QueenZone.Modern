@@ -66,10 +66,17 @@ internal sealed class BlobUploadValidator(BlobUploadOptions options)
 
         // Prefer sniff when available; require agreement with extension when both present.
         // Office Open XML (docx/xlsx) files are ZIP containers — allow extension to win.
+        // Audio must be sniffed: a .mp3/.flac name with non-audio bytes is rejected.
+        if (IsAudioContentType(fromExtension) && fromSniff is null)
+        {
+            throw new BlobUploadException(
+                $"File content is not recognized as audio for '{originalFileName}'.");
+        }
+
         string? contentType = fromSniff ?? fromExtension;
         if (fromSniff is not null
             && fromExtension is not null
-            && !string.Equals(fromSniff, fromExtension, StringComparison.OrdinalIgnoreCase)
+            && !ContentTypesAgree(fromSniff, fromExtension)
             && !IsZipBasedOfficePackage(fromSniff, fromExtension))
         {
             throw new BlobUploadException(
@@ -88,7 +95,7 @@ internal sealed class BlobUploadValidator(BlobUploadOptions options)
         }
 
         var allowed = GetAllowedContentTypes(containerName);
-        if (!allowed.Any(item => string.Equals(item, contentType, StringComparison.OrdinalIgnoreCase)))
+        if (!allowed.Any(item => ContentTypesAgree(item, contentType)))
         {
             throw new BlobUploadException(
                 $"Content type '{contentType}' is not allowed for container '{containerName}'. " +
@@ -97,6 +104,24 @@ internal sealed class BlobUploadValidator(BlobUploadOptions options)
 
         return contentType;
     }
+
+    private static bool IsAudioContentType(string? contentType) =>
+        contentType is not null
+        && contentType.StartsWith("audio/", StringComparison.OrdinalIgnoreCase);
+
+    internal static bool ContentTypesAgree(string a, string b) =>
+        string.Equals(a, b, StringComparison.OrdinalIgnoreCase)
+        || (CanonicalAudioType(a) is { } left
+            && CanonicalAudioType(b) is { } right
+            && string.Equals(left, right, StringComparison.OrdinalIgnoreCase));
+
+    private static string? CanonicalAudioType(string contentType) =>
+        contentType.ToLowerInvariant() switch
+        {
+            "audio/mpeg" or "audio/mp3" => "audio/mpeg",
+            "audio/flac" or "audio/x-flac" => "audio/flac",
+            _ => null,
+        };
 
     private static bool IsZipBasedOfficePackage(string? sniffed, string? fromExtension) =>
         string.Equals(sniffed, "application/zip", StringComparison.OrdinalIgnoreCase)
