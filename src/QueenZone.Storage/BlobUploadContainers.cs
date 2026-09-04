@@ -23,6 +23,12 @@ public static class BlobUploadContainers
     /// </summary>
     public const string FanPerformances = "ugc-fan-performances";
 
+    /// <summary>
+    /// Published fan-performance audio. Admin promote copies here from
+    /// <see cref="FanPerformances"/>. Not a UGC upload target and not in <see cref="All"/>.
+    /// </summary>
+    public const string SongFiles = "songfiles";
+
     public static readonly IReadOnlyList<string> All =
     [
         Avatars,

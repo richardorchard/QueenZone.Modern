@@ -91,6 +91,10 @@
         <span class="admin-dashboard__nav-link-title">Photo submissions</span>
         <span class="admin-dashboard__nav-link-desc">Review member photo uploads</span>
       </a>
+      <a class="admin-dashboard__nav-link" href="/admin/fan-performance-submissions">
+        <span class="admin-dashboard__nav-link-title">Fan performance submissions</span>
+        <span class="admin-dashboard__nav-link-desc">Review member fan-performance uploads</span>
+      </a>
       <a class="admin-dashboard__nav-link" href="/admin/trivia-submissions">
         <span class="admin-dashboard__nav-link-title">Trivia submissions</span>
         <span class="admin-dashboard__nav-link-desc">Review member trivia fact suggestions</span>
@@ -288,6 +292,13 @@
       <a class="admin-dashboard__queue-tile" href="/admin/trivia-submissions">
         <span class="admin-dashboard__queue-tile-label">Trivia suggestions</span>
         <span class="admin-dashboard__queue-tile-sub">member suggestions</span>
+      </a>
+
+      <a class="admin-dashboard__queue-tile" href="/admin/fan-performance-submissions">
+        <span class="admin-dashboard__queue-tile-label">Fan performances</span>
+        <span class="admin-dashboard__queue-tile-count">@Model.SubmissionQueue.FanPerformances.Pending</span>
+        <span class="admin-dashboard__queue-tile-sub">pending review</span>
+        <span class="admin-dashboard__queue-tile-meta">Today: @Model.SubmissionQueue.FanPerformances.ReceivedToday &nbsp;&middot;&nbsp; This week: @Model.SubmissionQueue.FanPerformances.ReceivedThisWeek</span>
       </a>
 
     </div>

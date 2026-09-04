@@ -51,6 +51,9 @@ public static class FanPerformanceSubmissionWorkflow
             FanPerformanceSubmissionStatus.NeedsInfo,
             StringComparison.Ordinal);
 
+    public static bool CanAdminAct(string status) =>
+        FanPerformanceSubmissionStatus.IsKnown(status) && !IsTerminal(status);
+
     public static bool CanTransition(string current, string next)
     {
         if (!FanPerformanceSubmissionStatus.IsKnown(current) || !FanPerformanceSubmissionStatus.IsKnown(next))

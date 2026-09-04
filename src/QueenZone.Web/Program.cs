@@ -258,6 +258,7 @@ app.MapGet("/account/member-probe", () => Results.Ok(new { authenticated = true 
     .RequireAuthorization(MemberAuthenticationSchemes.MemberPolicy);
 
 app.MapFanPerformanceEndpoints();
+app.MapAdminFanPerformanceSubmissionEndpoints();
 app.MapForumAttachmentEndpoints();
 app.MapForumPollEndpoints();
 app.MapEditorImageUploadEndpoints();

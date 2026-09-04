@@ -165,6 +165,77 @@ public sealed class EfFanPerformanceSubmissionRepositoryTests : IAsyncDisposable
         Assert.Equal("Not a Queen cover", rejected.RejectionReason);
     }
 
+    [Fact]
+    public async Task GetPendingAsync_ReturnsReviewableStatusesNewestFirst()
+    {
+        var older = await repository.CreateAsync(NewSubmission(Guid.NewGuid(), "Older pending"));
+        await Task.Delay(5);
+        var newer = await repository.CreateAsync(NewSubmission(Guid.NewGuid(), "Newer pending"));
+        var withdrawn = await repository.CreateAsync(NewSubmission(Guid.NewGuid(), "Withdrawn"));
+        await repository.UpdateStatusAsync(
+            withdrawn.Id,
+            FanPerformanceSubmissionStatus.Withdrawn,
+            string.Empty,
+            null,
+            null);
+
+        var page = await repository.GetPendingAsync(1, 50);
+        Assert.Equal(2, page.Count);
+        Assert.Equal(newer.Id, page[0].Id);
+        Assert.Equal(older.Id, page[1].Id);
+        Assert.DoesNotContain(page, item => item.Id == withdrawn.Id);
+    }
+
+    [Fact]
+    public async Task PromoteAsync_SetsApprovedStatusPromotedStageIdAndAudit()
+    {
+        var created = await repository.CreateAsync(NewSubmission(Guid.NewGuid(), "Promote me"));
+        var promoted = await repository.PromoteAsync(created.Id, 42, "admin@test.local", "Ready");
+
+        Assert.Equal(FanPerformanceSubmissionStatus.Approved, promoted!.Status);
+        Assert.Equal(42, promoted.PromotedStageId);
+        Assert.Equal("admin@test.local", promoted.ReviewerEmail);
+        Assert.Contains(
+            await repository.GetAuditLogsAsync(created.Id),
+            log => log.Action == FanPerformanceSubmissionStatus.Approved && log.Details!.Contains("#42"));
+    }
+
+    [Fact]
+    public async Task PromoteAsync_Throws_WhenTransitionNotAllowed()
+    {
+        var created = await repository.CreateAsync(NewSubmission(Guid.NewGuid(), "Already done"));
+        await repository.UpdateStatusAsync(
+            created.Id,
+            FanPerformanceSubmissionStatus.Rejected,
+            "admin@test.local",
+            null,
+            "Nope");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            repository.PromoteAsync(created.Id, 1, "admin@test.local", null));
+    }
+
+    [Fact]
+    public async Task GetEligibleForPendingBlobPurgeAsync_OnlyRejectedAndWithdrawnPastCutoff()
+    {
+        var rejected = await repository.CreateAsync(NewSubmission(Guid.NewGuid(), "Old reject"));
+        await repository.UpdateStatusAsync(
+            rejected.Id,
+            FanPerformanceSubmissionStatus.Rejected,
+            "admin@test.local",
+            null,
+            "No");
+        var pending = await repository.CreateAsync(NewSubmission(Guid.NewGuid(), "Still pending"));
+
+        var rejectedEntity = await dbContext.FanPerformanceSubmissions.SingleAsync(row => row.Id == rejected.Id);
+        rejectedEntity.ReviewedAt = DateTimeOffset.UtcNow.AddDays(-40);
+        await dbContext.SaveChangesAsync();
+
+        var eligible = await repository.GetEligibleForPendingBlobPurgeAsync(DateTimeOffset.UtcNow.AddDays(-30));
+        Assert.Contains(eligible, row => row.Id == rejected.Id);
+        Assert.DoesNotContain(eligible, row => row.Id == pending.Id);
+    }
+
     public ValueTask DisposeAsync()
     {
         dbContext.Dispose();

@@ -24,6 +24,7 @@ public sealed class AdminDashboardServiceTests
         Assert.Equal(SubmissionTypeCounts.Empty, snapshot.SubmissionQueue.Photos);
         Assert.Equal(SubmissionTypeCounts.Empty, snapshot.SubmissionQueue.NewsSuggestions);
         Assert.Equal(SubmissionTypeCounts.Empty, snapshot.SubmissionQueue.Articles);
+        Assert.Equal(SubmissionTypeCounts.Empty, snapshot.SubmissionQueue.FanPerformances);
         Assert.Equal(0, snapshot.OpenHelpRequestCount);
         Assert.Equal("stub-traffic", snapshot.Traffic.UnavailableReason);
     }
@@ -43,8 +44,9 @@ public sealed class AdminDashboardServiceTests
             new SubmissionContributor(memberB, "Bob", 4),
         };
         var articles = Array.Empty<SubmissionContributor>();
+        var fanPerformances = Array.Empty<SubmissionContributor>();
 
-        var combined = AdminDashboardService.CombineTopContributors(photos, news, articles, maxCount: 5);
+        var combined = AdminDashboardService.CombineTopContributors(photos, news, articles, fanPerformances, maxCount: 5);
 
         Assert.Equal(2, combined.Count);
         Assert.Equal(memberA, combined[0].MemberId);

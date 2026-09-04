@@ -70,6 +70,8 @@ public sealed class QueenZoneWebCompositionTests
             Assert.NotNull(scope.ServiceProvider.GetRequiredService<FanPerformanceAudioUploadService>());
             Assert.NotNull(scope.ServiceProvider.GetRequiredService<IFanPerformanceSubmissionRepository>());
             Assert.NotNull(scope.ServiceProvider.GetRequiredService<FanPerformanceSubmissionService>());
+            Assert.NotNull(scope.ServiceProvider.GetRequiredService<FanPerformanceSubmissionPromotionService>());
+            Assert.NotNull(scope.ServiceProvider.GetRequiredService<FanPerformanceSubmissionPurgeService>());
         }
 
         Assert.Equal(["admin@test.local"], provider.GetRequiredService<IOptions<AdminOptions>>().Value.AllowedEmails);

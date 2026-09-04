@@ -165,6 +165,34 @@ public sealed class AdminDashboardSubmissionQueueTests : IClassFixture<WebApplic
         Assert.Equal(2, contributors[0].Count);
     }
 
+    // ── In-memory repo: fan performances ───────────────────────────────────
+
+    [Fact]
+    public async Task FanPerformanceRepo_GetDashboardCounts_ReturnsZerosWhenEmpty()
+    {
+        var repo = new InMemoryFanPerformanceSubmissionRepository();
+        var counts = await repo.GetDashboardCountsAsync(DateTimeOffset.UtcNow);
+
+        Assert.Equal(SubmissionTypeCounts.Empty, counts);
+    }
+
+    [Fact]
+    public async Task FanPerformanceRepo_GetDashboardCounts_CountsPendingCorrectly()
+    {
+        var member = SampleMember();
+        var repo = new InMemoryFanPerformanceSubmissionRepository(id => id == member.Id ? member : null);
+        var utcNow = DateTimeOffset.UtcNow;
+
+        await repo.CreateAsync(SampleFanPerformanceSubmission(member.Id));
+        await repo.CreateAsync(SampleFanPerformanceSubmission(member.Id));
+
+        var counts = await repo.GetDashboardCountsAsync(utcNow);
+
+        Assert.Equal(2, counts.Pending);
+        Assert.Equal(2, counts.ReceivedToday);
+        Assert.Equal(2, counts.ReceivedThisWeek);
+    }
+
     // ── SubmissionQueueStats helper ─────────────────────────────────────────
 
     [Fact]
@@ -174,12 +202,12 @@ public sealed class AdminDashboardSubmissionQueueTests : IClassFixture<WebApplic
             Pending: 3, ReceivedToday: 1, ReceivedThisWeek: 2,
             ApprovedLast30Days: 4, RejectedLast30Days: 2, StillPendingFromLast30Days: 1);
 
-        var stats = new SubmissionQueueStats(counts, counts, counts, []);
+        var stats = new SubmissionQueueStats(counts, counts, counts, counts, []);
 
-        Assert.Equal(12, stats.TotalApprovedLast30Days);
-        Assert.Equal(6, stats.TotalRejectedLast30Days);
-        Assert.Equal(3, stats.TotalStillPendingLast30Days);
-        Assert.Equal(21, stats.TotalLast30Days);
+        Assert.Equal(16, stats.TotalApprovedLast30Days);
+        Assert.Equal(8, stats.TotalRejectedLast30Days);
+        Assert.Equal(4, stats.TotalStillPendingLast30Days);
+        Assert.Equal(28, stats.TotalLast30Days);
     }
 
     // ── Dashboard page integration ──────────────────────────────────────────
@@ -201,6 +229,8 @@ public sealed class AdminDashboardSubmissionQueueTests : IClassFixture<WebApplic
         Assert.Contains("/admin/photo-submissions", body);
         Assert.Contains("/admin/news-suggestions", body);
         Assert.Contains("/admin/articles", body);
+        Assert.Contains("Fan performances", body);
+        Assert.Contains("/admin/fan-performance-submissions", body);
     }
 
     [Fact]
@@ -261,6 +291,21 @@ public sealed class AdminDashboardSubmissionQueueTests : IClassFixture<WebApplic
             DuplicateCandidateId: null,
             SubmitterDisplayName: null,
             SubmitterEmail: null);
+
+    private static NewFanPerformanceSubmission SampleFanPerformanceSubmission(Guid memberId) =>
+        new(
+            memberId,
+            "Test cover",
+            "Reaching Out",
+            "Sample Contributor",
+            null,
+            "members/test/cover.mp3",
+            "cover.mp3",
+            2048,
+            "audio/mpeg",
+            120,
+            DateTimeOffset.UtcNow,
+            FanPerformanceSubmissionRights.DeclarationVersion);
 
     private static ArticleSubmissionDraft SampleArticleDraft(Guid memberId, string title = "Test Article") =>
         new(
