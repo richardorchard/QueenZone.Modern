@@ -225,7 +225,7 @@ SDK; only this mobile client reports.
 | `SENTRY_DISABLE_AUTO_UPLOAD` | CI unsigned mobile jobs (`ci.yml`); optional locally | Skips source-map / dSYM upload when org/token are unset. Required for simulator/debug CI builds once the Sentry Expo plugin is registered — otherwise Xcode fails with "organization ID or slug is required". |
 
 Unsigned CI Android/iOS jobs set `SENTRY_DISABLE_AUTO_UPLOAD=true`. Publish workflows
-(`publish-mobile-test-build.yml`, `publish-ios-testflight.yml`) set org/project/token
+(`publish-android-google-play.yml`, `publish-ios-testflight.yml`) set org/project/token
 and upload symbols. For a local native build without Sentry credentials, export the
 same disable flag (or set org/project/token as in `.env.example`).
 
@@ -420,7 +420,7 @@ required contexts on 2026-08-24 did **not** yet include them; see
 
 The unsigned jobs are PR compile checks only. Publishing runs the same
 `npm run preflight` against `github.sha` **before** signing or upload:
-[`publish-mobile-test-build.yml`](../../.github/workflows/publish-mobile-test-build.yml)
+[`publish-android-google-play.yml`](../../.github/workflows/publish-android-google-play.yml)
 and [`publish-ios-testflight.yml`](../../.github/workflows/publish-ios-testflight.yml).
 A failed or cancelled preflight skips publication.
 
@@ -495,11 +495,15 @@ journeys` / `Mobile iOS device journeys`. Dispatch with `suite=journeys`
 names to branch protection until soak. `smoke.yaml` stays exactly the
 9 #872 flows.
 
-The unsigned jobs are PR compile checks only. A separate manual workflow,
-[`publish-ios-testflight.yml`](../../.github/workflows/publish-ios-testflight.yml),
+The unsigned jobs are PR compile checks only. Separate manual workflows
+publish installable builds: [`publish-ios-testflight.yml`](../../.github/workflows/publish-ios-testflight.yml)
 archives and signs the iOS app on the dedicated self-hosted Mac runner and
-uploads it to TestFlight. The installable Android build below uses a test-only
-key.
+uploads it to TestFlight;
+[`publish-android-google-play.yml`](../../.github/workflows/publish-android-google-play.yml)
+uploads a signed Android App Bundle to the Play internal track. CI
+`mobile-android` still compiles an unsigned debug APK and uploads it as a
+one-day workflow artifact; that is a compile gate, not tester
+distribution.
 
 ## Install the latest iOS TestFlight build
 
@@ -611,9 +615,9 @@ testers. Keep the upload keystore and passwords in Bitwarden; do not add the
 service-account JSON or any private signing material to GitHub secrets or the
 repository.
 
-The Play-installed build and the APK from `dev.queenzone.org` cannot update one
-another because Play App Signing gives the store build a different signing
-certificate. Uninstall one distribution before switching to the other.
+Play App Signing gives the store build a different signing certificate from a
+locally signed, leftover sideload, or CI debug APK. Uninstall the other
+install before switching to Play.
 
 Android push does not use APNs. The app already uses Firebase Cloud Messaging
 (FCM) directly, with the Firebase client configuration in
@@ -622,31 +626,9 @@ Android push does not use APNs. The app already uses Firebase Cloud Messaging
 `PushNotifications__Fcm__ProjectId`; it is separate from the Play publishing
 service account. APNs remains iOS-only.
 
-## Install the latest Android test build
-
-Open [dev.queenzone.org](https://dev.queenzone.org) on an Android phone and tap
-**Download latest APK**. The page shows the build date and time in Western
-Australian time, file size, and source revision. No GitHub login or computer is
-required.
-
-Android may ask the first time whether the browser can install unknown apps.
-Allow that browser, return to the download, and confirm the installation. Later
-builds install as updates because the package identifier and test signing key
-stay stable.
-
-If a locally built or earlier CI debug version is already installed, Android may
-report a package conflict because that copy used a different signing key.
-Uninstall it once, then install the downloaded test build. Builds downloaded
-from this page will update one another normally.
-
-The APK is a pre-release build connected to the staging API. It and its download
-page are public to anyone who knows the URL, although the page asks search
-engines not to index it. The page is hosted by Azure Static Web Apps; the APK is
-served from a separate, throwaway-build-only Azure Storage account so it cannot
-affect production media or UGC. The publishing design is recorded in
-[ADR 0013](../../docs/decisions/0013-static-web-app-mobile-test-distribution.md).
-
-The separate `publish-mobile-test-build.yml` workflow publishes Android after
-mobile changes merge to `main`, and can also be run manually. iOS remains an
-explicit manual TestFlight release so signing and upload never run merely
-because a pull request was opened or merged.
+Sideload APK publish to the old Blob + Static Web App download site is retired
+(#1306). Testers install Android from Play internal testing, iOS from
+TestFlight, or grab the unsigned CI `mobile-android` debug artifact from a
+workflow run when they only need a compile check. iOS remains an explicit
+manual TestFlight release so signing and upload never run merely because a
+pull request was opened or merged.

@@ -205,7 +205,7 @@ reach that device token.
 Private messages are default-on and fan out to one recipient. Use this before
 forum or news.
 
-1. On the Android phone, open the test-distribution build and sign in as the
+1. On the Android phone, open the Play internal-test build and sign in as the
    **receiver**.
 2. Allow notifications when the OS prompt appears. Sign-in is what registers
    the FCM token with `https://www.queenzone.org`. If you previously denied
@@ -238,7 +238,7 @@ drops the send.
 
 - **Fires when:** another member DMs you (new conversation or reply).
 - **Does not fire:** you message yourself; you are the sender.
-- **Preference:** default on. Mute only from the test-distribution app:
+- **Preference:** default on. Mute only from the Play internal-test app:
   Profile (Home masthead avatar) → **Account settings** → Notifications →
   **Private messages**.
 - **Trigger on live:** `https://www.queenzone.org/messages/compose`, or
@@ -253,7 +253,7 @@ drops the send.
 - **Preference:** default on, but Watch is a separate opt-in. The mobile
   Settings toggle **Forum replies** does not subscribe you to a topic.
 - **Trigger on live:**
-  1. Signed in as the receiver, open the topic in the test-distribution app
+  1. Signed in as the receiver, open the topic in the Play internal-test app
      or at `https://www.queenzone.org/forum/topic/{id}/{slug}` and tap
      **Watch topic**.
   2. Signed in as someone else, post a reply on that topic (website or app).
