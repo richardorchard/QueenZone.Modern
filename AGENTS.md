@@ -13,7 +13,7 @@ This repository is the modern QueenZone rebuild. The project is archive-first: i
 - `docs/architecture/opentofu-contributor-runbook.md` is the OpenTofu operating contract, including `prevent_destroy` on SQL, Storage, and other irreplaceable resources. OpenTofu does not manage blob objects or SQL rows, and it will not automatically refuse to destroy a data store unless that lifecycle flag is set.
 - `docs/decisions/0007-rich-text-editor-quill.md` is the shared Quill rich-text editor decision (partial + `/api/uploads/editor-image`).
 - `docs/architecture/json-api-v1.md` is the versioned `/api/v1` JSON API contract (pagination, Problem Details, OpenAPI).
-- `docs/decisions/0009-react-native-for-mobile-app.md` and `docs/decisions/0011-mobile-project-location-and-build-tooling.md` are the mobile client tech and project-location decisions. `docs/decisions/0012-react-navigation-app-shell.md` is the React Navigation shell and public vs member tab boundary.
+- `docs/decisions/0009-react-native-for-mobile-app.md` and `docs/decisions/0011-mobile-project-location-and-build-tooling.md` are the mobile client tech and project-location decisions. `docs/decisions/0012-react-navigation-app-shell.md` is the React Navigation shell and public vs member tab boundary. `docs/decisions/0018-mobile-server-state-strategy.md` is the mobile server-state decision (bespoke hooks, not React Query).
 - `docs/mobile-development-environment.md` is the shared Windows/macOS native toolchain (Node 24, JDK 17, Android SDK 36).
 - `docs/backlog/migration-backlog.md` tracks migration work.
 - `docs/backlog/book-content-extraction-approach.md` is the standard approach for pulling new quote/event/trivia candidates out of book PDFs for `queen_quotes.csv` / `queen_history_events.csv` — use `pdftotext`, not vision-based PDF reading.
@@ -30,6 +30,8 @@ Keep durable workflow guidance in this file and keep user-facing setup guidance 
 Do not build visitor-facing or admin pages by streaming inline HTML from minimal route handlers. Minimal endpoints are appropriate for small non-page responses such as `/health` or the versioned JSON API under `/api/v1` (`src/QueenZone.Web/Api/`). Existing narrow endpoints in `src/QueenZone.Web/Endpoints/` (RSS, uploads, streaming) stay outside that contract. See `docs/architecture/json-api-v1.md`.
 
 The React Native client lives at `src/QueenZone.Mobile/` as an Expo development-build project (TypeScript, `expo-dev-client`, Continuous Native Generation). Keep it out of `QueenZone.sln`. Expo Go is not a supported runtime. Native `ios/` and `android/` output is generated at build time and is not committed. Navigation is React Navigation (bottom tabs + native stacks per tab); signed-out vs signed-in surfaces follow ADR 0012. See `src/QueenZone.Mobile/README.md`.
+
+Mobile server state uses the in-repo hooks, not a query library: `useHomeSection` for home sections, `useDetailQuery` for a single resource, `usePagedContent` for paginated and infinite lists, all fetching through `src/cache/fetchCached.ts` with a key from `src/cache/keys.ts`. Do not add `@tanstack/react-query` or another server-state library, and do not add a new bespoke pub/sub module for cache invalidation — see ADR 0018 for the decision and its revisit trigger.
 
 ## Branch And Pull Request Policy
 
