@@ -80,6 +80,17 @@ public sealed class BlobUploadOptions
                 MaxBytes = 10 * 1024 * 1024,
                 AllowedContentTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"],
             },
+            [BlobUploadContainers.FanPerformances] = new()
+            {
+                MaxBytes = 25 * 1024 * 1024,
+                AllowedContentTypes =
+                [
+                    "audio/mpeg",
+                    "audio/mp3",
+                    "audio/flac",
+                    "audio/x-flac",
+                ],
+            },
         };
 
     /// <summary>
