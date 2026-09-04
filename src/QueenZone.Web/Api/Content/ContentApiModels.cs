@@ -85,8 +85,9 @@ public sealed record ArticleDetailDto(
     string DetailPath);
 
 /// <summary>
-/// List-card shape for <c>/api/v1/content/timeline</c>. No detail endpoint: the website
-/// has no single-event page, only the one continuous timeline list.
+/// List-card shape for <c>/api/v1/content/timeline</c> and
+/// <c>/api/v1/content/timeline/{id}</c>. The website still has no single-event page;
+/// the by-id route is the mobile On This Day widget destination.
 /// </summary>
 public sealed record TimelineEventDto(
     int Id,

@@ -32,6 +32,7 @@ public class LiveSiteContentApiTests : RealDataPageTest
         "/api/v1/content/discography",
         "/api/v1/content/discography/{id}",
         "/api/v1/content/timeline",
+        "/api/v1/content/timeline/{id}",
         "/api/v1/content/freddietribute",
         "/api/v1/content/photos/categories",
         "/api/v1/content/photos/categories/{slug}",
@@ -79,10 +80,10 @@ public class LiveSiteContentApiTests : RealDataPageTest
             RequiredDetailStrings: ["name", "artistName"]),
         new(
             ListPath: "/api/v1/content/timeline",
-            DetailPathTemplate: null,
+            DetailPathTemplate: "/api/v1/content/timeline/{0}",
             IdProperty: "id",
             RequiredItemStrings: ["title", "summary", "eventDate", "formattedDate", "category", "categoryLabel"],
-            RequiredDetailStrings: []),
+            RequiredDetailStrings: ["title", "summary", "eventDate", "formattedDate", "category", "categoryLabel"]),
         new(
             ListPath: "/api/v1/content/freddietribute",
             DetailPathTemplate: null,

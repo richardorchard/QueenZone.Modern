@@ -27,7 +27,7 @@ export function widgetTimelineDeepLinkUrl(id: number): string {
   return `queenzone://timeline/${id}`;
 }
 
-/** Face-specific tap URL. Quote face with a real id opens that quote; day face opens Timeline. */
+/** Face-specific tap URL. Quote face with a real id opens that quote; day face opens the timeline event. */
 export function widgetFaceDeepLinkUrl(face: WidgetFace | null, quoteId?: number, eventId?: number): string {
   if (face === 'trivia') {
     return widgetTriviaDeepLinkUrl;
@@ -150,7 +150,9 @@ export type WidgetQuoteDestination = {
 
 export type WidgetTimelineDestination = {
   screen: 'ArchiveTab';
-  params: { screen: 'Timeline'; params?: { focusId: number }; initial: false };
+  params:
+    | { screen: 'TimelineEvent'; params: { id: number }; initial: false }
+    | { screen: 'Timeline'; initial: false };
 };
 
 export type WidgetTriviaDestination = {
@@ -185,7 +187,7 @@ export function openWidgetDestination(navigation: WidgetNavigation, url?: string
       screen: 'ArchiveTab',
       params:
         eventId != null
-          ? { screen: 'Timeline', params: { focusId: eventId }, initial: false }
+          ? { screen: 'TimelineEvent', params: { id: eventId }, initial: false }
           : { screen: 'Timeline', initial: false },
     });
     return;

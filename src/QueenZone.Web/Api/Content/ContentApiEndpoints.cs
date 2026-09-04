@@ -64,6 +64,12 @@ public static class ContentApiEndpoints
             .WithSummary("Paged list of published history timeline events, in date order.")
             .Produces<ApiPagedResponse<TimelineEventDto>>();
 
+        group.MapGet("/timeline/{id:int}", GetTimelineEventDetailAsync)
+            .WithName("GetContentTimelineEventDetail")
+            .WithSummary("A single published history timeline event by id. Unpublished or missing events return 404.")
+            .Produces<TimelineEventDto>()
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
         group.MapGet("/on-this-day", GetOnThisDayAsync)
             .WithName("GetContentOnThisDay")
             .WithSummary("The single most notable published history event for today's date, with a +/-7 day fallback when none. Matches the website home page.")
@@ -287,6 +293,24 @@ public static class ContentApiEndpoints
             events.Count);
 
         return Results.Ok(response);
+    }
+
+    internal static async Task<IResult> GetTimelineEventDetailAsync(
+        IQueenHistoryRepository historyRepository,
+        int id,
+        CancellationToken cancellationToken)
+    {
+        var historyEvent = (await historyRepository.GetAllPublishedAsync(cancellationToken))
+            .FirstOrDefault(item => item.Id == id);
+        if (historyEvent is null)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status404NotFound,
+                title: "Not Found",
+                detail: $"No published timeline event with id '{id}'.");
+        }
+
+        return Results.Ok(ContentApiMapper.ToTimelineEvent(historyEvent));
     }
 
     internal static async Task<IResult> GetOnThisDayAsync(

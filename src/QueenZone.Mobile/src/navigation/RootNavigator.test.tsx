@@ -70,7 +70,7 @@ describe('RootNavigator', () => {
     );
 
     fireEvent.press(screen.getByRole('button', { name: 'Open widget event' }));
-    expect(ref.getCurrentRoute()?.name).toBe('Timeline');
+    expect(ref.getCurrentRoute()?.name).toBe('TimelineEvent');
 
     fireEvent.press(screen.getByLabelText('Home'));
     expect(ref.getCurrentRoute()?.name).toBe('HomeTab');
@@ -153,7 +153,7 @@ function HomeTabRaceScreen({
       name: 'ArchiveTab',
       params:
         | ReturnType<typeof nestedTabParams<'Timeline'>>
-        | ReturnType<typeof nestedTabParams<'Timeline', { focusId: number }>>,
+        | ReturnType<typeof nestedTabParams<'TimelineEvent', { id: number }>>,
     ) => void;
   };
 }) {
@@ -170,7 +170,7 @@ function HomeTabRaceScreen({
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Open widget event"
-        onPress={() => navigation.navigate('ArchiveTab', nestedTabParams('Timeline', { focusId: 12 }))}
+        onPress={() => navigation.navigate('ArchiveTab', nestedTabParams('TimelineEvent', { id: 12 }))}
       >
         <Text>Open widget event</Text>
       </Pressable>
@@ -183,6 +183,7 @@ function ArchiveTabRaceStack() {
     <Archive.Navigator>
       <Archive.Screen name="ArchiveHub" component={ArchiveHubRaceScreen} />
       <Archive.Screen name="Timeline" component={TimelineRaceScreen} />
+      <Archive.Screen name="TimelineEvent" component={TimelineEventRaceScreen} />
     </Archive.Navigator>
   );
 }
@@ -193,4 +194,8 @@ function ArchiveHubRaceScreen() {
 
 function TimelineRaceScreen() {
   return <Text>Timeline section</Text>;
+}
+
+function TimelineEventRaceScreen() {
+  return <Text>Timeline event</Text>;
 }

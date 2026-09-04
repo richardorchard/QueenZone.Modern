@@ -132,6 +132,7 @@ export type AlbumDetail = {
   songs: AlbumSong[];
 };
 
+/** Shape for `/api/v1/content/timeline`, `/api/v1/content/timeline/{id}`, and `/api/v1/content/on-this-day`. */
 export type TimelineEvent = {
   id: number;
   title: string;

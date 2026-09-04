@@ -22,6 +22,7 @@ import { BiographyChapterScreen } from '../screens/archive/BiographyChapterScree
 import { DiscographyScreen } from '../screens/archive/DiscographyScreen';
 import { AlbumScreen } from '../screens/archive/AlbumScreen';
 import { TimelineScreen } from '../screens/archive/TimelineScreen';
+import { TimelineEventScreen } from '../screens/archive/TimelineEventScreen';
 import { FreddieTributeScreen } from '../screens/archive/FreddieTributeScreen';
 import { FanPerformancesScreen } from '../screens/archive/FanPerformancesScreen';
 import { FanPerformanceDetailScreen } from '../screens/archive/FanPerformanceDetailScreen';
@@ -199,6 +200,7 @@ export function ArchiveStack() {
       <Archive.Screen name="Discography" component={DiscographyScreen} />
       <Archive.Screen name="Album" component={AlbumScreen} options={{ title: 'Album' }} />
       <Archive.Screen name="Timeline" component={TimelineScreen} />
+      <Archive.Screen name="TimelineEvent" component={TimelineEventScreen} />
       <Archive.Screen
         name="FreddieTribute"
         component={FreddieTributeScreen}

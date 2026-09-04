@@ -32,9 +32,9 @@ const quoteDestination = {
   params: { screen: 'Quote', params: { id: 9 }, initial: false },
 };
 
-const timelineFocusDestination = {
+const timelineEventDestination = {
   screen: 'ArchiveTab',
-  params: { screen: 'Timeline', params: { focusId: 12 }, initial: false },
+  params: { screen: 'TimelineEvent', params: { id: 12 }, initial: false },
 };
 
 const timelineListDestination = {
@@ -78,14 +78,14 @@ describe('WidgetLinkBridge', () => {
     await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('Tabs', homeDestination));
   });
 
-  it('opens Timeline with focusId from a cold-start day-face URL', async () => {
+  it('opens TimelineEvent from a cold-start day-face URL', async () => {
     getInitialURL.mockResolvedValue('queenzone://timeline/12');
     renderWithProviders(<WidgetLinkBridge />);
 
-    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('Tabs', timelineFocusDestination));
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('Tabs', timelineEventDestination));
   });
 
-  it('re-navigates Timeline with a new focusId from a later day-face tap', async () => {
+  it('re-navigates TimelineEvent with a new id from a later day-face tap', async () => {
     let handler: ((event: { url: string }) => void) | undefined;
     addEventListener.mockImplementation((_type, next) => {
       handler = next as (event: { url: string }) => void;
@@ -94,16 +94,16 @@ describe('WidgetLinkBridge', () => {
     getInitialURL.mockResolvedValue('queenzone://timeline/12');
     renderWithProviders(<WidgetLinkBridge />);
 
-    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('Tabs', timelineFocusDestination));
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('Tabs', timelineEventDestination));
     mockNavigate.mockClear();
 
     await act(async () => {
-      handler?.({ url: 'queenzone://timeline/99' });
+      handler?.({ url: 'queenzone://timeline/9999' });
     });
 
     expect(mockNavigate).toHaveBeenCalledWith('Tabs', {
       screen: 'ArchiveTab',
-      params: { screen: 'Timeline', params: { focusId: 99 }, initial: false },
+      params: { screen: 'TimelineEvent', params: { id: 9999 }, initial: false },
     });
   });
 
