@@ -103,7 +103,7 @@ import {
 }
 
 import {
-  to = module.azure_data.azapi_resource.blob_service
+  to = module.azure_data.azapi_resource.blob_service[0]
   id = "${local.azure_storage_base_id}/storageAccounts/queenzone/blobServices/default"
 }
 
