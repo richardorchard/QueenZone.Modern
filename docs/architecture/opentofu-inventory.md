@@ -42,7 +42,9 @@ APK-distribution workflow. The production Cloudflare root now declares the
 creates the hostname binding and Azure-managed certificate. See
 [#1267](https://github.com/richardorchard/QueenZone.Modern/issues/1267) and the
 [dev provisioning runbook](opentofu-dev-environment.md) for the required apply
-order and verification steps.
+order and verification steps. The CNAME remains DNS-only so Azure can renew its
+managed certificate; dev permits direct ingress while production remains
+Cloudflare-only.
 
 ## Scope boundaries
 
