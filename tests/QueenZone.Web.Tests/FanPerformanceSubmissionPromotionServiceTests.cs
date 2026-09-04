@@ -232,6 +232,27 @@ public sealed class FanPerformanceSubmissionPromotionServiceTests
     }
 
     [Fact]
+    public async Task PromoteAsync_DoesNotCompensateDeleteSongFile_WhenConcurrentApproveAlreadyCommitted()
+    {
+        var submissionRepository = new ConcurrentApproveLoserSubmissionRepository();
+        var store = new SharedFanPerformanceStore();
+        var adminRepository = new InMemoryAdminFanPerformanceRepository(store);
+        var backend = new InMemoryBlobStorageBackend();
+        var blobs = new AzureBlobUploadService(backend, Options.Create(new BlobUploadOptions()));
+        var service = CreateService(submissionRepository, adminRepository, blobs);
+
+        var submission = await CreateApprovableSubmissionAsync(submissionRepository, backend, blobs);
+        var publishedName = FanPerformanceSubmissionPromotionService.BuildPublishedBlobName(submission);
+
+        var stageId = await service.PromoteAsync(submission, "admin@test.local", "Looks great", null);
+
+        Assert.Equal(ConcurrentApproveLoserSubmissionRepository.WinnerStageId, stageId);
+        Assert.True(backend.Exists(SongFileUrl.ContainerName, publishedName));
+        var latest = await submissionRepository.GetByIdAsync(submission.Id);
+        Assert.Equal(ConcurrentApproveLoserSubmissionRepository.WinnerStageId, latest!.PromotedStageId);
+    }
+
+    [Fact]
     public void BuildPublishedBlobName_IsSafeBareFilenameFromSubmissionId()
     {
         var submission = new FanPerformanceSubmission(
@@ -357,6 +378,76 @@ public sealed class FanPerformanceSubmissionPromotionServiceTests
             string? reviewNotes,
             CancellationToken cancellationToken = default) =>
             throw new InvalidOperationException("Simulated DB write failure after blob upload.");
+
+        public Task<SubmissionTypeCounts> GetDashboardCountsAsync(
+            DateTimeOffset utcNow, CancellationToken cancellationToken = default) =>
+            inner.GetDashboardCountsAsync(utcNow, cancellationToken);
+
+        public Task<IReadOnlyList<SubmissionContributor>> GetTopContributorsThisMonthAsync(
+            DateTimeOffset monthStart, int maxCount, CancellationToken cancellationToken = default) =>
+            inner.GetTopContributorsThisMonthAsync(monthStart, maxCount, cancellationToken);
+
+        public Task<IReadOnlyList<FanPerformanceSubmission>> GetEligibleForPendingBlobPurgeAsync(
+            DateTimeOffset cutoffUtc, CancellationToken cancellationToken = default) =>
+            inner.GetEligibleForPendingBlobPurgeAsync(cutoffUtc, cancellationToken);
+
+        public Task ClearPendingBlobPathAsync(Guid id, CancellationToken cancellationToken = default) =>
+            inner.ClearPendingBlobPathAsync(id, cancellationToken);
+    }
+
+    private sealed class ConcurrentApproveLoserSubmissionRepository : IFanPerformanceSubmissionRepository
+    {
+        public const int WinnerStageId = 188;
+
+        private readonly InMemoryFanPerformanceSubmissionRepository inner = new();
+
+        public Task<FanPerformanceSubmission> CreateAsync(
+            NewFanPerformanceSubmission submission,
+            CancellationToken cancellationToken = default) =>
+            inner.CreateAsync(submission, cancellationToken);
+
+        public Task<FanPerformanceSubmission?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
+            inner.GetByIdAsync(id, cancellationToken);
+
+        public Task<IReadOnlyList<FanPerformanceSubmissionListItem>> GetPendingAsync(
+            int page, int pageSize, CancellationToken cancellationToken = default) =>
+            inner.GetPendingAsync(page, pageSize, cancellationToken);
+
+        public Task<SubmissionListPage<FanPerformanceSubmission>> GetBySubmitterAsync(
+            Guid submitterMemberId, int page = 1, int pageSize = 10, CancellationToken cancellationToken = default) =>
+            inner.GetBySubmitterAsync(submitterMemberId, page, pageSize, cancellationToken);
+
+        public Task<IReadOnlyList<FanPerformanceSubmissionAuditEntry>> GetAuditLogsAsync(
+            Guid id, CancellationToken cancellationToken = default) =>
+            inner.GetAuditLogsAsync(id, cancellationToken);
+
+        public Task<FanPerformanceSubmission?> UpdateStatusAsync(
+            Guid id,
+            string status,
+            string? actorEmail,
+            string? reviewNotes,
+            string? rejectionReason,
+            string? auditDetails = null,
+            CancellationToken cancellationToken = default) =>
+            inner.UpdateStatusAsync(id, status, actorEmail, reviewNotes, rejectionReason, auditDetails, cancellationToken);
+
+        public Task<FanPerformanceSubmission?> UpdateReviewMetadataAsync(
+            Guid id,
+            FanPerformanceReviewEdits edits,
+            string editorEmail,
+            CancellationToken cancellationToken = default) =>
+            inner.UpdateReviewMetadataAsync(id, edits, editorEmail, cancellationToken);
+
+        public Task<FanPerformanceSubmission?> PromoteAsync(
+            Guid id,
+            int promotedStageId,
+            string reviewerEmail,
+            string? reviewNotes,
+            CancellationToken cancellationToken = default)
+        {
+            inner.ForcePromotedStageId(id, WinnerStageId);
+            throw new InvalidOperationException("Simulated concurrent approve lost the Q_STAGE_T race.");
+        }
 
         public Task<SubmissionTypeCounts> GetDashboardCountsAsync(
             DateTimeOffset utcNow, CancellationToken cancellationToken = default) =>

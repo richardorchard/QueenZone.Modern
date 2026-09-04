@@ -94,7 +94,19 @@ public sealed class FanPerformanceSubmissionPromotionService(
         {
             if (wroteSongFile)
             {
-                await CompensateUploadedBlobAsync(publishedName, submission.Id, cancellationToken);
+                var latest = await fanPerformanceSubmissionRepository.GetByIdAsync(
+                    submission.Id,
+                    cancellationToken);
+                if (latest?.PromotedStageId is int promotedStageId)
+                {
+                    await TryDeletePendingBlobAsync(latest, cancellationToken);
+                    return promotedStageId;
+                }
+
+                if (!IsAlreadyApproved(latest))
+                {
+                    await CompensateUploadedBlobAsync(publishedName, submission.Id, cancellationToken);
+                }
             }
 
             throw;
@@ -230,6 +242,12 @@ public sealed class FanPerformanceSubmissionPromotionService(
         Guid submissionId,
         CancellationToken cancellationToken)
     {
+        var latest = await fanPerformanceSubmissionRepository.GetByIdAsync(submissionId, cancellationToken);
+        if (latest?.PromotedStageId is not null || IsAlreadyApproved(latest))
+        {
+            return;
+        }
+
         try
         {
             await blobUploadService.DeleteAsync(SongFileUrl.ContainerName, blobName, cancellationToken);
@@ -244,6 +262,13 @@ public sealed class FanPerformanceSubmissionPromotionService(
                 blobName);
         }
     }
+
+    private static bool IsAlreadyApproved(FanPerformanceSubmission? submission) =>
+        submission is not null
+        && string.Equals(
+            submission.Status,
+            FanPerformanceSubmissionStatus.Approved,
+            StringComparison.OrdinalIgnoreCase);
 
     private static bool IsAllowedAudioExtension(string? extension) =>
         string.Equals(extension, ".mp3", StringComparison.OrdinalIgnoreCase)
