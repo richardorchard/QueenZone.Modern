@@ -27,7 +27,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: opentofu-plan-${{ github.event.pull_request.number }}
+  # The validation and privileged plan events must not cancel each other.
+  group: opentofu-plan-${{ github.event_name }}-${{ github.event.pull_request.number }}
   # Safe to cancel — this workflow is entirely read-only (fmt/validate/plan).
   cancel-in-progress: true
 
