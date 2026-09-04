@@ -9,8 +9,9 @@ import {
   fetchPhotoCategories,
   fetchRandomQuote,
 } from '../../api';
+import { NEWS_LIST_CACHE_KEY } from '../../cache/keys';
+import { useStoreRefresh } from '../../cache/useExternalStore';
 import { useHomeSection } from '../../hooks/useHomeSection';
-import { useNewsListEpochRefresh } from '../../hooks/useNewsListEpochRefresh';
 import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import { syncHomeWidget } from '../../widgets/widgetSync';
 import { onThisDayIsVisible, queenQuotesIsVisible } from './homeMeta';
@@ -23,7 +24,7 @@ import { onThisDayIsVisible, queenQuotesIsVisible } from './homeMeta';
  */
 export function useHomeScreenData(isSignedIn: boolean, accessToken: string | null) {
   const news = useHomeSection(useCallback((signal) => fetchNewsPage({ page: 1, pageSize: 4, signal }), []));
-  useNewsListEpochRefresh(news.refresh);
+  useStoreRefresh(NEWS_LIST_CACHE_KEY, news.refresh);
   const forum = useHomeSection(useCallback((signal) => fetchForumRecentThreads(3, signal), []));
   const gallery = useHomeSection(
     useCallback((signal) => fetchPhotoCategories({ page: 1, pageSize: 3, signal }), []),

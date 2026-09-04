@@ -1,10 +1,11 @@
 import { act, fireEvent, screen, userEvent, waitFor } from '@testing-library/react-native';
 import { fetchNewsPage, fetchNewsYearRange } from '../../api';
 import { ApiError } from '../../api/client';
+import { invalidate } from '../../cache/externalStore';
+import { NEWS_LIST_CACHE_KEY } from '../../cache/keys';
 import { newsArticlePlaceholder } from '../../content/newsArticleImage';
 import { deferred, newsItemFixture, pagedResponse } from '../../test/fixtures';
 import { fakeNavigation, renderWithProviders } from '../../test/render';
-import { bumpNewsListEpoch } from '../../notifications/newsListEpoch';
 import { NewsIndexScreen, newsListResetKey } from './NewsIndexScreen';
 
 jest.mock('../../api', () => {
@@ -159,7 +160,7 @@ describe('NewsIndexScreen', () => {
     expect(fetchNews).toHaveBeenLastCalledWith(expect.objectContaining({ decade: undefined, year: undefined }));
   });
 
-  it('refreshes the mounted list when a news push bumps the list epoch', async () => {
+  it('refreshes the mounted list when a news push invalidates the list', async () => {
     fetchNews.mockResolvedValueOnce(pagedResponse([newsItemFixture({ id: 1, title: 'Stale headline' })], 1, 1));
     renderNews();
     await waitFor(() => expect(screen.getByRole('button', { name: 'Open Stale headline' })).toBeOnTheScreen());
@@ -169,7 +170,7 @@ describe('NewsIndexScreen', () => {
       pagedResponse([newsItemFixture({ id: 1003, title: 'QueenZone modernisation begins' })], 1, 1),
     );
     await act(async () => {
-      bumpNewsListEpoch();
+      invalidate(NEWS_LIST_CACHE_KEY);
     });
 
     await waitFor(() =>
@@ -187,7 +188,7 @@ describe('NewsIndexScreen', () => {
     unmount();
 
     await act(async () => {
-      bumpNewsListEpoch();
+      invalidate(NEWS_LIST_CACHE_KEY);
     });
 
     expect(fetchNews).toHaveBeenCalledTimes(newsCalls);

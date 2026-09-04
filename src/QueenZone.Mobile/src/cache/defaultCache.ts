@@ -1,6 +1,12 @@
 import { createAsyncStorageAdapter } from './asyncStorageAdapter';
 import { CONTENT_CACHE_MAX_ENTRIES, ContentCache } from './contentCache';
-import { PRIVATE_CACHE_KEY_PREFIX, privateMemberCachePrefix } from './keys';
+import { invalidatePrefix } from './externalStore';
+import {
+  DOWNLOAD_UI_CACHE_KEY_PREFIX,
+  PRIVATE_CACHE_KEY_PREFIX,
+  downloadUiCachePrefix,
+  privateMemberCachePrefix,
+} from './keys';
 
 let shared: ContentCache | null = null;
 
@@ -22,10 +28,15 @@ export function setContentCacheForTests(cache: ContentCache | null): void {
 
 /** Drop conversation snapshots. Public forum cache is left in place. */
 export async function purgePrivateContentCache(memberId?: string | null): Promise<void> {
+  const prefix = memberId ? privateMemberCachePrefix(memberId) : PRIVATE_CACHE_KEY_PREFIX;
+  const downloadPrefix = memberId ? downloadUiCachePrefix(memberId) : DOWNLOAD_UI_CACHE_KEY_PREFIX;
   try {
-    const prefix = memberId ? privateMemberCachePrefix(memberId) : PRIVATE_CACHE_KEY_PREFIX;
     await getContentCache().purgePrefix(prefix);
   } catch {
     // Sign-out still has to finish if the device store is unavailable.
   }
+  // Prefix-scoped store invalidation (PM unread + #927 download-ui seam).
+  // Binary download files are a sibling store; this only drops UI versions.
+  invalidatePrefix(prefix);
+  invalidatePrefix(downloadPrefix);
 }

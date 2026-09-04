@@ -87,6 +87,11 @@ This primitive is also the home for #927's download manifest state — locally
 owned mutable state with a lifecycle, which is a poor fit for a query cache
 even in a codebase that had one. Building it here rather than inside #927 keeps
 the download feature from inventing a third pub/sub under delivery pressure.
+Implemented in `src/QueenZone.Mobile/src/cache/externalStore.ts` (#1285).
+#927 download-manifest UI state (`queued` / `downloading` / `downloaded` /
+`failed` / `removing`) belongs on this store under `DOWNLOAD_UI_CACHE_KEY_PREFIX`
+in `keys.ts`. Binary files and the durable manifest remain a sibling store
+(decision 4) — do not implement them here.
 
 ### 4. Binary downloads are out of scope of this decision
 

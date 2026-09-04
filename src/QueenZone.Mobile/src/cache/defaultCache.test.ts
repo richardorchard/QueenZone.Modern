@@ -24,11 +24,24 @@ const { getContentCache, purgePrivateContentCache, setContentCacheForTests } = a
   './defaultCache.ts'
 );
 const { createMemoryStorage } = await import('./storage.ts');
-const { conversationCacheKey, forumTopicCacheKey } = await import('./keys.ts');
+const {
+  conversationCacheKey,
+  DOWNLOAD_UI_CACHE_KEY_PREFIX,
+  forumTopicCacheKey,
+  NEWS_LIST_CACHE_KEY,
+  PM_UNREAD_CACHE_KEY,
+  PRIVATE_CACHE_KEY_PREFIX,
+  downloadUiCachePrefix,
+  privateMemberCachePrefix,
+} = await import('./keys.ts');
+const { getStoreVersion, resetExternalStoreForTests, subscribePrefix } = await import(
+  './externalStore.ts'
+);
 
 describe('getContentCache', () => {
   afterEach(() => {
     setContentCacheForTests(null);
+    resetExternalStoreForTests();
   });
 
   it('returns the same singleton after the first create', () => {
@@ -66,5 +79,51 @@ describe('getContentCache', () => {
     await purgePrivateContentCache();
     assert.equal(await injected.get(conversationCacheKey('member-a', 'c1')), null);
     assert.deepEqual(await injected.get(forumTopicCacheKey(1)), { id: 1 });
+  });
+
+  it('prefix-invalidates private and download-ui store keys on full purge', async () => {
+    resetExternalStoreForTests();
+    setContentCacheForTests(new ContentCache({ storage: createMemoryStorage() }));
+    const heard: string[] = [];
+    const stopPrivate = subscribePrefix(PRIVATE_CACHE_KEY_PREFIX, () => {
+      heard.push('private');
+    });
+    const stopDownloads = subscribePrefix(DOWNLOAD_UI_CACHE_KEY_PREFIX, () => {
+      heard.push('downloads');
+    });
+    const newsStart = getStoreVersion(NEWS_LIST_CACHE_KEY);
+    const pmStart = getStoreVersion(PM_UNREAD_CACHE_KEY);
+
+    await purgePrivateContentCache();
+
+    assert.deepEqual(heard, ['private', 'downloads']);
+    assert.equal(getStoreVersion(PM_UNREAD_CACHE_KEY), pmStart + 1);
+    assert.equal(getStoreVersion(NEWS_LIST_CACHE_KEY), newsStart);
+    stopPrivate();
+    stopDownloads();
+  });
+
+  it('member-scoped purge invalidates that member prefix only', async () => {
+    resetExternalStoreForTests();
+    setContentCacheForTests(new ContentCache({ storage: createMemoryStorage() }));
+    const heard: string[] = [];
+    const stopMember = subscribePrefix(privateMemberCachePrefix('member-a'), () => {
+      heard.push('member-a');
+    });
+    const stopOther = subscribePrefix(privateMemberCachePrefix('member-b'), () => {
+      heard.push('member-b');
+    });
+    const stopDownloads = subscribePrefix(downloadUiCachePrefix('member-a'), () => {
+      heard.push('downloads-a');
+    });
+    const pmStart = getStoreVersion(PM_UNREAD_CACHE_KEY);
+
+    await purgePrivateContentCache('member-a');
+
+    assert.deepEqual(heard, ['member-a', 'downloads-a']);
+    assert.equal(getStoreVersion(PM_UNREAD_CACHE_KEY), pmStart);
+    stopMember();
+    stopOther();
+    stopDownloads();
   });
 });
