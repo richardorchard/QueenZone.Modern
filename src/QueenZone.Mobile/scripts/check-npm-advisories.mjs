@@ -69,7 +69,8 @@ export function parseAuditJson(text) {
 
   if (parsed.error && !parsed.vulnerabilities) {
     const summary = parsed.error.summary || parsed.error.detail || parsed.error.code || 'npm audit failed';
-    throw new Error(`Missing npm audit output: ${summary}`);
+    const code = parsed.error.code ? ` code=${parsed.error.code}` : '';
+    throw new Error(`Missing npm audit output: ${summary}${code}`);
   }
 
   if (!parsed.vulnerabilities || typeof parsed.vulnerabilities !== 'object' || Array.isArray(parsed.vulnerabilities)) {
@@ -251,7 +252,7 @@ export function loadAllowlist(filePath) {
   return parsed;
 }
 
-const AUDIT_ATTEMPTS = 3;
+const AUDIT_ATTEMPTS = 2;
 const AUDIT_FETCH_TIMEOUT_MS = 600_000;
 
 export function auditStdout(result) {
@@ -263,17 +264,19 @@ export function auditStdout(result) {
   return String(result?.stderr ?? '');
 }
 
+export function npmAuditArgs(fetchTimeoutMs = AUDIT_FETCH_TIMEOUT_MS) {
+  return [`--fetch-timeout=${fetchTimeoutMs}`, 'audit', '--json'];
+}
+
 export function runNpmAudit(cwd, { attempts = AUDIT_ATTEMPTS, fetchTimeoutMs = AUDIT_FETCH_TIMEOUT_MS } = {}) {
   let lastError;
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
-    const result = spawnSync('npm', ['audit', '--json'], {
+    // Pass fetch-timeout as an npm global CLI flag. GHA ignored NPM_CONFIG_*
+    // and still died at the default 300s on a second audit after `npm ci`.
+    const result = spawnSync('npm', npmAuditArgs(fetchTimeoutMs), {
       cwd,
       encoding: 'utf8',
       maxBuffer: 20 * 1024 * 1024,
-      env: {
-        ...process.env,
-        NPM_CONFIG_FETCH_TIMEOUT: String(fetchTimeoutMs),
-      },
     });
 
     if (result.error) {
@@ -508,6 +511,13 @@ function runSelfTest() {
     }
     if (auditStdout({ stdout: '', stderr: '{"error":true}' }) !== '{"error":true}') {
       throw new Error('expected stderr fallback');
+    }
+  });
+
+  assert('npmAuditArgs passes fetch-timeout as an npm global flag', () => {
+    const args = npmAuditArgs(600000);
+    if (args[0] !== '--fetch-timeout=600000' || args[1] !== 'audit' || args[2] !== '--json') {
+      throw new Error(JSON.stringify(args));
     }
   });
 
