@@ -86,12 +86,13 @@ run "dev_rejects_production_hostname" {
 run "dev_managed_tls_after_dns" {
   command = plan
   variables {
-    environment_name  = "dev"
-    custom_hostnames  = {}
-    managed_hostnames = ["dev.queenzone.org"]
+    environment_name    = "dev"
+    custom_hostnames    = {}
+    managed_hostnames   = ["dev.queenzone.org"]
+    allow_direct_access = true
   }
   assert {
-    condition     = length(azurerm_app_service_managed_certificate.managed) == 1 && azurerm_app_service_certificate_binding.managed["dev.queenzone.org"].ssl_state == "SniEnabled" && azurerm_linux_web_app.production.site_config[0].ip_restriction_default_action == "Deny"
-    error_message = "The later DNS phase must enable managed SNI TLS and restricted ingress."
+    condition     = length(azurerm_app_service_managed_certificate.managed) == 1 && azurerm_app_service_certificate_binding.managed["dev.queenzone.org"].ssl_state == "SniEnabled" && azurerm_linux_web_app.production.site_config[0].ip_restriction_default_action == "Allow"
+    error_message = "The later DNS phase must enable managed SNI TLS while preserving direct dev ingress for certificate renewal."
   }
 }
