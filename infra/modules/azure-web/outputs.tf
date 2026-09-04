@@ -19,3 +19,14 @@ output "managed_identity_principal_id" {
   description = "System-assigned identity principal ID for separately scoped RBAC."
   value       = azurerm_linux_web_app.production.identity[0].principal_id
 }
+
+output "default_hostname" {
+  description = "Azure-provided HTTPS hostname."
+  value       = azurerm_linux_web_app.production.default_hostname
+}
+
+output "custom_domain_verification_id" {
+  sensitive   = true
+  description = "Public DNS ownership verification value for the later domain cutover."
+  value       = azurerm_linux_web_app.production.custom_domain_verification_id
+}

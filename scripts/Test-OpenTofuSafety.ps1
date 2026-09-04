@@ -11,6 +11,7 @@ $criticalResourceTypes = @(
     "azurerm_service_plan",
     "azurerm_linux_web_app",
     "azurerm_app_service_certificate",
+    "azurerm_app_service_managed_certificate",
     "azurerm_app_service_custom_hostname_binding",
     "azurerm_app_service_certificate_binding",
     "azurerm_mssql_server",

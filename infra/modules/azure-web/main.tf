@@ -96,7 +96,9 @@ resource "azurerm_linux_web_app" "production" {
   # fix. Marking the configured value sensitive redacts it as
   # "(sensitive value)" in all cases; ignore_changes still keeps OpenTofu
   # from ever touching the live map (ADR 0008).
-  app_settings = sensitive({})
+  app_settings = sensitive(var.environment_name == "dev" ? {
+    WEBSITE_WARMUP_PATH = "/health"
+  } : {})
 
   tags = {
     "hidden-link: /app-insights-resource-id" = replace(
@@ -121,7 +123,7 @@ resource "azurerm_linux_web_app" "production" {
     scm_minimum_tls_version           = "1.2"
     scm_use_main_ip_restriction       = false
     scm_ip_restriction_default_action = "Allow"
-    ip_restriction_default_action     = "Deny"
+    ip_restriction_default_action     = var.allow_direct_access ? "Allow" : "Deny"
     use_32_bit_worker                 = true
     websockets_enabled                = false
     worker_count                      = var.worker_count
@@ -180,6 +182,36 @@ resource "azurerm_app_service_custom_hostname_binding" "production" {
   ssl_state           = "SniEnabled"
   thumbprint          = each.value
 
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+# Separate addresses preserve production's imported uploaded-certificate bindings.
+resource "azurerm_app_service_custom_hostname_binding" "managed" {
+  for_each            = var.managed_hostnames
+  hostname            = each.value
+  app_service_name    = azurerm_linux_web_app.production.name
+  resource_group_name = var.resource_group_name
+  lifecycle {
+    prevent_destroy = true
+    ignore_changes  = [ssl_state, thumbprint]
+  }
+}
+
+resource "azurerm_app_service_managed_certificate" "managed" {
+  for_each                   = var.managed_hostnames
+  custom_hostname_binding_id = azurerm_app_service_custom_hostname_binding.managed[each.key].id
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+resource "azurerm_app_service_certificate_binding" "managed" {
+  for_each            = var.managed_hostnames
+  hostname_binding_id = azurerm_app_service_custom_hostname_binding.managed[each.key].id
+  certificate_id      = azurerm_app_service_managed_certificate.managed[each.key].id
+  ssl_state           = "SniEnabled"
   lifecycle {
     prevent_destroy = true
   }
