@@ -93,14 +93,16 @@ public sealed class EfFanPerformanceReportRepository(QueenZoneDbContext dbContex
         var totalCount = await query.CountAsync(cancellationToken);
         var rows = await query
             .Include(row => row.Reporter)
+            .ToListAsync(cancellationToken);
+        var pageRows = rows
             .OrderBy(row => row.Status == FanPerformanceReportStatus.Open ? 0 : 1)
             .ThenByDescending(row => row.CreatedAt)
             .Skip((safePage - 1) * safePageSize)
             .Take(safePageSize)
-            .ToListAsync(cancellationToken);
+            .ToList();
 
         return new FanPerformanceReportListPage(
-            rows.Select(MapListItem).ToList(),
+            pageRows.Select(MapListItem).ToList(),
             totalCount,
             filter);
     }

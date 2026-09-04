@@ -1,4 +1,6 @@
-import { audioFromDocumentAsset, validateFanPerformanceSubmit } from './fanPerformanceSubmitMeta';
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { audioFromDocumentAsset, validateFanPerformanceSubmit } from './fanPerformanceSubmitMeta.ts';
 
 describe('validateFanPerformanceSubmit', () => {
   const valid = {
@@ -12,23 +14,24 @@ describe('validateFanPerformanceSubmit', () => {
   };
 
   it('accepts a complete pick-file submission', () => {
-    expect(validateFanPerformanceSubmit(valid)).toBeNull();
+    assert.equal(validateFanPerformanceSubmit(valid), null);
   });
 
   it('requires the rights declaration', () => {
-    expect(validateFanPerformanceSubmit({ ...valid, rightsDeclarationAccepted: false })).toBe(
+    assert.equal(
+      validateFanPerformanceSubmit({ ...valid, rightsDeclarationAccepted: false }),
       'You must confirm this is your own performance and agree to publication.',
     );
   });
 
   it('requires an audio file', () => {
-    expect(validateFanPerformanceSubmit({ ...valid, audio: null })).toBe('Choose an audio file to upload.');
+    assert.equal(validateFanPerformanceSubmit({ ...valid, audio: null }), 'Choose an audio file to upload.');
   });
 });
 
 describe('audioFromDocumentAsset', () => {
   it('defaults mp3 mime when the picker omits it', () => {
     const mapped = audioFromDocumentAsset({ uri: 'file://x.mp3', name: 'x.mp3' });
-    expect(mapped.file.type).toBe('audio/mpeg');
+    assert.equal(mapped.file.type, 'audio/mpeg');
   });
 });

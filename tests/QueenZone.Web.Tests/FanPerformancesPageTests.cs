@@ -185,7 +185,7 @@ public sealed class FanPerformancesPageTests : IClassFixture<WebApplicationFacto
         var client = await CreateSignedInMemberClientAsync();
         var formPage = await client.GetStringAsync("/fan-performances/186/report");
         Assert.Contains("Report a fan performance", formPage);
-        Assert.Contains("Dear Mr Murdoch", formPage);
+        Assert.Contains("Liar", formPage);
 
         var first = await client.PostAsync(
             "/fan-performances/186/report",
