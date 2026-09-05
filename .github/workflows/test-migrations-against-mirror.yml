@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       force_resync:
-        description: "Resync the mirror from the live legacy DB first (~3-5 min). Leave unchecked to test against whatever's already in the mirror (e.g. last night's sync, or a prior run of this workflow)."
+        description: "Resync the mirror from the live legacy DB first (~25-30 min currently). Leave unchecked to test against whatever's already in the mirror (e.g. last night's sync, or a prior run of this workflow)."
         required: false
         type: boolean
         default: false
