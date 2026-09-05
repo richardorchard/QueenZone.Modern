@@ -142,6 +142,7 @@ IF DATABASE_PRINCIPAL_ID(N'$ownerLiteral') IS NULL
         /SourceFile:"$dacpacPath" `
         /TargetConnectionString:"Server=localhost\$InstanceName;Database=$stagingDatabase;Integrated Security=True;TrustServerCertificate=True" `
         /p:ExcludeObjectTypes="Views;Users;Logins;Permissions;RoleMembership" `
+        /p:ScriptDatabaseOptions=False `
         /p:AllowIncompatiblePlatform=True
     if ($LASTEXITCODE -ne 0) { throw "sqlpackage publish failed with exit code $LASTEXITCODE" }
 
