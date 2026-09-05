@@ -18,11 +18,11 @@ export type NotificationPreferencePatch = {
 
 export type NotificationPreferenceKey = keyof NotificationPreferences;
 
-/** Server defaults from #758: forum replies on, messages on, news off. */
+/** Server defaults: forum replies, private messages, and news on. */
 export const defaultNotificationPreferences: NotificationPreferences = {
   forumReply: true,
   privateMessage: true,
-  news: false,
+  news: true,
 };
 
 export function parseNotificationPreferences(payload: unknown): NotificationPreferences {
