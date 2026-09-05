@@ -1,7 +1,8 @@
 appId: org.queenzone.mobile
 ---
 # Testing-seeded access token from the contract-host fixture. The runner
-# exports SMOKE_AUTH_URL. Debug builds only handle queenzone://smoke-auth.
+# exports SMOKE_AUTH_URL. Debug or Release-embedded smoke builds handle
+# queenzone://smoke-auth when appEnv is development.
 - runFlow: open-smoke-auth.yaml
 - tapOn:
     id: tab-home

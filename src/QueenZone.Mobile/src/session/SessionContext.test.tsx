@@ -22,6 +22,7 @@ const mockAppConfig = {
   apiBaseUrl: 'http://qz.test',
   appEnv: 'development' as string,
   version: '0.1.0',
+  smokeEmbed: false as boolean | undefined,
 };
 
 jest.mock('../config/appConfig', () => ({
@@ -145,6 +146,7 @@ beforeEach(() => {
   jest.spyOn(AppState, 'addEventListener').mockImplementation(() => ({ remove: jest.fn() }));
   mockAppConfig.appEnv = 'development';
   mockAppConfig.version = '0.1.0';
+  mockAppConfig.smokeEmbed = false;
   fetchJsonMock.mockReset();
   readStored.mockReset();
   writeStored.mockReset();
@@ -174,6 +176,31 @@ describe('SessionProvider', () => {
     renderSession();
     await waitFor(() => expect(screen.getByText('signed-out')).toBeOnTheScreen());
     expect(screen.getByText('no-token')).toBeOnTheScreen();
+  });
+
+  it('applies the smoke session when Release smokeEmbed is baked', async () => {
+    const user = userEvent.setup();
+    const runtime = globalThis as typeof globalThis & { __DEV__?: boolean };
+    const previous = runtime.__DEV__;
+    runtime.__DEV__ = false;
+    mockAppConfig.smokeEmbed = true;
+    try {
+      readStored.mockResolvedValue(null);
+      renderSession();
+      await waitFor(() => expect(screen.getByText('signed-out')).toBeOnTheScreen());
+
+      await user.press(screen.getByText('do-smoke-auth'));
+      await waitFor(() => expect(screen.getByText('signed-in')).toBeOnTheScreen());
+      expect(screen.getByText('smoke-applied')).toBeOnTheScreen();
+      expect(signInWithProvider).not.toHaveBeenCalled();
+      expect(writeStored).toHaveBeenCalledWith({
+        accessToken: 'smoke-access',
+        refreshToken: 'smoke-debug-no-refresh',
+        expiresIn: 3600,
+      });
+    } finally {
+      runtime.__DEV__ = previous;
+    }
   });
 
   it('rejects the smoke session when __DEV__ is false', async () => {
@@ -548,6 +575,7 @@ describe('SessionProvider', () => {
     async (appEnv) => {
       const user = userEvent.setup();
       mockAppConfig.appEnv = appEnv;
+      mockAppConfig.smokeEmbed = true;
       readStored.mockResolvedValue(null);
       renderSession();
       await waitFor(() => expect(screen.getByText('signed-out')).toBeOnTheScreen());

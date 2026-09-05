@@ -473,16 +473,18 @@ used. Both jobs upload their build as a workflow artifact
 (`mobile-android-<run-id>` / `mobile-ios-<run-id>`), downloadable from the
 run's summary page for one day. Those compile artifacts are **not** the
 device-smoke binaries: `EXPO_PUBLIC_API_BASE_URL` is bake-time, so smoke
-rebuilds Debug with a loopback Testing origin.
+rebuilds a Release-embedded binary with a loopback Testing origin.
 
 ## Device smoke (Maestro)
 
-Device smoke boots a Debug APK / Simulator `.app` against the same
-Testing contract host as the consumer-contract suite
+Device smoke boots a **Release-embedded** APK / Simulator `.app` against the
+same Testing contract host as the consumer-contract suite
 (`ASPNETCORE_ENVIRONMENT=Testing`, `QUEENZONE_MOBILE_CONTRACT_HOST=1`).
 It is **not** a substitute for `npm test` (#833), consumer contracts
 (#869), or the unsigned compile jobs. It does not use EAS, Expo Go, the
-live site, Azure SQL, real OAuth, or member passwords.
+live site, Azure SQL, real OAuth, Metro in CI, or member passwords.
+Local `expo start` + Debug remains for developers; device smoke/journeys
+never install `app-debug.apk` or `Debug-iphonesimulator`.
 
 | Smoke is | Smoke is not |
 | --- | --- |
@@ -493,10 +495,14 @@ Shared flows live in [`maestro/`](maestro/). Android and iOS use the same YAML; 
 Local (repo root). Install [Maestro](https://maestro.mobile.dev) first
 (`curl -Ls "https://get.maestro.mobile.dev" | bash`). Unset any
 `ConnectionStrings__*` env vars. The script starts the Testing host on
-port 5098, bakes a Debug binary with the JS bundle embedded
-(`QUEENZONE_MOBILE_SMOKE_EMBED=1`, no expo-dev-client launcher), and runs
-`maestro/smoke.yaml`. That keeps `__DEV__` true for `queenzone://smoke-auth`
-and still points `EXPO_PUBLIC_API_BASE_URL` at the Testing host, not prod.
+port 5098, bakes a Release-embedded binary
+(`assembleRelease` / `-configuration Release`, `QUEENZONE_MOBILE_SMOKE_EMBED=1`
+to strip expo-dev-client), and runs `maestro/smoke.yaml`. Release embed is
+what puts the JS bundle in the binary — Debug + env flags still opened the
+dev-client launcher (#1322). `EXPO_PUBLIC_API_BASE_URL` still points at the
+Testing host (`10.0.2.2:5098` / `127.0.0.1:5098`), not prod.
+`SENTRY_DISABLE_AUTO_UPLOAD=true` stays. `queenzone://smoke-auth` is allowed
+on that bake because `appEnv` is development and `smokeEmbed` is set.
 
 ```bash
 # Android: start an API 36 emulator first
@@ -513,9 +519,10 @@ and still points `EXPO_PUBLIC_API_BASE_URL` at the Testing host, not prod.
 ```
 
 Authenticated smoke injects the contract-host access token through
-`queenzone://smoke-auth`. That deep link is handled only when `__DEV__`
-is true (Debug). It is not compiled into staging/production Release
-behavior.
+`queenzone://smoke-auth`. That deep link is handled when `appEnv` is
+development and either `__DEV__` is true (local Debug) or `smokeEmbed`
+was baked (CI/local Release smoke). It is not compiled into
+staging/production store Release behavior.
 
 CI: [`.github/workflows/mobile-device-smoke.yml`](../../.github/workflows/mobile-device-smoke.yml)
 runs on **Actions → Mobile device smoke** (`workflow_dispatch`) and

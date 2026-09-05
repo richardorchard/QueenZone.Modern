@@ -21,6 +21,11 @@ export type AppConfig = {
   buildRevision?: string;
   /** Public Sentry DSN baked at prebuild; unset keeps `initSentry()` a no-op. */
   sentryDsn?: string;
+  /**
+   * True when CI/local smoke prebuild set QUEENZONE_MOBILE_SMOKE_EMBED.
+   * Lets Release-embedded Testing binaries accept queenzone://smoke-auth.
+   */
+  smokeEmbed?: boolean;
 };
 
 type ExpoExtra = {
@@ -30,6 +35,7 @@ type ExpoExtra = {
   buildTimestampUtc?: string;
   buildRevision?: string;
   sentryDsn?: string;
+  smokeEmbed?: boolean;
 };
 
 function readExtra(): ExpoExtra {
@@ -66,6 +72,7 @@ export function getAppConfig(): AppConfig {
     buildTimestampUtc: extra.buildTimestampUtc,
     buildRevision: extra.buildRevision,
     sentryDsn: readSentryDsn(extra),
+    smokeEmbed: extra.smokeEmbed === true,
   };
 }
 

@@ -58,9 +58,11 @@ function messageFromUnknownError(err: unknown): string {
 }
 
 function smokeAttachAllowed(): boolean {
+  const config = getAppConfig();
   return isSmokeAttachEnabled({
     dev: typeof __DEV__ !== 'undefined' ? __DEV__ : false,
-    appEnv: getAppConfig().appEnv,
+    appEnv: config.appEnv,
+    smokeEmbed: config.smokeEmbed,
   });
 }
 
