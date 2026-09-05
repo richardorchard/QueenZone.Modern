@@ -1,0 +1,474 @@
+name: Deploy dev
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+
+env:
+  SIXLABORS_LICENSE_KEY: ${{ secrets.SIXLABORS_LICENSE_KEY }}
+
+concurrency:
+  # Keep dev releases independent from production's deploy workflow. Phase 5
+  # will narrow production's trigger; until then both may observe the same push.
+  group: deploy-dev-${{ github.ref }}
+  # Never cancel an in-flight run here — cancelling mid-migrate/deploy can
+  # leave the DB or App Service half-updated.
+  cancel-in-progress: false
+
+# Runs after a PR merges to main. ci.yml already ran the full test/coverage/
+# e2e suite against this exact tree as a required status check before the
+# merge was allowed (see branch protection on main), so none of that re-runs
+# here. This workflow no longer rebuilds — it reuses the exact binaries
+# ci.yml already built and tested on the PR, resolved below by PR head SHA.
+# Docs/infra/design/workflow-only and mobile-only merges skip
+# migrate/deploy/post-deploy-smoke (see `changes`) since ci.yml never
+# produced a website binary to reuse for those.
+# Mixed web+mobile merges still deploy the website: resolve-ci-run keys
+# off the web-publish artifact (not overall ci.yml success), because
+# long Mobile iOS/Android jobs can leave the workflow in_progress after
+# required web checks — and merge — already passed.
+# post-deploy-smoke is the safety net after the real deploy.
+jobs:
+  # Mirrors ci.yml's non-web bypass (scripts/classify-pipeline-changes.sh).
+  # ci.yml skips `build` (no web-publish artifact) for those PRs, so deploy
+  # has nothing to download — and there's genuinely nothing to redeploy.
+  # Without this gate, resolve-ci-run still finds the successful-but-skipped
+  # ci.yml run and `deploy` fails downloading an artifact that was never
+  # uploaded.
+  changes:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    outputs:
+      code: ${{ steps.check.outputs.code }}
+      migrations: ${{ steps.check.outputs.migrations }}
+      mobile: ${{ steps.check.outputs.mobile }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Self-test change classifier
+        run: bash ./scripts/classify-pipeline-changes.sh --self-test
+      - name: Check for code changes
+        id: check
+        run: |
+          if [ "${{ github.event_name }}" != "push" ] || [ -z "${{ github.event.before }}" ]; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            echo "migrations=true" >> "$GITHUB_OUTPUT"
+            echo "mobile=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git diff --name-only ${{ github.event.before }}...${{ github.sha }} \
+            | bash ./scripts/classify-pipeline-changes.sh \
+            >> "$GITHUB_OUTPUT"
+
+  # Finds the ci.yml run that built+tested this exact code, so `deploy` can
+  # download its publish artifact instead of rebuilding. github.sha on main is
+  # the merge result, not the PR head that ci.yml ran against:
+  #   - merge commits (2 parents): second parent is the PR head
+  #   - squash/rebase merges (1 parent): look up the associated PR head via API
+  #   - direct pushes with no PR: fall back to github.sha itself
+  resolve-ci-run:
+    runs-on: ubuntu-latest
+    needs: changes
+    if: github.ref == 'refs/heads/main' && needs.changes.outputs.code == 'true'
+    outputs:
+      run_id: ${{ steps.find.outputs.run_id }}
+      head_sha: ${{ steps.sha.outputs.head_sha }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Determine PR head SHA
+        id: sha
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PARENTS=($(git rev-list --parents -n 1 HEAD))
+          if [ "${#PARENTS[@]}" -ge 3 ]; then
+            HEAD_SHA="${PARENTS[2]}"
+            echo "Merge commit — using second parent as PR head SHA."
+          else
+            # Squash/rebase merge: the commit on main is not the PR head that
+            # ci.yml tested. Resolve via the commit→PR association.
+            HEAD_SHA=$(gh api "repos/${{ github.repository }}/commits/${PARENTS[0]}/pulls" \
+              --jq '.[0].head.sha // empty')
+            if [ -n "$HEAD_SHA" ]; then
+              echo "Single-parent commit — resolved associated PR head SHA."
+            else
+              HEAD_SHA="${PARENTS[0]}"
+              echo "No associated PR — falling back to commit SHA itself."
+            fi
+          fi
+          echo "Resolved PR head SHA: $HEAD_SHA"
+          echo "head_sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
+
+      # Prefer web-publish artifact presence over overall workflow conclusion.
+      # Mixed web+mobile PRs leave ci.yml in_progress on native builds after
+      # required web checks (and merge) already passed — see
+      # scripts/Resolve-CiPublishRun.sh and deploys after #860 / #866.
+      - name: Self-test CI publish-run resolver
+        run: bash ./scripts/Resolve-CiPublishRun.sh --self-test
+      - name: Find matching CI run
+        id: find
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ steps.sha.outputs.head_sha }}
+        run: |
+          bash ./scripts/Resolve-CiPublishRun.sh >> "$GITHUB_OUTPUT"
+
+  migrate:
+    name: Apply database migrations
+    runs-on: ubuntu-latest
+    needs: [changes]
+    # Does not wait on resolve-ci-run — that output is only for the zip deploy.
+    # Skip the restore/`database update` when the push did not touch EF paths
+    # (issue #659). workflow_dispatch still fails closed (migrations=true).
+    if: |
+      github.ref == 'refs/heads/main' &&
+      needs.changes.outputs.code == 'true' &&
+      needs.changes.outputs.migrations == 'true'
+    environment: dev-migrate
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+          cache: true
+          cache-dependency-path: |
+            **/*.csproj
+            .config/dotnet-tools.json
+
+      - name: Restore
+        run: |
+          dotnet tool restore
+          dotnet restore QueenZone.sln
+
+      - name: Fetch Bitwarden deploy secrets
+        id: bitwarden-secrets
+        uses: bitwarden/sm-action@v3.0.1
+        with:
+          access_token: ${{ secrets.BITWARDEN_SECRETS_MANAGER_ACCESS_TOKEN }}
+          secrets: ${{ vars.BITWARDEN_APP_SERVICE_DEPLOY_SECRETS }}
+
+      - name: Apply database migrations
+        env:
+          ConnectionStrings__QueenZoneLegacy: ${{ steps.bitwarden-secrets.outputs.QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING }}
+        run: |
+          if [ -z "$ConnectionStrings__QueenZoneLegacy" ]; then
+            echo "::error::QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING is not configured. Check the Bitwarden secret and BITWARDEN_APP_SERVICE_DEPLOY_SECRETS mapping before deploying."
+            exit 1
+          fi
+
+          dotnet ef database update \
+            --project src/QueenZone.Data/QueenZone.Data.csproj \
+            --startup-project src/QueenZone.Web/QueenZone.Web.csproj
+
+  # WEBSITE_RUN_FROM_PACKAGE=1 (mount the zip read-only rather than extracting
+  # it) was removed after it repeatedly served stale builds post-deploy: a
+  # worker could pass the post-deploy build-stamp smoke check and then revert
+  # to the previous build minutes later with no further restart logged,
+  # consistent with the old worker not draining cleanly during the mount
+  # handoff. Plain extract-mode deploys do not have this failure mode.
+  # WEBSITE_WARMUP_PATH is still ARM-owned here (Kudu POST /api/settings
+  # cannot persist ARM Application Settings — it returns 204 but does not
+  # take effect, #660/#664), through a dedicated OIDC identity scoped to
+  # Website Contributor on queenzone-devbox only (#666), never through
+  # scripts/Invoke-AppServiceKudu.py.
+  #
+  # WEBSITE_WARMUP_PATH points at /health, not /warmup. Azure's own container
+  # startup probe must succeed within WEBSITES_CONTAINER_START_TIME_LIMIT
+  # (default 230s) or the platform kills the container and retries. /warmup
+  # runs dependency checks and primes public caches, so it is a deploy-time
+  # readiness gate rather than the platform's container-liveness gate.
+  # Pointing the platform probe at /warmup crash-looped
+  # the App Service for over an hour on the first #666 rollout. /health stays
+  # cheap (no dependency I/O) so it can't blow the platform's tight budget.
+  # WEBSITE_WARMUP_STATUSES stays unset: App Service pings can carry an internal
+  # link-local Host header, and the old ASP.NET Core host filter rejected that
+  # before /health with 400. Requiring exactly 200 turned the rejection into a
+  # 230-second crash loop (#684). The app now bypasses host validation for probe
+  # paths, but accepting any HTTP response remains the safer platform liveness
+  # contract; the post-deploy /warmup + route smoke below is the strict gate.
+  # deploy.yml's own "Warm up custom domain" step still hits /warmup
+  # directly afterward, with its own ~8 minute retry budget — that is the
+  # right amount of patience for "are caches warm," not a platform gate.
+  configure-app-settings:
+    name: Configure ARM Application Settings
+    runs-on: ubuntu-latest
+    needs: [changes, resolve-ci-run]
+    if: |
+      always() &&
+      github.ref == 'refs/heads/main' &&
+      needs.changes.outputs.code == 'true' &&
+      needs.resolve-ci-run.result == 'success'
+    environment: dev-deploy
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Fetch Bitwarden runtime secrets
+        id: bitwarden-secrets
+        uses: bitwarden/sm-action@v3.0.1
+        with:
+          access_token: ${{ secrets.BITWARDEN_SECRETS_MANAGER_ACCESS_TOKEN }}
+          secrets: ${{ vars.BITWARDEN_APP_SERVICE_DEPLOY_SECRETS }}
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v3
+        with:
+          client-id: ${{ vars.ARM_CLIENT_ID }}
+          tenant-id: ${{ vars.ARM_TENANT_ID }}
+          subscription-id: ${{ vars.ARM_SUBSCRIPTION_ID }}
+
+      # az webapp config appsettings set restarts the SCM/Kudu container on
+      # every call, whether or not the values actually changed — and this
+      # job runs on every code deploy, not just the first flip. Writing
+      # unconditionally would pay a 90s settle wait (see below) on every
+      # deploy forever. Only write, and only wait, when the live settings
+      # actually differ from the desired ones.
+      - name: Check and set required application settings via ARM
+        id: apply-settings
+        env:
+          BLOB_STORAGE_CONNECTION_STRING: ${{ steps.bitwarden-secrets.outputs.BLOB_STORAGE_CONNECTION_STRING }}
+          DEV_DATABASE_CONNECTION_STRING: ${{ steps.bitwarden-secrets.outputs.QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING }}
+          MOBILE_AUTH_SIGNING_KEY: ${{ steps.bitwarden-secrets.outputs.MOBILE_AUTH_SIGNING_KEY }}
+        run: |
+          if [ -z "$DEV_DATABASE_CONNECTION_STRING" ]; then
+            echo "::error::QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING is not configured for dev."
+            exit 1
+          fi
+
+          if [ -z "$BLOB_STORAGE_CONNECTION_STRING" ]; then
+            echo "::error::BLOB_STORAGE_CONNECTION_STRING is not configured for dev."
+            exit 1
+          fi
+
+          if [ "${#MOBILE_AUTH_SIGNING_KEY}" -lt 32 ]; then
+            echo "::error::MOBILE_AUTH_SIGNING_KEY must map to a Bitwarden secret of at least 32 characters."
+            exit 1
+          fi
+
+          desired=$(printf '%s\n' \
+            "WEBSITE_WARMUP_PATH=/health" | sort)
+
+          current=$(az webapp config appsettings list \
+            --name queenzone-devbox \
+            --resource-group Queenzone-Dev-RG \
+            --query "[?name=='WEBSITE_WARMUP_PATH'].[join('=', [name, value])]" \
+            -o tsv | tr -d '\r' | sort)
+
+          strict_warmup_status=$(az webapp config appsettings list \
+            --name queenzone-devbox \
+            --resource-group Queenzone-Dev-RG \
+            --query "[?name=='WEBSITE_WARMUP_STATUSES'].value | [0]" \
+            -o tsv | tr -d '\r')
+
+          # Kept absent by design (see comment above): a stale WEBSITE_RUN_FROM_PACKAGE=1
+          # from before this removal must not linger and re-enable the read-only mount.
+          run_from_package=$(az webapp config appsettings list \
+            --name queenzone-devbox \
+            --resource-group Queenzone-Dev-RG \
+            --query "[?name=='WEBSITE_RUN_FROM_PACKAGE'].value | [0]" \
+            -o tsv | tr -d '\r')
+
+          current_mobile_auth_signing_key=$(az webapp config appsettings list \
+            --name queenzone-devbox \
+            --resource-group Queenzone-Dev-RG \
+            --query "[?name=='MobileAuth__SigningKey'].value | [0]" \
+            -o tsv | tr -d '\r')
+
+          current_database_connection_string=$(az webapp config appsettings list \
+            --name queenzone-devbox \
+            --resource-group Queenzone-Dev-RG \
+            --query "[?name=='ConnectionStrings__QueenZoneLegacy'].value | [0]" \
+            -o tsv | tr -d '\r')
+
+          current_blob_storage_connection_string=$(az webapp config appsettings list \
+            --name queenzone-devbox \
+            --resource-group Queenzone-Dev-RG \
+            --query "[?name=='ConnectionStrings__BlobStorage'].value | [0]" \
+            -o tsv | tr -d '\r')
+
+          changed=false
+          if [ -n "$strict_warmup_status" ]; then
+            az webapp config appsettings delete \
+              --name queenzone-devbox \
+              --resource-group Queenzone-Dev-RG \
+              --setting-names WEBSITE_WARMUP_STATUSES \
+              --output none
+            changed=true
+          fi
+
+          if [ -n "$run_from_package" ]; then
+            az webapp config appsettings delete \
+              --name queenzone-devbox \
+              --resource-group Queenzone-Dev-RG \
+              --setting-names WEBSITE_RUN_FROM_PACKAGE \
+              --output none
+            changed=true
+          fi
+
+          if [ "$current" != "$desired" ]; then
+            az webapp config appsettings set \
+              --name queenzone-devbox \
+              --resource-group Queenzone-Dev-RG \
+              --settings WEBSITE_WARMUP_PATH=/health \
+              --output none
+            changed=true
+          fi
+
+          if [ "$current_mobile_auth_signing_key" != "$MOBILE_AUTH_SIGNING_KEY" ]; then
+            az webapp config appsettings set \
+              --name queenzone-devbox \
+              --resource-group Queenzone-Dev-RG \
+              --settings "MobileAuth__SigningKey=$MOBILE_AUTH_SIGNING_KEY" \
+              --output none
+            changed=true
+          fi
+
+          if [ "$current_database_connection_string" != "$DEV_DATABASE_CONNECTION_STRING" ]; then
+            az webapp config appsettings set \
+              --name queenzone-devbox \
+              --resource-group Queenzone-Dev-RG \
+              --settings "ConnectionStrings__QueenZoneLegacy=$DEV_DATABASE_CONNECTION_STRING" \
+              --output none
+            changed=true
+          fi
+
+          if [ "$current_blob_storage_connection_string" != "$BLOB_STORAGE_CONNECTION_STRING" ]; then
+            az webapp config appsettings set \
+              --name queenzone-devbox \
+              --resource-group Queenzone-Dev-RG \
+              --settings "ConnectionStrings__BlobStorage=$BLOB_STORAGE_CONNECTION_STRING" \
+              --output none
+            changed=true
+          fi
+
+          if [ "$changed" = "false" ]; then
+            echo "Settings already match; skipping write and restart wait."
+          else
+            echo "Settings updated; waiting for the resulting SCM restart before deploy."
+          fi
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+
+      # Only needed right after an actual settings write: Kudu killed the
+      # in-flight OneDeploy on the #666 rollout run when the zip push started
+      # ~25s after a settings write ("Deployment has been stopped due to SCM
+      # container restart... Do not perform a management operation and a
+      # deployment operation in quick succession"). Azure's own fix is the
+      # delay it recommends.
+      - name: Wait for SCM container to settle after the settings write
+        if: steps.apply-settings.outputs.changed == 'true'
+        run: sleep 90
+
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs: [changes, resolve-ci-run, migrate, configure-app-settings]
+    # migrate is skipped on non-EF pushes; treat skipped as success so the
+    # zip deploy still runs (issue #659).
+    if: |
+      always() &&
+      github.ref == 'refs/heads/main' &&
+      needs.changes.outputs.code == 'true' &&
+      needs.resolve-ci-run.result == 'success' &&
+      needs.configure-app-settings.result == 'success' &&
+      (needs.migrate.result == 'success' || needs.migrate.result == 'skipped')
+    environment:
+      name: dev-deploy
+      url: https://dev.queenzone.org
+    # A stuck azure/webapps-deploy poll (e.g. hitting the SCM-restart race
+    # this job now waits out) had no bound and hung for ~20 minutes before a
+    # manual cancel on the #666 rollout run. Fail loudly instead.
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # Reuses the exact binary ci.yml built and tested on the PR — no rebuild.
+      - name: Download publish artifact from CI run
+        uses: actions/download-artifact@v8
+        with:
+          name: web-publish-${{ needs.resolve-ci-run.outputs.run_id }}
+          run-id: ${{ needs.resolve-ci-run.outputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: publish
+
+      - name: Fetch Bitwarden deploy secrets
+        id: bitwarden-secrets
+        uses: bitwarden/sm-action@v3.0.1
+        with:
+          access_token: ${{ secrets.BITWARDEN_SECRETS_MANAGER_ACCESS_TOKEN }}
+          secrets: ${{ vars.BITWARDEN_APP_SERVICE_DEPLOY_SECRETS }}
+
+      - name: Deploy
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: queenzone-devbox
+          publish-profile: ${{ steps.bitwarden-secrets.outputs.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: publish
+
+      # An explicit Kudu restart after the zip push is required for a worker
+      # that can finish /warmup — skipping it after #688 left /warmup on HTTP
+      # 500 empty and / flaking until the deploy job was cancelled. Keep the
+      # stamp check as the strict readiness gate regardless of extract mode.
+      - name: Recycle App Service
+        env:
+          AZURE_WEBAPP_PUBLISH_PROFILE: ${{ steps.bitwarden-secrets.outputs.AZURE_WEBAPP_PUBLISH_PROFILE }}
+        run: python3 ./scripts/Invoke-AppServiceKudu.py --restart
+
+      - name: Warm up custom domain
+        run: |
+          bash ./scripts/Invoke-PostDeploySmoke.sh \
+            --base-url https://dev.queenzone.org \
+            --warmup-only \
+            --expect-build-version "${{ needs.resolve-ci-run.outputs.head_sha }}"
+
+  post-deploy-smoke:
+    name: Post-deploy smoke
+    runs-on: ubuntu-latest
+    needs: [changes, resolve-ci-run, deploy]
+    # always() is required: migrate is skipped on non-EF pushes, and GitHub
+    # then skips every descendant that does not opt out of that cascade —
+    # even when `deploy` itself ran (run 31702420754 after #660).
+    if: |
+      always() &&
+      github.ref == 'refs/heads/main' &&
+      needs.changes.outputs.code == 'true' &&
+      needs.resolve-ci-run.result == 'success' &&
+      needs.deploy.result == 'success'
+    # Allow retry loop (~8 min) plus request time; avoid false fails during App Service recycle.
+    timeout-minutes: 12
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # Smoke the public custom domain (Site:PublicBaseUrl), not only the App Service hostname.
+      # /health alone is liveness only — content pages can still 500 during recycle/warmup.
+      # The deploy job already polled /warmup and the new build stamp; this job
+      # still starts with warmup then the content-route suite. A failure fails
+      # the job so watchers get mail.
+      - name: Post-deploy smoke (custom domain)
+        run: |
+          bash ./scripts/Invoke-PostDeploySmoke.sh \
+            --base-url https://dev.queenzone.org \
+            --expect-build-version "${{ needs.resolve-ci-run.outputs.head_sha }}"
