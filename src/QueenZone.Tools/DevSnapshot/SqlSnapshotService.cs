@@ -226,6 +226,8 @@ internal sealed class SqlSnapshotCopySession(
     SqlConnection source,
     SqlConnection target) : IAsyncDisposable
 {
+    private const int SourceCommandTimeoutSeconds = 600;
+
     public async Task PrepareSelectionsAsync()
     {
         // Keep temp-table creation outside the parameterized command below.
@@ -450,7 +452,7 @@ internal sealed class SqlSnapshotCopySession(
         var columns = await GetInsertableColumnsAsync(table);
         await using var command = source.CreateCommand();
         command.CommandText = query;
-        command.CommandTimeout = 600;
+        command.CommandTimeout = SourceCommandTimeoutSeconds;
         await using var reader = await command.ExecuteReaderAsync(CommandBehavior.SequentialAccess);
         var sourceColumns = Enumerable.Range(0, reader.FieldCount).Select(reader.GetName).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var mapped = columns.Where(sourceColumns.Contains).ToArray();
@@ -492,6 +494,7 @@ internal sealed class SqlSnapshotCopySession(
     {
         await using var command = source.CreateCommand();
         command.CommandText = sql;
+        command.CommandTimeout = SourceCommandTimeoutSeconds;
         await using var reader = await command.ExecuteReaderAsync();
         while (await reader.ReadAsync())
         {
@@ -503,6 +506,7 @@ internal sealed class SqlSnapshotCopySession(
     {
         await using var command = source.CreateCommand();
         command.CommandText = sql;
+        command.CommandTimeout = SourceCommandTimeoutSeconds;
         await using var reader = await command.ExecuteReaderAsync();
         while (await reader.ReadAsync())
         {
@@ -519,7 +523,7 @@ internal sealed class SqlSnapshotCopySession(
     {
         await using var command = source.CreateCommand();
         command.CommandText = sql;
-        command.CommandTimeout = 600;
+        command.CommandTimeout = SourceCommandTimeoutSeconds;
         foreach (var parameter in parameters) command.Parameters.AddWithValue(parameter.Name, parameter.Value);
         await command.ExecuteNonQueryAsync();
     }
