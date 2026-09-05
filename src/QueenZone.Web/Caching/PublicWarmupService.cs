@@ -71,6 +71,10 @@ public sealed class PublicWarmupService
                 (cache, stepToken) => cache.GetForumRecentThreadsAsync(ForumRoutes.RecentThreadsCount, stepToken),
                 cancellationToken),
             WarmStepAsync(
+                "forum-legacy-discography-threads",
+                (cache, stepToken) => cache.GetForumLegacyDiscographyThreadsAsync(stepToken),
+                cancellationToken),
+            WarmStepAsync(
                 "on-this-day",
                 (cache, stepToken) => cache.GetOnThisDayAsync(today, 3, stepToken),
                 cancellationToken),

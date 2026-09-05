@@ -85,6 +85,21 @@ public sealed class InMemoryForumRepository(
         return Task.FromResult<IReadOnlyList<ForumRecentThreadItem>>(items);
     }
 
+    public Task<IReadOnlyList<ForumRecentThreadItem>> GetLegacyDiscographyThreadsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var rarities = seedCategories.SingleOrDefault(category => category.Name == "Recordings & Rarities")
+            ?? seedCategories[0];
+        var items = new List<ForumRecentThreadItem>
+        {
+            new(5001, "1970s studio session tape log", rarities.Id, rarities.Name, 212, new DateTime(2024, 3, 2, 9, 0, 0, DateTimeKind.Utc)),
+            new(5002, "A Day at the Races outtakes and rough mixes", rarities.Id, rarities.Name, 158, new DateTime(2024, 2, 18, 11, 0, 0, DateTimeKind.Utc)),
+            new(5003, "Complete guide to Queen promo-only pressings", rarities.Id, rarities.Name, 301, new DateTime(2024, 4, 5, 15, 0, 0, DateTimeKind.Utc)),
+        };
+        return Task.FromResult<IReadOnlyList<ForumRecentThreadItem>>(
+            items.OrderBy(item => item.Title, StringComparer.Ordinal).ToList());
+    }
+
     public async Task<ForumArchiveStats> GetArchiveStatsAsync(CancellationToken cancellationToken = default) =>
         ForumArchiveStats.FromCategories(
             await GetCategoriesAsync(cancellationToken),

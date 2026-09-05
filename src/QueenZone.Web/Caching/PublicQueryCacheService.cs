@@ -86,6 +86,18 @@ public sealed class PublicQueryCacheService(
             () => forumRepository.GetRecentThreadsAsync(count, cancellationToken),
             cancellationToken);
 
+    /// <summary>
+    /// John S Stuart's rare/discography posts for the "Rare Discography" page. Long-lived cache:
+    /// this legacy-flagged set only changes via re-import, not day-to-day forum activity.
+    /// </summary>
+    public Task<IReadOnlyList<ForumRecentThreadItem>> GetForumLegacyDiscographyThreadsAsync(
+        CancellationToken cancellationToken = default) =>
+        GetOrCreateAsync(
+            PublicQueryCacheKeys.ForumLegacyDiscographyThreads,
+            options.Value.ForumStatsCacheDuration,
+            () => forumRepository.GetLegacyDiscographyThreadsAsync(cancellationToken),
+            cancellationToken);
+
     public Task<IReadOnlyList<QueenHistoryEvent>> GetOnThisDayAsync(
         DateOnly date,
         int count,
@@ -209,6 +221,7 @@ public sealed class PublicQueryCacheService(
         cache.Remove(PublicQueryCacheKeys.ForumCategories);
         cache.Remove(PublicQueryCacheKeys.ForumThreadCount);
         cache.Remove(PublicQueryCacheKeys.ForumRecentThreads(ForumRoutes.RecentThreadsCount));
+        cache.Remove(PublicQueryCacheKeys.ForumLegacyDiscographyThreads);
     }
 
     /// <summary>

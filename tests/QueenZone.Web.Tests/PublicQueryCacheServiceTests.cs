@@ -656,6 +656,10 @@ public sealed class PublicQueryCacheServiceTests
             ]);
         }
 
+        public Task<IReadOnlyList<ForumRecentThreadItem>> GetLegacyDiscographyThreadsAsync(
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<ForumRecentThreadItem>>([]);
+
         public Task<ForumArchiveStats> GetArchiveStatsAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult(new ForumArchiveStats(1, 4, 12));
 

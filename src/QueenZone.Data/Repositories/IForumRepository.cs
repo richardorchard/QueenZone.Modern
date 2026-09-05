@@ -24,6 +24,9 @@ public interface IForumRepository
         int count,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<ForumRecentThreadItem>> GetLegacyDiscographyThreadsAsync(
+        CancellationToken cancellationToken = default);
+
     Task<ForumArchiveStats> GetArchiveStatsAsync(CancellationToken cancellationToken = default);
 
     Task<int> GetTopicSitemapCountAsync(CancellationToken cancellationToken = default);
