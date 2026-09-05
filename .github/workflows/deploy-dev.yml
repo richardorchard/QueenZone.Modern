@@ -16,8 +16,8 @@ env:
   SIXLABORS_LICENSE_KEY: ${{ secrets.SIXLABORS_LICENSE_KEY }}
 
 concurrency:
-  # Keep dev releases independent from production's deploy workflow. Phase 5
-  # will narrow production's trigger; until then both may observe the same push.
+  # Keep automatic dev releases independent from deliberate production
+  # promotions and manual production deployments.
   group: deploy-dev-${{ github.ref }}
   # Never cancel an in-flight run here — cancelling mid-migrate/deploy can
   # leave the DB or App Service half-updated.

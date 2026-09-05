@@ -21,7 +21,7 @@ concurrency:
   cancel-in-progress: false
 
 # Runs when a verified commit on main is promoted with a v* tag, or through
-# the manual emergency fallback. ci.yml already ran the full test/coverage/
+# a manual dispatch from main. ci.yml already ran the full test/coverage/
 # e2e suite against this exact tree as a required status check before the
 # merge was allowed (see branch protection on main), so none of that re-runs
 # here. This workflow no longer rebuilds — it reuses the exact binaries

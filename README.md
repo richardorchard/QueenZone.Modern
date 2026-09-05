@@ -319,7 +319,7 @@ Feature work should happen on an agent-prefixed branch such as `grok/news-pagina
 
 ## Deployment
 
-Every merge to `main` deploys automatically to the isolated dev environment through `.github/workflows/deploy-dev.yml`. The production `Deploy` workflow (`.github/workflows/deploy.yml`) runs only for a `v*` tag or a manual emergency dispatch. Despite its legacy Azure resource name, production is the `queenzone-dev` App Service at `https://www.queenzone.org`.
+Every qualifying web merge to `main` deploys automatically to the isolated dev environment through `.github/workflows/deploy-dev.yml`; workflow/docs-only and mobile-only merges skip the web deploy. The production `Deploy` workflow (`.github/workflows/deploy.yml`) runs only for a `v*` tag or a manual dispatch from `main`. Despite its legacy Azure resource name, production is the `queenzone-dev` App Service at `https://www.queenzone.org`.
 
 `.github/workflows/ci.yml` runs the required build, test, coverage, migration consistency, smoke, and Playwright checks on pull requests. The dev and production deploy workflows reuse the exact tested `web-publish` artifact; they do not rebuild or rerun CI.
 
@@ -336,7 +336,9 @@ git tag vX.Y.Z <verified-commit-sha>
 git push origin vX.Y.Z
 ```
 
-The `v*` tag triggers the production workflow. That workflow resolves the tagged commit back to the PR head SHA and deploys the matching CI artifact, then applies migrations and runs production smoke checks. Use the Actions `workflow_dispatch` control on `main` only for a manual or emergency redeploy.
+The `v*` tag triggers the production workflow. That workflow resolves the tagged commit back to the PR head SHA and deploys the matching CI artifact, then applies migrations and runs production smoke checks. You can also open **Actions → Deploy → Run workflow**, select `main`, and run the same production deployment without creating a tag.
+
+Dev currently runs the real application with deterministic sample data. Its isolated `queenzone-dev-db` exists, but it does not yet contain the legacy baseline tables required by the existing EF migrations. `deploy-dev.yml` therefore removes the dev legacy-database connection and skips migrations until that baseline is provisioned. Dev blob storage, authentication, telemetry, artifact deployment, warmup, and public/API smoke checks are active; do not treat a successful dev deployment as proof of legacy SQL behavior yet.
 
 The planned public canonical domain for the site is `https://www.queenzone.org`. SEO features that emit absolute public URLs, such as sitemaps and robots.txt, should use that host in production configuration.
 
@@ -368,7 +370,7 @@ ALTER ROLE db_datawriter ADD MEMBER [app_login_name];
 
 Keep read-only environments on `db_datareader` only.
 
-The `Deploy` workflow applies pending EF Core migrations after its rebuild and before deployment. Pull-request tests have already passed in the separate `CI` workflow and are not rerun here. Configure the Bitwarden access secret and deploy-secret mapping in the GitHub `dev` environment as described above.
+The production `Deploy` workflow applies pending EF Core migrations when required, then deploys the existing CI artifact; it does not rebuild. Pull-request tests have already passed in the separate `CI` workflow and are not rerun here. Configure the Bitwarden access secret and deploy-secret mapping in the GitHub `dev` environment as described above.
 
 For manual bootstrap or recovery, you can still run:
 
@@ -487,8 +489,11 @@ direct dependencies.
 
 ### Dev Azure environment
 
-The isolated dev App Service is declared in `infra/environments/dev`, with its
-own state key. Run `./scripts/Test-OpenTofu.ps1` to validate both environments.
-See the [dev provisioning runbook](docs/architecture/opentofu-dev-environment.md)
-for first-use permissions, approval and DNS handoff. This declaration does not
-deploy the application or change the production release flow.
+The isolated dev App Service, database, storage, and managed TLS are declared
+in `infra/environments/dev`, with a separate state key; the shared Cloudflare
+DNS record remains in the production root. Run
+`./scripts/Test-OpenTofu.ps1` to validate both infrastructure roots. See the
+[dev environment runbook](docs/architecture/opentofu-dev-environment.md) for
+the current runtime boundary and historical provisioning evidence. Application
+deployment is automatic through `deploy-dev.yml`; production deployment is a
+separate tag or manual action.

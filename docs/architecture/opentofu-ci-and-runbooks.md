@@ -33,9 +33,15 @@ hanging or failing unpredictably later.
 | [`opentofu-plan.yml`](../../.github/workflows/opentofu-plan.yml) | Pull request touching `infra/**` | `opentofu-plan` (Reader) | No — read-only plan, posts a PR comment |
 | [`opentofu-apply.yml`](../../.github/workflows/opentofu-apply.yml) | Push to `main` touching `infra/**`, or manual dispatch | `opentofu-plan` for its own `plan` job, then `opentofu-apply` (Contributor) for `apply` | Yes, only after the required reviewer approves the `opentofu-apply` environment |
 | [`opentofu-drift.yml`](../../.github/workflows/opentofu-drift.yml) | Daily schedule, or manual dispatch | `opentofu-plan` (Reader) only | No — structurally incapable of applying |
-| [`deploy-dev.yml`](../../.github/workflows/deploy-dev.yml) migrate | Push to `main`/`master`, or manual dispatch | `dev-migrate`; Bitwarden mapping targets `queenzone-dev-db` | Dev database schema only; never production |
+| [`deploy-dev.yml`](../../.github/workflows/deploy-dev.yml) migrate | Push to `main`/`master`, or manual dispatch | `dev-migrate`; Bitwarden mapping targets `queenzone-dev-db` | Temporarily skipped while dev uses sample data; when enabled, dev schema only and never production |
 | [`deploy-dev.yml`](../../.github/workflows/deploy-dev.yml) configure/deploy | Push to `main`/`master`, or manual dispatch | `dev-deploy`; OIDC Website Contributor scope is limited to `queenzone-devbox` | Dev App Service only; never production |
-| [`deploy.yml`](../../.github/workflows/deploy.yml) | Push of a `v*` promotion tag, or manual emergency dispatch from `main` | Existing production `dev`/`deploy` environments | Yes — production migration, App Service deployment, and smoke checks |
+| [`deploy.yml`](../../.github/workflows/deploy.yml) | Push of a `v*` promotion tag, or manual dispatch from `main` | Existing production `dev`/`deploy` environments | Yes — production migration, App Service deployment, and smoke checks |
+
+The dev application temporarily runs with deterministic sample data while the
+legacy database baseline is completed in separate work. `deploy-dev.yml`
+removes `ConnectionStrings__QueenZoneLegacy` and skips its migrate job during
+this interim state. Dev deployment is therefore not yet proof of migrations or
+legacy SQL data shapes.
 
 `opentofu-plan.yml`'s `fmt-validate` job runs for every PR, including forks,
 with no cloud credentials at all (`scripts/Test-OpenTofu.ps1`), triggered by
