@@ -10,7 +10,7 @@ resolution, deployment, warmup, and public/API smoke at
 
 Dev uses deterministic sample data until the approval-gated curated refresh in
 [`dev-curated-snapshot.md`](dev-curated-snapshot.md) passes. The refresh then
-sets `DEV_SNAPSHOT_READY=true`; later `deploy-dev.yml` runs retain and migrate
+sets App Service `DevSnapshot__Ready=true`; later `deploy-dev.yml` runs retain and migrate
 the verified dev-only database. Infrastructure provisioned the targets, but a
 merged workflow alone is not proof that the first data refresh has run.
 

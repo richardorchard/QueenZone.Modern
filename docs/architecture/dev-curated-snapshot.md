@@ -34,6 +34,15 @@ then set repository variable `DEV_SNAPSHOT_APPROVAL_GATE_CONFIGURED=true`.
 The workflow fails before secrets or cloud access when that explicit setup flag
 is absent. It also requires the operator to type `REFRESH DEV SNAPSHOT`.
 
+The environment uses the same narrowly scoped Azure identity as `dev-deploy`.
+Copy its `ARM_CLIENT_ID`, `ARM_TENANT_ID`, and `ARM_SUBSCRIPTION_ID` environment
+variables to `dev-data-refresh`, then add one federated credential to the
+`QueenZone Dev Deploy` Entra application with subject
+`repo:richardorchard/QueenZone.Modern:environment:dev-data-refresh`. Do not add
+or widen an Azure role: the existing Website Contributor assignment on
+`queenzone-devbox` is sufficient. The four isolated SQL and Blob credentials,
+not this identity, perform the snapshot data work.
+
 ## What is selected
 
 Selection rules live in [`config/dev-snapshot.json`](../../config/dev-snapshot.json).
@@ -88,7 +97,7 @@ check, or relationship check fails.
 
 Run **Refresh dev curated snapshot** manually. It performs these stages:
 
-1. set `DEV_SNAPSHOT_READY=false` and remove the dev database setting;
+1. set App Service `DevSnapshot__Ready=false` and remove the dev database setting;
 2. extract a schema-only DACPAC from production;
 3. publish the production-compatible schema to `queenzone-dev-db`, excluding
    the known broken legacy views;
@@ -100,8 +109,9 @@ Run **Refresh dev curated snapshot** manually. It performs these stages:
 9. enforce size, privacy, relationship, content, and Blob guards;
 10. connect the dev-only SQL and Blob settings;
 11. run readiness/public-route smoke plus read-only browser/API journeys;
-12. set `DEV_SNAPSHOT_READY=true`, allowing future `deploy-dev.yml` runs to
-    migrate and retain the verified snapshot.
+12. set App Service `DevSnapshot__Ready=true`, allowing future `deploy-dev.yml`
+    runs to migrate and retain the verified snapshot, then repeat public-route
+    smoke after the resulting App Service restart.
 
 The workflow uploads only `summary.json` for 30 days. It does not upload the
 full manifest because forum filenames may contain user-supplied text. Logs and
