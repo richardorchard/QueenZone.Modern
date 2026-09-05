@@ -12,6 +12,7 @@ internal sealed record PhotoSelection(IReadOnlyList<int> PhotoIds, IReadOnlyList
 
 internal sealed record MissingForumBlobReference(long? LegacyPostId, Guid? AttachmentId);
 
+[ExcludeFromCodeCoverage]
 internal sealed record ReferencedBlobSelection(
     IReadOnlyList<SnapshotBlob> Blobs,
     IReadOnlyList<MissingForumBlobReference> MissingForumBlobs);
