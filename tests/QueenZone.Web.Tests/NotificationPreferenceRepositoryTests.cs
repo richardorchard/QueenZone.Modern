@@ -16,21 +16,21 @@ public sealed class NotificationPreferenceRepositoryTests
     }
 
     [Fact]
-    public async Task FilterEnabledAsync_News_DefaultOff_RequiresExplicitEnable()
+    public async Task FilterEnabledAsync_News_DefaultOn_IncludesMembersWithoutARow()
     {
         var repository = CreateRepository();
         var absent = Guid.NewGuid();
-        var enabled = Guid.NewGuid();
         var muted = Guid.NewGuid();
+        var confirmed = Guid.NewGuid();
 
-        await repository.ApplyAsync(enabled, new NotificationPreferencePatch(null, null, true));
         await repository.ApplyAsync(muted, new NotificationPreferencePatch(null, null, false));
+        await repository.ApplyAsync(confirmed, new NotificationPreferencePatch(null, null, true));
 
         var filtered = await repository.FilterEnabledAsync(
-            [absent, enabled, muted, enabled],
+            [absent, muted, confirmed],
             NotificationCategory.News);
 
-        Assert.Equal([enabled], filtered);
+        Assert.Equal([absent, confirmed], filtered);
     }
 
     [Fact]
