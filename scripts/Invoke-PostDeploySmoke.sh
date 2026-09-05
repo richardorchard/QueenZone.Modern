@@ -9,6 +9,8 @@
 # and cache priming (#674), not anything upstream of it (#681).
 # Deploy still Kudu-recycles after the zip push: skipping that after #688 left
 # /warmup on HTTP 500 even though the new data-build-version was already live.
+# --sample-data omits the hard-coded production legacy topic while retaining
+# the common route and API checks used by the isolated dev environment.
 set -euo pipefail
 
 BASE_URL="https://www.queenzone.org"
@@ -16,6 +18,7 @@ WARMUP_ONLY=0
 MAX_ATTEMPTS=32
 SLEEP_SECONDS=15
 EXPECT_BUILD_VERSION=""
+SAMPLE_DATA=0
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -24,6 +27,7 @@ while [ "$#" -gt 0 ]; do
     --max-attempts) MAX_ATTEMPTS="${2:?}"; shift ;;
     --sleep-seconds) SLEEP_SECONDS="${2:?}"; shift ;;
     --expect-build-version) EXPECT_BUILD_VERSION="${2:?}"; shift ;;
+    --sample-data) SAMPLE_DATA=1 ;;
     *)
       echo "Unknown argument: $1" >&2
       exit 2
@@ -43,7 +47,6 @@ PATHS=(
   "/news"
   "/forum"
   "/forum/1/queen-serious-discussion"
-  "/forum/topic/455095/forum-guidelines"
   "/articles"
   "/biography"
   "/photography"
@@ -51,6 +54,10 @@ PATHS=(
   "/api/v1"
   "/api/v1/content/news?pageSize=1"
 )
+
+if [ "$SAMPLE_DATA" -eq 0 ]; then
+  PATHS+=("/forum/topic/455095/forum-guidelines")
+fi
 
 check_path() {
   local path="$1"
