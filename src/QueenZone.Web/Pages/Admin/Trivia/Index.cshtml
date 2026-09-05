@@ -44,6 +44,8 @@ else
     </div>
   </form>
 
+  <partial name="_ArchivePagination" model="Model.Pagination" />
+
   @if (Model.Facts.Count == 0)
   {
     <p>@(string.IsNullOrWhiteSpace(Model.CategoryFilter) ? "No trivia facts yet." : "No trivia facts match that category.")</p>
@@ -76,11 +78,15 @@ else
                 <input type="hidden" name="@AdminTriviaPageModel.AntiforgeryTokenFieldName" value="@antiforgeryToken">
                 <input type="hidden" name="id" value="@fact.Id">
                 <input type="hidden" name="isPublished" value="@fact.IsPublished">
+                <input type="hidden" name="PageNumber" value="@Model.PageNumber">
+                <input type="hidden" name="category" value="@Model.CategoryFilter">
                 <button type="submit">@(fact.IsPublished ? "Unpublish" : "Publish")</button>
               </form>
               <form method="post" action="/admin/trivia?handler=Delete" style="display:inline" onsubmit="return confirm('Delete this trivia fact?');">
                 <input type="hidden" name="@AdminTriviaPageModel.AntiforgeryTokenFieldName" value="@antiforgeryToken">
                 <input type="hidden" name="id" value="@fact.Id">
+                <input type="hidden" name="PageNumber" value="@Model.PageNumber">
+                <input type="hidden" name="category" value="@Model.CategoryFilter">
                 <button type="submit">Delete</button>
               </form>
             </td>
@@ -88,6 +94,8 @@ else
         }
       </tbody>
     </table>
+
+    <partial name="_ArchivePagination" model="Model.Pagination" />
   }
 }
 </div>

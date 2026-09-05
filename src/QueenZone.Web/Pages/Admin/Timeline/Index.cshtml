@@ -55,6 +55,8 @@ else
     <button type="submit">Filter</button>
   </form>
 
+  <partial name="_ArchivePagination" model="Model.Pagination" />
+
   @if (events is null || events.Items.Count == 0)
   {
     <p>No timeline events matched the current filters.</p>
@@ -87,11 +89,17 @@ else
                 <input type="hidden" name="@AdminTimelinePageModel.AntiforgeryTokenFieldName" value="@antiforgeryToken">
                 <input type="hidden" name="id" value="@item.Id">
                 <input type="hidden" name="isPublished" value="@(item.IsPublished ? "true" : "false")">
+                <input type="hidden" name="PageNumber" value="@events.Page">
+                <input type="hidden" name="Published" value="@Model.Published">
+                <input type="hidden" name="Q" value="@Model.Q">
                 <button type="submit">@(item.IsPublished ? "Unpublish" : "Publish")</button>
               </form>
               <form method="post" action="/admin/timeline?handler=Delete" style="display:inline" onsubmit="return confirm('Delete this timeline event?');">
                 <input type="hidden" name="@AdminTimelinePageModel.AntiforgeryTokenFieldName" value="@antiforgeryToken">
                 <input type="hidden" name="id" value="@item.Id">
+                <input type="hidden" name="PageNumber" value="@events.Page">
+                <input type="hidden" name="Published" value="@Model.Published">
+                <input type="hidden" name="Q" value="@Model.Q">
                 <button type="submit">Delete</button>
               </form>
             </td>
@@ -100,21 +108,7 @@ else
       </tbody>
     </table>
 
-    var totalPages = (int)Math.Ceiling(events.TotalCount / (double)events.PageSize);
-    if (totalPages > 1)
-    {
-      <p>
-        Page @events.Page of @totalPages
-        @if (events.Page > 1)
-        {
-          <a href="?pageNumber=@(events.Page - 1)&published=@Model.Published&q=@Model.Q">Previous</a>
-        }
-        @if (events.Page < totalPages)
-        {
-          <a href="?pageNumber=@(events.Page + 1)&published=@Model.Published&q=@Model.Q">Next</a>
-        }
-      </p>
-    }
+    <partial name="_ArchivePagination" model="Model.Pagination" />
   }
 }
 </div>

@@ -21,6 +21,11 @@ public sealed class IndexModel(
 
     public string? StatusMessageKind { get; private set; }
 
+    [BindProperty(SupportsGet = true)]
+    public int PageNumber { get; set; } = 1;
+
+    public ArchivePaginationViewModel? Pagination { get; private set; }
+
     public async Task OnGetAsync(string? category, CancellationToken cancellationToken)
     {
         CategoryFilter = string.IsNullOrWhiteSpace(category) ? null : category.Trim();
@@ -32,12 +37,21 @@ public sealed class IndexModel(
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
             .ToList();
-        Facts = CategoryFilter is null
+        var filtered = CategoryFilter is null
             ? all
             : all.Where(fact =>
                     fact.Category is not null &&
                     fact.Category.Contains(CategoryFilter, StringComparison.OrdinalIgnoreCase))
                 .ToList();
+
+        var totalPages = ArchivePagination.GetTotalPages(filtered.Count, AdminTriviaRoutes.ListPageSize);
+        var currentPage = Math.Max(1, PageNumber);
+        Facts = filtered
+            .Skip((currentPage - 1) * AdminTriviaRoutes.ListPageSize)
+            .Take(AdminTriviaRoutes.ListPageSize)
+            .ToList();
+        Pagination = AdminTriviaRoutes.GetListPaginationViewModel(currentPage, totalPages, CategoryFilter);
+
         StatusMessage = TempData[MessageKey] as string;
         StatusMessageKind = TempData[MessageKindKey] as string;
         ViewData["Title"] = "Trivia";
@@ -63,26 +77,32 @@ public sealed class IndexModel(
         return Redirect("/admin/trivia");
     }
 
-    public async Task<IActionResult> OnPostDeleteAsync(int id, CancellationToken cancellationToken)
+    public async Task<IActionResult> OnPostDeleteAsync(
+        int id,
+        string? category,
+        CancellationToken cancellationToken)
     {
         await triviaRepository.DeleteAsync(id, cancellationToken);
         await InvalidatePublicHomeCacheAsync(outputCacheStore, cancellationToken);
         TempData[MessageKey] = "Deleted trivia fact.";
         TempData[MessageKindKey] = "success";
-        return Redirect("/admin/trivia");
+        return Redirect(BuildReturnUrl(category));
     }
 
     public async Task<IActionResult> OnPostTogglePublishAsync(
         int id,
         bool isPublished,
+        string? category,
         CancellationToken cancellationToken)
     {
         await triviaRepository.SetPublishedAsync(id, !isPublished, cancellationToken);
         await InvalidatePublicHomeCacheAsync(outputCacheStore, cancellationToken);
         TempData[MessageKey] = !isPublished ? "Trivia fact published." : "Trivia fact unpublished.";
         TempData[MessageKindKey] = "success";
-        return Redirect("/admin/trivia");
+        return Redirect(BuildReturnUrl(category));
     }
+
+    private string BuildReturnUrl(string? category) => AdminTriviaRoutes.GetListPath(PageNumber, category);
 
     internal static async Task InvalidatePublicHomeCacheAsync(
         IOutputCacheStore outputCacheStore,
