@@ -24,9 +24,10 @@ SQL and Blob connection strings.
 
 Store the credentials and two generated synthetic-account passwords in the
 `Queenzone Development` Bitwarden Secrets Manager project. Map them through the
-repository variable `BITWARDEN_DEV_SNAPSHOT_SECRETS` to the six names used by
-`.github/workflows/refresh-dev-snapshot.yml`. Do not reuse the production App
-Service connection string as the read-only source credential.
+repository variable `BITWARDEN_DEV_SNAPSHOT_SECRETS` to the six snapshot names
+used by `.github/workflows/refresh-dev-snapshot.yml`, plus the existing
+`SIXLABORS_LICENSE_KEY` needed to build the refresh tooling. Do not reuse the
+production App Service connection string as the read-only source credential.
 
 Protect the `dev-data-refresh` GitHub environment with a required reviewer,
 then set repository variable `DEV_SNAPSHOT_APPROVAL_GATE_CONFIGURED=true`.
@@ -117,6 +118,7 @@ Load the six environment variables from Bitwarden without printing them. Review
 the boundaries first:
 
 ```powershell
+./scripts/Import-SixLaborsLicense.ps1
 ./scripts/Refresh-DevSnapshot.ps1
 ```
 

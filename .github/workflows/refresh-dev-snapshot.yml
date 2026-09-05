@@ -53,11 +53,6 @@ jobs:
             **/*.csproj
             .config/dotnet-tools.json
 
-      - name: Restore and build refresh tooling
-        run: |
-          dotnet restore QueenZone.sln
-          dotnet build QueenZone.sln --configuration Release --no-restore
-
       - name: Fetch isolated refresh credentials
         id: bitwarden-secrets
         uses: bitwarden/sm-action@v3.0.1
@@ -73,6 +68,7 @@ jobs:
           DEV_SNAPSHOT_TARGET_BLOB: ${{ steps.bitwarden-secrets.outputs.DEV_SNAPSHOT_TARGET_BLOB }}
           DEV_SNAPSHOT_ADMIN_PASSWORD: ${{ steps.bitwarden-secrets.outputs.DEV_SNAPSHOT_ADMIN_PASSWORD }}
           DEV_SNAPSHOT_MEMBER_PASSWORD: ${{ steps.bitwarden-secrets.outputs.DEV_SNAPSHOT_MEMBER_PASSWORD }}
+          SIXLABORS_LICENSE_KEY: ${{ steps.bitwarden-secrets.outputs.SIXLABORS_LICENSE_KEY }}
         shell: bash
         run: |
           required=(
@@ -82,6 +78,7 @@ jobs:
             DEV_SNAPSHOT_TARGET_BLOB
             DEV_SNAPSHOT_ADMIN_PASSWORD
             DEV_SNAPSHOT_MEMBER_PASSWORD
+            SIXLABORS_LICENSE_KEY
           )
           for name in "${required[@]}"; do
             if [ -z "${!name}" ]; then
@@ -89,6 +86,13 @@ jobs:
               exit 1
             fi
           done
+
+      - name: Restore and build refresh tooling
+        env:
+          SIXLABORS_LICENSE_KEY: ${{ steps.bitwarden-secrets.outputs.SIXLABORS_LICENSE_KEY }}
+        run: |
+          dotnet restore QueenZone.sln
+          dotnet build QueenZone.sln --configuration Release --no-restore
 
       - name: Azure login
         id: azure-login
