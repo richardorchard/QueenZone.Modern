@@ -308,6 +308,41 @@ public sealed class InMemoryFanPerformanceSubmissionRepository : IFanPerformance
         }
     }
 
+    public Task<IReadOnlyDictionary<int, FanPerformanceContributorCredit>> GetApprovedContributorCreditsAsync(
+        IReadOnlyCollection<int> stageIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (stageIds is not { Count: > 0 })
+        {
+            return Task.FromResult<IReadOnlyDictionary<int, FanPerformanceContributorCredit>>(
+                new Dictionary<int, FanPerformanceContributorCredit>());
+        }
+
+        var ids = stageIds.ToHashSet();
+        lock (sync)
+        {
+            IReadOnlyDictionary<int, FanPerformanceContributorCredit> result = submissions
+                .Where(row =>
+                    row.Status == FanPerformanceSubmissionStatus.Approved
+                    && row.PromotedStageId is int stageId
+                    && ids.Contains(stageId))
+                .GroupBy(row => row.PromotedStageId!.Value)
+                .ToDictionary(
+                    group => group.Key,
+                    group =>
+                    {
+                        var newest = group.OrderByDescending(row => row.SubmittedAt).First();
+                        var member = resolveMember?.Invoke(newest.SubmitterMemberId);
+                        var displayName = string.IsNullOrWhiteSpace(member?.DisplayName)
+                            ? "Member"
+                            : member.DisplayName.Trim();
+                        return new FanPerformanceContributorCredit(newest.SubmitterMemberId, displayName);
+                    });
+
+            return Task.FromResult(result);
+        }
+    }
+
     /// <summary>Test helper: audit entries written for a submission.</summary>
     public IReadOnlyList<FanPerformanceSubmissionAuditLogEntity> GetAuditLogs(Guid submissionId)
     {

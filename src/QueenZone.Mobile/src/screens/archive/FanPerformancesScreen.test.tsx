@@ -85,6 +85,17 @@ describe('FanPerformancesScreen', () => {
     await flushVirtualizedList();
   });
 
+  it('shows submitted-by credit and opens the pick-file submit screen when signed in', async () => {
+    mockSession.accessToken = 'member-token';
+    fetchPage.mockResolvedValue(
+      pagedResponse([fanPerformanceFixture({ contributorDisplayName: 'Stage Fan' })]),
+    );
+    const { navigation } = renderList();
+    await waitFor(() => expect(screen.getByText(/Submitted by Stage Fan/)).toBeOnTheScreen());
+    await userEvent.setup().press(screen.getByTestId(testIds.fanPerformanceSubmit));
+    expect(navigation.navigate).toHaveBeenCalledWith('FanPerformanceSubmit');
+  });
+
   it('opens detail from the title and sends unsigned visitors to sign in from play', async () => {
     const { navigation } = renderList();
     await waitFor(() => expect(screen.getByText(track.title)).toBeOnTheScreen());

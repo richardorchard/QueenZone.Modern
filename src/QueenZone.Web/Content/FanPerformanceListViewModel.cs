@@ -10,7 +10,10 @@ public sealed record FanPerformanceListItem(
     string PerformedBy,
     string Description,
     DateTime DateAdded,
-    string? AudioPlayPath);
+    string? AudioPlayPath,
+    Guid? ContributorMemberId = null,
+    string? ContributorDisplayName = null,
+    string? ReportPath = null);
 
 public sealed record FanPerformanceCatalogEntry(int Id, string Title, string AudioPlayPath);
 

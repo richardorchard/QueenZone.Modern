@@ -1,0 +1,30 @@
+@page "/fan-performances/{id:int}/report"
+@model QueenZone.Web.Pages.FanPerformances.ReportModel
+
+<section class="qz-section">
+  <div class="qz-container">
+    <p><a href="@FanPerformanceRoutes.GetIndexPath()">Back to fan performances</a></p>
+    <h1>Report a fan performance</h1>
+    @if (Model.Performance is not null)
+    {
+      <p class="qz-meta">@Model.Performance.Title · Performed by @Model.Performance.PerformedBy</p>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+    {
+      <p class="qz-account-notice qz-account-notice--success" role="status">@Model.StatusMessage</p>
+    }
+    else
+    {
+      <p>Tell the admin team why this recording should be hidden. Do not use this for copyright claims that need a formal notice.</p>
+      <form method="post">
+        <div class="qz-field">
+          <label asp-for="Reason"></label>
+          <textarea asp-for="Reason" rows="5" maxlength="1000"></textarea>
+          <span asp-validation-for="Reason"></span>
+        </div>
+        <button type="submit" class="qz-button">Send report</button>
+      </form>
+    }
+  </div>
+</section>

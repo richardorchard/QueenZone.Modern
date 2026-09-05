@@ -27,6 +27,7 @@ describe('member-only screens', () => {
     assert.equal(isMemberOnlyScreen('Settings'), true);
     assert.equal(isMemberOnlyScreen('DeleteAccount'), true);
     assert.equal(isMemberOnlyScreen('PhotoSubmit'), true);
+    assert.equal(isMemberOnlyScreen('FanPerformanceSubmit'), true);
     assert.equal(isMemberOnlyScreen('MySubmissions'), true);
     assert.equal(isMemberOnlyScreen('SavedList'), true);
   });
@@ -68,6 +69,7 @@ describe('shouldHideTabBar', () => {
       'Conversation',
       'Composer',
       'SuggestNews',
+      'FanPerformanceSubmit',
     ]) {
       assert.equal(shouldHideTabBar(name), true, name);
     }

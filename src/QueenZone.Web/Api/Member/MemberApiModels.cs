@@ -50,3 +50,29 @@ public sealed record NewsSuggestionCreatedDto(
     string Url,
     string? Title,
     DateTimeOffset SubmittedAt);
+
+/// <summary>
+/// Multipart fields for <c>POST /api/v1/member/fan-performance-submissions</c>.
+/// Same names as <c>/submit/fan-performance</c>.
+/// </summary>
+public sealed record FanPerformanceSubmissionRequestDto
+{
+    public string? Title { get; init; }
+
+    public string? CoveredSong { get; init; }
+
+    public string? PerformedBy { get; init; }
+
+    public string? Description { get; init; }
+
+    public bool RightsDeclarationAccepted { get; init; }
+}
+
+/// <summary>
+/// Result of <c>POST /api/v1/member/fan-performance-submissions</c>.
+/// </summary>
+public sealed record FanPerformanceSubmissionCreatedDto(
+    Guid Id,
+    string Status,
+    string Title,
+    DateTimeOffset SubmittedAt);

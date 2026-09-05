@@ -1,8 +1,11 @@
-import { screen, waitFor } from '@testing-library/react-native';
+import { screen, userEvent, waitFor } from '@testing-library/react-native';
 import { fetchFanPerformanceDetail, fetchFanPerformancesPage } from '../../api';
+import { ApiError } from '../../api/errors';
+import { reportFanPerformance } from '../../api/fanPerformanceSubmissions';
 import { fanPerformanceFixture, pagedResponse } from '../../test/fixtures';
 import { createMockSession } from '../../test/mockSession';
 import { fakeNavigation, renderWithProviders } from '../../test/render';
+import { testIds } from '../../test/testIds';
 import { FanPerformanceDetailScreen } from './FanPerformanceDetailScreen';
 
 const mockSession = createMockSession();
@@ -36,6 +39,10 @@ jest.mock('../../session/SessionContext', () => ({
   useSession: () => mockSession,
 }));
 
+jest.mock('../../api/fanPerformanceSubmissions', () => ({
+  reportFanPerformance: jest.fn(),
+}));
+
 jest.mock('../../audio/FanPerformancePlayer', () => ({
   useFanPerformancePlayer: () => mockPlayer,
 }));
@@ -61,6 +68,7 @@ describe('FanPerformanceDetailScreen', () => {
     mockSession.isRestoring = false;
     fetchDetail.mockResolvedValue(track);
     fetchPage.mockResolvedValue(pagedResponse([track]));
+    (reportFanPerformance as jest.Mock).mockReset();
   });
 
   it('does not ask for sign-in while a previous session is still restoring', async () => {
@@ -83,6 +91,61 @@ describe('FanPerformanceDetailScreen', () => {
     renderDetail();
     await waitFor(() => expect(screen.getByLabelText('Play')).toBeOnTheScreen());
     expect(screen.queryByRole('button', { name: 'Sign in' })).toBeNull();
+  });
+
+  it('shows contributor credit and sends a report when signed in', async () => {
+    mockSession.accessToken = 'member-token';
+    mockSession.isSignedIn = true;
+    fetchDetail.mockResolvedValue(
+      fanPerformanceFixture({
+        contributorMemberId: 'member-1',
+        contributorDisplayName: 'Stage Fan',
+      }),
+    );
+    (reportFanPerformance as jest.Mock).mockResolvedValue({ reportId: 'rep-1', alreadyReported: false });
+    renderDetail();
+    await waitFor(() => expect(screen.getByText('Submitted by Stage Fan')).toBeOnTheScreen());
+    expect(screen.getByTestId(testIds.fanPerformanceReport)).toBeOnTheScreen();
+
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText('Report reason'), 'Not the performer.');
+    await user.press(screen.getByTestId(testIds.fanPerformanceReportSend));
+    await waitFor(() =>
+      expect(screen.getByText('Thanks. The admin team will review this performance.')).toBeOnTheScreen(),
+    );
+    expect(reportFanPerformance).toHaveBeenCalledWith(track.id, 'Not the performer.', 'member-token');
+  });
+
+  it('requires a report reason and shows the already-reported confirmation', async () => {
+    mockSession.accessToken = 'member-token';
+    mockSession.isSignedIn = true;
+    (reportFanPerformance as jest.Mock).mockResolvedValue({ reportId: 'rep-2', alreadyReported: true });
+    renderDetail();
+    await waitFor(() => expect(screen.getByTestId(testIds.fanPerformanceReport)).toBeOnTheScreen());
+
+    const user = userEvent.setup();
+    await user.press(screen.getByTestId(testIds.fanPerformanceReportSend));
+    expect(screen.getByText('A reason is required.')).toBeOnTheScreen();
+    expect(reportFanPerformance).not.toHaveBeenCalled();
+
+    await user.type(screen.getByLabelText('Report reason'), 'Duplicate upload');
+    await user.press(screen.getByTestId(testIds.fanPerformanceReportSend));
+    await waitFor(() =>
+      expect(screen.getByText('You have already reported this performance.')).toBeOnTheScreen(),
+    );
+  });
+
+  it('shows a report API failure', async () => {
+    mockSession.accessToken = 'member-token';
+    mockSession.isSignedIn = true;
+    (reportFanPerformance as jest.Mock).mockRejectedValue(ApiError.http(429, 'Too many reports.'));
+    renderDetail();
+    await waitFor(() => expect(screen.getByTestId(testIds.fanPerformanceReport)).toBeOnTheScreen());
+
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText('Report reason'), 'Spam');
+    await user.press(screen.getByTestId(testIds.fanPerformanceReportSend));
+    await waitFor(() => expect(screen.getByText('Too many reports.')).toBeOnTheScreen());
   });
 
   it('does not show restoring copy when a stored session is already signed in', async () => {

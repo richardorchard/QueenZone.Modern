@@ -119,6 +119,10 @@
         <span class="admin-dashboard__nav-link-title">Reported messages</span>
         <span class="admin-dashboard__nav-link-desc">Review private messages reported by members</span>
       </a>
+      <a class="admin-dashboard__nav-link" href="/admin/fan-performance-reports">
+        <span class="admin-dashboard__nav-link-title">Fan performance reports</span>
+        <span class="admin-dashboard__nav-link-desc">Review listener reports of published fan performances</span>
+      </a>
     </nav>
   </section>
 
@@ -259,6 +263,11 @@
       <a class="admin-dashboard__queue-tile" href="/admin/private-messages">
         <span class="admin-dashboard__queue-tile-label">Reported messages</span>
         <span class="admin-dashboard__queue-tile-count">@Model.OpenPrivateMessageReportCount</span>
+        <span class="admin-dashboard__queue-tile-sub">open</span>
+      </a>
+      <a class="admin-dashboard__queue-tile" href="/admin/fan-performance-reports">
+        <span class="admin-dashboard__queue-tile-label">Fan performance reports</span>
+        <span class="admin-dashboard__queue-tile-count">@Model.OpenFanPerformanceReportCount</span>
         <span class="admin-dashboard__queue-tile-sub">open</span>
       </a>
     </div>

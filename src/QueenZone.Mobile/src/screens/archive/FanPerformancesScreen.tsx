@@ -29,6 +29,9 @@ function metaLine(item: FanPerformance): string {
   const parts = [formatPublishedDate(item.dateAdded), formatTrackDuration(item.durationSeconds)].filter(
     Boolean,
   );
+  if (item.contributorDisplayName) {
+    parts.push(`Submitted by ${item.contributorDisplayName}`);
+  }
   return parts.join(' · ');
 }
 
@@ -175,6 +178,16 @@ export function FanPerformancesScreen({ navigation }: Props) {
       {catalogError ? (
         <Text style={[type.caption, { color: c.textSecondary }]}>{catalogError}</Text>
       ) : null}
+      <View style={styles.submitRow}>
+        <Button
+          label="Submit a performance"
+          size="sm"
+          variant="outline"
+          onPress={() => navigation.navigate('FanPerformanceSubmit')}
+          testID={testIds.fanPerformanceSubmit}
+          accessibilityLabel="Submit a fan performance"
+        />
+      </View>
     </View>
   );
 
@@ -257,6 +270,9 @@ const styles = StyleSheet.create({
   },
   playAllButton: {
     flex: 1,
+  },
+  submitRow: {
+    marginTop: space.xs,
   },
   play: {
     width: 48,

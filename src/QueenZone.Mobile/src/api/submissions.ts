@@ -1,6 +1,6 @@
 /** Member `/api/v1/me/submissions/*` contract (issue #745). Matches website `/account/my-submissions`. */
 
-export const submissionKinds = ['photos', 'news', 'articles'] as const;
+export const submissionKinds = ['photos', 'news', 'articles', 'fan-performances'] as const;
 
 export type SubmissionKind = (typeof submissionKinds)[number];
 
@@ -31,6 +31,19 @@ export type NewsSuggestionItem = {
   status: SubmissionStatus;
   notes: string | null;
   publishedNewsId: number | null;
+  publishedPath: string | null;
+};
+
+export type FanPerformanceSubmissionItem = {
+  id: string;
+  title: string;
+  coveredSong: string;
+  performedBy: string;
+  submittedAt: string;
+  status: SubmissionStatus;
+  notes: string | null;
+  rejectionReason: string | null;
+  promotedStageId: number | null;
   publishedPath: string | null;
 };
 
@@ -115,6 +128,12 @@ export function parseArticleSubmissions(payload: unknown): PagedSubmissions<Arti
   return parsePaged(payload, parseArticleItem);
 }
 
+export function parseFanPerformanceSubmissions(
+  payload: unknown,
+): PagedSubmissions<FanPerformanceSubmissionItem> {
+  return parsePaged(payload, parseFanPerformanceItem);
+}
+
 function parsePaged<T>(payload: unknown, mapItem: (raw: Record<string, unknown>) => T): PagedSubmissions<T> {
   if (!payload || typeof payload !== 'object') {
     throw new Error('Submissions response was empty.');
@@ -162,6 +181,21 @@ function parseNewsItem(raw: Record<string, unknown>): NewsSuggestionItem {
     status: parseStatus(raw.status),
     notes: readOptionalString(raw.notes),
     publishedNewsId: typeof raw.publishedNewsId === 'number' ? raw.publishedNewsId : null,
+    publishedPath: readOptionalString(raw.publishedPath),
+  };
+}
+
+function parseFanPerformanceItem(raw: Record<string, unknown>): FanPerformanceSubmissionItem {
+  return {
+    id: readRequiredString(raw.id, 'Fan performance submission id'),
+    title: readRequiredString(raw.title, 'Fan performance title'),
+    coveredSong: typeof raw.coveredSong === 'string' ? raw.coveredSong : '',
+    performedBy: typeof raw.performedBy === 'string' ? raw.performedBy : '',
+    submittedAt: readRequiredString(raw.submittedAt, 'Fan performance submittedAt'),
+    status: parseStatus(raw.status),
+    notes: readOptionalString(raw.notes),
+    rejectionReason: readOptionalString(raw.rejectionReason),
+    promotedStageId: typeof raw.promotedStageId === 'number' ? raw.promotedStageId : null,
     publishedPath: readOptionalString(raw.publishedPath),
   };
 }

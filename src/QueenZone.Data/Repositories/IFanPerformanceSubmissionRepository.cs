@@ -69,4 +69,13 @@ public interface IFanPerformanceSubmissionRepository
         CancellationToken cancellationToken = default);
 
     Task ClearPendingBlobPathAsync(Guid id, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Batch credit lookup for published rows. Returns approved submissions whose
+    /// <see cref="FanPerformanceSubmission.PromotedStageId"/> is in <paramref name="stageIds"/>.
+    /// When more than one approved row shares a stage id, the newest submitted wins.
+    /// </summary>
+    Task<IReadOnlyDictionary<int, FanPerformanceContributorCredit>> GetApprovedContributorCreditsAsync(
+        IReadOnlyCollection<int> stageIds,
+        CancellationToken cancellationToken = default);
 }

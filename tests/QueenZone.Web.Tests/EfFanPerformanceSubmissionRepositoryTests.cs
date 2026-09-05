@@ -216,6 +216,32 @@ public sealed class EfFanPerformanceSubmissionRepositoryTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task GetApprovedContributorCreditsAsync_BatchesNewestApprovedSubmission()
+    {
+        var older = await repository.CreateAsync(NewSubmission(Guid.NewGuid(), "Older credit"));
+        await repository.PromoteAsync(older.Id, 187, "admin@test.local", null);
+        var olderRow = await dbContext.FanPerformanceSubmissions.SingleAsync(row => row.Id == older.Id);
+        olderRow.SubmittedAt = DateTimeOffset.UtcNow.AddDays(-2);
+        await dbContext.SaveChangesAsync();
+
+        var newer = await repository.CreateAsync(NewSubmission(Guid.NewGuid(), "Newer credit"));
+        await repository.PromoteAsync(newer.Id, 187, "admin@test.local", null);
+
+        var pending = await repository.CreateAsync(NewSubmission(Guid.NewGuid(), "Pending other"));
+        var pendingRow = await dbContext.FanPerformanceSubmissions.SingleAsync(row => row.Id == pending.Id);
+        pendingRow.PromotedStageId = 186;
+        await dbContext.SaveChangesAsync();
+
+        var credits = await repository.GetApprovedContributorCreditsAsync([187, 186, 173]);
+
+        Assert.True(credits.ContainsKey(187));
+        Assert.False(credits.ContainsKey(186));
+        Assert.False(credits.ContainsKey(173));
+        Assert.Equal(memberId, credits[187].MemberId);
+        Assert.Equal("EF Stage Fan", credits[187].DisplayName);
+    }
+
+    [Fact]
     public async Task GetEligibleForPendingBlobPurgeAsync_OnlyRejectedAndWithdrawnPastCutoff()
     {
         var rejected = await repository.CreateAsync(NewSubmission(Guid.NewGuid(), "Old reject"));

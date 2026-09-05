@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using QueenZone.Data;
+using QueenZone.Data.Entities;
 using QueenZone.Storage;
 
 namespace QueenZone.Web.Tests;
@@ -53,6 +54,7 @@ public sealed class FanPerformancesPageTests : IClassFixture<WebApplicationFacto
         Assert.Contains("returnUrl=%2Ffan-performances", body);
         Assert.DoesNotContain("songfiles", body, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("/fan-performances/187/audio", body);
+        Assert.DoesNotContain("Report this performance", body);
         Assert.Contains(TestSiteConfiguration.CanonicalLink("/fan-performances"), body);
     }
 
@@ -73,6 +75,8 @@ public sealed class FanPerformancesPageTests : IClassFixture<WebApplicationFacto
         Assert.Contains(">Shuffle Play All</button>", body);
         Assert.DoesNotContain("Sign in to play", body);
         Assert.DoesNotContain("songfiles", body, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Report this performance", body);
+        Assert.Contains("/fan-performances/187/report", body);
 
         var catalog = ReadCatalog(body);
         Assert.Equal([187, 186, 176, 173], catalog.Select(entry => entry.Id).ToArray());
@@ -137,6 +141,72 @@ public sealed class FanPerformancesPageTests : IClassFixture<WebApplicationFacto
         Assert.Contains(">Track 25</h2>", pageOne);
         Assert.DoesNotContain(">Track 5</h2>", pageOne);
         Assert.Contains(">Track 5</h2>", pageTwo);
+    }
+
+    [Fact]
+    public async Task FanPerformancesPage_ShowsSubmittedByCredit_WhenApprovedSubmissionExists()
+    {
+        var members = factory.Services.GetRequiredService<IMemberAccountRepository>();
+        var member = await members.CreateAsync(new MemberAccount
+        {
+            Id = Guid.NewGuid(),
+            Email = "page-credit@example.com",
+            DisplayName = "Page Credit Fan",
+            CreatedAt = DateTime.UtcNow,
+        });
+        var submissions = factory.Services.GetRequiredService<IFanPerformanceSubmissionRepository>();
+        var created = await submissions.CreateAsync(new NewFanPerformanceSubmission(
+            member.Id,
+            "Page credit cover",
+            "Reaching Out",
+            "Mike Ryde",
+            null,
+            "pending/page-credit.mp3",
+            "page-credit.mp3",
+            1024,
+            "audio/mpeg",
+            120,
+            DateTimeOffset.UtcNow,
+            FanPerformanceSubmissionRights.DeclarationVersion));
+        await submissions.PromoteAsync(created.Id, 187, "admin@test.local", null);
+
+        var client = factory.CreateClient();
+        var body = await client.GetStringAsync("/fan-performances");
+
+        Assert.Contains("Submitted by", body);
+        Assert.Contains("Page Credit Fan", body);
+        Assert.Contains($"/members/{member.Id}", body);
+        Assert.Contains("Performed by Mike Ryde", body);
+    }
+
+    [Fact]
+    public async Task ReportPage_CreatesOpenReport_AndIsIdempotent()
+    {
+        var client = await CreateSignedInMemberClientAsync();
+        var formPage = await client.GetStringAsync("/fan-performances/186/report");
+        Assert.Contains("Report a fan performance", formPage);
+        Assert.Contains("Liar", formPage);
+
+        var first = await client.PostAsync(
+            "/fan-performances/186/report",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["Reason"] = "This is not the performer's recording.",
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(formPage),
+            }));
+        var firstBody = await first.Content.ReadAsStringAsync();
+        Assert.Contains("The admin team will review this performance.", firstBody);
+
+        var againPage = await client.GetStringAsync("/fan-performances/186/report");
+        var second = await client.PostAsync(
+            "/fan-performances/186/report",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["Reason"] = "Still reporting the same track.",
+                ["__RequestVerificationToken"] = ExtractAntiforgeryToken(againPage),
+            }));
+        var secondBody = await second.Content.ReadAsStringAsync();
+        Assert.Contains("already reported this performance", secondBody);
     }
 
     [Fact]
@@ -247,6 +317,16 @@ public sealed class FanPerformancesPageTests : IClassFixture<WebApplicationFacto
             new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
         Assert.NotNull(catalog);
         return catalog;
+    }
+
+    private static string ExtractAntiforgeryToken(string html)
+    {
+        var match = System.Text.RegularExpressions.Regex.Match(
+            html,
+            "name=\"__RequestVerificationToken\"[^>]*value=\"(?<token>[^\"]+)\"",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        Assert.True(match.Success, "Antiforgery token was missing.");
+        return match.Groups["token"].Value;
     }
 
     private static int CountOccurrences(string body, string value)

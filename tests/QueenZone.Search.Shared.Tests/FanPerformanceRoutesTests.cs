@@ -41,6 +41,8 @@ public sealed class FanPerformanceRoutesTests
         Assert.Equal("/api/v1/content/fan-performances", FanPerformanceRoutes.GetApiListPath());
         Assert.Equal("/api/v1/content/fan-performances/187", FanPerformanceRoutes.GetApiDetailPath(187));
         Assert.Equal("/api/v1/content/fan-performances/187/audio", FanPerformanceRoutes.GetApiAudioPath(187));
+        Assert.Equal("/fan-performances/187/report", FanPerformanceRoutes.GetReportPath(187));
+        Assert.Equal("/api/v1/me/fan-performances/187/report", FanPerformanceRoutes.GetApiReportPath(187));
     }
 
     [Fact]

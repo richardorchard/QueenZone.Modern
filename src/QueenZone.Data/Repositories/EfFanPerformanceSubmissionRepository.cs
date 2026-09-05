@@ -419,6 +419,45 @@ public sealed class EfFanPerformanceSubmissionRepository(QueenZoneDbContext dbCo
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyDictionary<int, FanPerformanceContributorCredit>> GetApprovedContributorCreditsAsync(
+        IReadOnlyCollection<int> stageIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (stageIds is not { Count: > 0 })
+        {
+            return new Dictionary<int, FanPerformanceContributorCredit>();
+        }
+
+        var ids = stageIds.Distinct().ToArray();
+        var rows = await dbContext.FanPerformanceSubmissions
+            .AsNoTracking()
+            .Where(row =>
+                row.Status == FanPerformanceSubmissionStatus.Approved
+                && row.PromotedStageId != null
+                && ids.Contains(row.PromotedStageId.Value))
+            .Select(row => new
+            {
+                StageId = row.PromotedStageId!.Value,
+                row.SubmitterMemberId,
+                DisplayName = row.Submitter != null ? row.Submitter.DisplayName : null,
+                row.SubmittedAt,
+            })
+            .ToListAsync(cancellationToken);
+
+        return rows
+            .GroupBy(row => row.StageId)
+            .ToDictionary(
+                group => group.Key,
+                group =>
+                {
+                    var newest = group.OrderByDescending(row => row.SubmittedAt).First();
+                    var displayName = string.IsNullOrWhiteSpace(newest.DisplayName)
+                        ? "Member"
+                        : newest.DisplayName.Trim();
+                    return new FanPerformanceContributorCredit(newest.SubmitterMemberId, displayName);
+                });
+    }
+
     internal IQueryable<FanPerformanceSubmissionListItem> PendingQueueQuery(int skip, int take) =>
         dbContext.FanPerformanceSubmissions
             .AsNoTracking()

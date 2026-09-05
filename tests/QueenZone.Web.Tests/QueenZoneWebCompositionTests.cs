@@ -70,6 +70,9 @@ public sealed class QueenZoneWebCompositionTests
             Assert.NotNull(scope.ServiceProvider.GetRequiredService<FanPerformanceAudioUploadService>());
             Assert.NotNull(scope.ServiceProvider.GetRequiredService<IFanPerformanceSubmissionRepository>());
             Assert.NotNull(scope.ServiceProvider.GetRequiredService<FanPerformanceSubmissionService>());
+            Assert.NotNull(scope.ServiceProvider.GetRequiredService<FanPerformanceCreditResolver>());
+            Assert.NotNull(scope.ServiceProvider.GetRequiredService<FanPerformanceReportService>());
+            Assert.NotNull(scope.ServiceProvider.GetRequiredService<IFanPerformanceReportRepository>());
             Assert.NotNull(scope.ServiceProvider.GetRequiredService<FanPerformanceSubmissionPromotionService>());
             Assert.NotNull(scope.ServiceProvider.GetRequiredService<FanPerformanceSubmissionPurgeService>());
         }

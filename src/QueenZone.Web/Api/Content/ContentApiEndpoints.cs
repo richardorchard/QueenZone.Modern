@@ -662,12 +662,15 @@ public static class ContentApiEndpoints
     internal static async Task<IResult> GetFanPerformancesAsync(
         PublicQueryCacheService publicQueryCache,
         FanPerformanceDurationResolver durationResolver,
+        FanPerformanceCreditResolver creditResolver,
         int? page,
         int? pageSize,
         CancellationToken cancellationToken)
     {
         var request = ApiPagination.Normalize(page, pageSize);
-        var items = await publicQueryCache.GetFanPerformancePageAsync(request.Page, request.PageSize, cancellationToken);
+        var items = await creditResolver.EnrichAsync(
+            await publicQueryCache.GetFanPerformancePageAsync(request.Page, request.PageSize, cancellationToken),
+            cancellationToken);
         var totalCount = await publicQueryCache.GetFanPerformanceVisibleCountAsync(cancellationToken);
         var durations = await durationResolver.ResolveManyAsync(items, cancellationToken);
 
@@ -683,10 +686,13 @@ public static class ContentApiEndpoints
     internal static async Task<IResult> GetFanPerformanceDetailAsync(
         PublicQueryCacheService publicQueryCache,
         FanPerformanceDurationResolver durationResolver,
+        FanPerformanceCreditResolver creditResolver,
         int id,
         CancellationToken cancellationToken)
     {
-        var performance = await publicQueryCache.GetFanPerformanceByIdAsync(id, cancellationToken);
+        var performance = await creditResolver.EnrichOneAsync(
+            await publicQueryCache.GetFanPerformanceByIdAsync(id, cancellationToken),
+            cancellationToken);
         if (performance is null)
         {
             return Results.Problem(

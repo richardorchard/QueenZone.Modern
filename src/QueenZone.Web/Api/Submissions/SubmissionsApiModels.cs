@@ -28,6 +28,18 @@ public sealed record NewsSuggestionItemDto(
     int? PublishedNewsId,
     string? PublishedPath);
 
+public sealed record FanPerformanceSubmissionItemDto(
+    Guid Id,
+    string Title,
+    string CoveredSong,
+    string PerformedBy,
+    DateTimeOffset SubmittedAt,
+    SubmissionStatusDto Status,
+    string? Notes,
+    string? RejectionReason,
+    int? PromotedStageId,
+    string? PublishedPath);
+
 public sealed record ArticleSubmissionItemDto(
     Guid Id,
     string Title,
