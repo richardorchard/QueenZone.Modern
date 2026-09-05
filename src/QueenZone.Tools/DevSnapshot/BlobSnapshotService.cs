@@ -159,11 +159,11 @@ internal sealed class BlobSnapshotService(
         }
     }
 
-    private static (string Container, string Name) ParseGalleryLocation(string path)
+    internal static (string Container, string Name) ParseGalleryLocation(string path)
     {
-        var absolute = Uri.TryCreate(path, UriKind.Absolute, out _)
-            ? path
-            : PhotoImageUrl.BuildBlobStorageUrl(path);
+        var isHttpUrl = Uri.TryCreate(path, UriKind.Absolute, out var uri)
+            && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
+        var absolute = isHttpUrl ? path : PhotoImageUrl.BuildBlobStorageUrl(path);
         if (!PhotoImageUrl.TryParseBlobLocation(absolute, out var container, out var name))
         {
             throw new InvalidOperationException($"Invalid gallery blob path: {path}");
