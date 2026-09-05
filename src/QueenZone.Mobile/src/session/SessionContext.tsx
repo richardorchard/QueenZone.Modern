@@ -98,9 +98,11 @@ function sessionFromAccessToken(
 }
 
 function smokeAuthAllowed(): boolean {
+  const config = getAppConfig();
   return isSmokeAuthEnabled({
     dev: typeof __DEV__ !== 'undefined' ? __DEV__ : false,
-    appEnv: getAppConfig().appEnv,
+    appEnv: config.appEnv,
+    smokeEmbed: config.smokeEmbed,
   });
 }
 

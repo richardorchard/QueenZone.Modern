@@ -1,6 +1,6 @@
 appId: org.queenzone.mobile
 ---
-# Debug smoke binaries embed JS and skip the expo-dev-client launcher (#1225).
+# Release-embedded smoke binaries bake JS and skip the expo-dev-client launcher (#1322).
 # After launch the QueenZone home testID must be visible on the Testing host.
 - launchApp:
     clearState: true

@@ -11,6 +11,7 @@ const smokeEmbed = require('../../plugins/smokeEmbed.cjs') as {
   filterExpoPluginsForSmokeEmbed: (plugins: unknown[], env?: EnvBag) => unknown[];
   smokeEmbedAutolinking: () => { exclude: string[] };
   applyAndroidBundleInDebug: (contents: string) => string;
+  applyAndroidReleaseDebugSigning: (contents: string) => string;
   DEV_CLIENT_PACKAGES: string[];
   EMBED_FLAG: string;
 };
@@ -59,6 +60,22 @@ describe('applyAndroidBundleInDebug', () => {
   });
 });
 
+describe('applyAndroidReleaseDebugSigning', () => {
+  it('signs Release with the debug keystore when prebuild left it unsigned', () => {
+    const patched = smokeEmbed.applyAndroidReleaseDebugSigning(
+      'buildTypes {\n    release {\n        minifyEnabled false\n    }\n}\n',
+    );
+    assert.match(patched, /signingConfig signingConfigs\.debug/);
+    assert.match(patched, /queenzone-smoke-embed-release-signing/);
+    assert.equal(smokeEmbed.applyAndroidReleaseDebugSigning(patched), patched);
+  });
+
+  it('leaves an existing debug signingConfig alone', () => {
+    const source = 'release {\n        signingConfig signingConfigs.debug\n        minifyEnabled false\n}\n';
+    assert.equal(smokeEmbed.applyAndroidReleaseDebugSigning(source), source);
+  });
+});
+
 describe('app.config smoke embed wiring', () => {
   it('filters expo-dev-client and registers the embed plugin when the flag is on', () => {
     assert.match(appConfigSource, /filterExpoPluginsForSmokeEmbed/);
@@ -66,5 +83,6 @@ describe('app.config smoke embed wiring', () => {
     assert.match(appConfigSource, /smokeEmbedAutolinking/);
     assert.match(appConfigSource, /QUEENZONE_MOBILE_SMOKE_EMBED|smokeEmbed/);
     assert.match(appConfigSource, /'\.\/plugins\/smokeEmbed\.cjs'/);
+    assert.match(appConfigSource, /smokeEmbed: smokeEmbed \|\| undefined/);
   });
 });
