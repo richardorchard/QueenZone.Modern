@@ -14,9 +14,18 @@
 # EfAdminNewsRepositoryLegacyWriteProbeTests, EfNewsSectionLiveProbeTests)
 # query news tables directly via EF/SQL - no view in the schema is on that
 # path - so views aren't needed here at all.
+# The live Azure SQL source also carries contained users, logins, permissions,
+# and role memberships that SQL Express cannot host - contained-user CREATE USER
+# WITH PASSWORD is legal only in a contained database, and Azure principals
+# have no Express counterpart. Recreating those would fail Publish the same
+# way the dead views would (SQL72014 / Msg 33233). Probe access is granted
+# after Publish to the Express-local queenzone_probe login, not by replaying
+# Azure security objects, so Users/Logins/Permissions/RoleMembership are
+# excluded here too. (sqlpackage's type name is RoleMembership, singular.)
 # /Action:Export doesn't support excluding object types at all; /Action:Extract
 # doesn't either (verified against this sqlpackage version's own /? help, not
-# assumed); but /Action:Publish does via /p:ExcludeObjectTypes=Views, and
+# assumed); but /Action:Publish does via
+# /p:ExcludeObjectTypes=Views;Users;Logins;Permissions;RoleMembership, and
 # empirically DOES restore the embedded table data from an ExtractAllTableData
 # dacpac (verified locally: NEWS_T came through with 5268 rows, ViewCount 0) -
 # that combination isn't obviously documented, hence this much explanation.
@@ -76,11 +85,11 @@ END
 "@
     sqlcmd -S "localhost\$InstanceName" -Q $dropSql
 
-    Write-Host "Publishing dacpac into SQLEXPRESS as $TargetDatabase (excluding views)..."
+    Write-Host "Publishing dacpac into SQLEXPRESS as $TargetDatabase (excluding views and Azure security objects)..."
     dotnet tool run sqlpackage /Action:Publish `
         /SourceFile:"$dacpacPath" `
         /TargetConnectionString:"Server=localhost\$InstanceName;Database=$TargetDatabase;Integrated Security=True;TrustServerCertificate=True" `
-        /p:ExcludeObjectTypes=Views `
+        /p:ExcludeObjectTypes="Views;Users;Logins;Permissions;RoleMembership" `
         /p:AllowIncompatiblePlatform=True
     if ($LASTEXITCODE -ne 0) { throw "sqlpackage publish failed with exit code $LASTEXITCODE" }
 
