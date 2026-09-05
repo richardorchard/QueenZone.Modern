@@ -1,4 +1,20 @@
-# Dev App Service provisioning
+# Dev Azure environment
+
+## Current status: 2026-09-05
+
+The infrastructure, DNS, managed TLS, runtime settings, and automatic
+application deployment are live. Qualifying web merges to `main` deploy the
+tested CI artifact through `deploy-dev.yml`; recent runs have passed artifact
+resolution, deployment, warmup, and public/API smoke at
+`https://dev.queenzone.org`.
+
+Dev temporarily uses deterministic sample data while separate work completes
+the legacy database baseline. `queenzone-dev-db` and isolated blob storage are
+provisioned, but `deploy-dev.yml` currently removes the legacy connection and
+skips migrations. This is not yet proof of migration or legacy SQL behavior.
+
+Mobile staging still points at production until #1270. Production remains in
+`australiaeast` under its historical `queenzone-dev` resource name until #1272.
 
 Phase 1 of epic #1264, issue #1265. The new root is
 `infra/environments/dev`; its backend uses `dev.tfstate` in the existing
@@ -24,9 +40,8 @@ returned exit code 0: no creates, updates, deletes or replacements.
 
 Production remained Running on `ASP-Queenzone` in `Queenzone-RG`, B1/one worker.
 The duplicate all-roots push workflow was cancelled before apply, so the deleted
-DNS record was not recreated. Custom DNS/TLS, data/storage and application
-deployment remain with their later epic phases; this proves infrastructure
-provisioning, not application release readiness.
+DNS record was not recreated. This paragraph records Phase 1 evidence only;
+the current state is summarised above.
 
 ## Resources and boundaries
 
@@ -44,27 +59,28 @@ The shared module preserves health checks, TLS, logging, Cloudflare ranges,
 identity and lifecycle protection. B1 and one worker remain enforced for both
 callers. Production's default hostnames and ingress cannot be relaxed by the
 new dev options. Dev initially permits direct access to its Azure HTTPS
-hostname. This exposes only Azure's empty-app placeholder until Phase 4 deploys
-the application. No production settings, databases or blobs are copied.
+hostname. This originally exposed only Azure's empty-app placeholder. Phase 4
+now deploys the application automatically. No production settings, databases
+or blobs are copied.
 `WEBSITE_WARMUP_PATH=/health` is seeded at creation; subsequent settings remain
 operator/deployment-owned under the existing ignore_changes boundary. Application
 Insights runtime wiring belongs with those settings in Phase 4.
 
-## DNS and managed TLS handoff
+## DNS and managed TLS history
 
 `enable_custom_domain` defaults to false. Phase 1 creates no hostname binding
 or certificate because DNS has not been pointed at this app. The maintainer
 reported deleting the old dev DNS record on 2026-09-04; this does not prove
 that the Static Web App itself has been decommissioned.
 
-In Phase 3 (#1267), finish decommissioning the APK site, set the CNAME directly
+Phase 3 (#1267) decommissioned the APK site, set the CNAME directly
 to `queenzone-devbox.azurewebsites.net`, publish Azure's ownership TXT value
-where required, and then enable the custom-domain option in committed HCL.
-That creates the hostname binding, Azure-managed certificate and SNI binding.
+where required, and enabled the custom-domain option in committed HCL.
+That created the hostname binding, Azure-managed certificate and SNI binding.
 Keep dev ingress direct: the CNAME must remain DNS-only for Azure-managed
 certificate issuance and renewal, so Cloudflare-only ingress is not compatible
 with this certificate choice. Production retains its Cloudflare-only ingress.
-Do not enable the hostname before DNS is ready.
+The resulting hostname and certificate are live and verified.
 
 Managed certificates require no supplied PFX/private key, so they avoid the
 production uploaded-certificate exception. Azure requires a direct CNAME for
@@ -74,10 +90,10 @@ on TLS, including renewal, rather than merely passing initial issuance.
 See [Azure certificate requirements](https://learn.microsoft.com/en-us/azure/app-service/configure-ssl-certificate)
 and [AzureRM managed certificates](https://registry.terraform.io/providers/hashicorp/azurerm/5.0.1/docs/resources/app_service_managed_certificate).
 
-Production still declares the old dev DNS record. A plan can propose recreating
-it after manual deletion. Do not approve that production plan; reconcile DNS
-ownership in Phase 3. The apply workflow's manual `root: dev` selection allows
-an independently reviewed dev plan/apply without applying production drift.
+The production root owns the `dev.queenzone.org` DNS record; the dev root owns
+the App Service hostname and certificate. The apply workflow serialises those
+roots when both change and still permits an independently reviewed dev-only
+apply.
 
 ## First-use permissions and approval
 
@@ -128,9 +144,9 @@ Run `./scripts/Test-OpenTofu.ps1` for both roots, or pass
 initialisation, validation, and mocked shared-module contract tests. Mock tests
 never contact Azure. A real plan must also pass `Test-OpenTofuPlanSafety.ps1`.
 
-After the approved apply, verify the Azure app's HTTPS root serves the default
-placeholder and inspect its plan, region and worker count in Azure. An empty
-App Service does not implement QueenZone's `/health`; that endpoint is verified
-after application deployment in Phase 4. Update the dev smoke URL when Phase 3
-closes direct origin access. Record the apply run and live verification before
-closing #1265 or starting its dependent phases. Merge alone is not provisioning.
+For infrastructure changes, verify both roots with `Test-OpenTofu.ps1`, review
+the approval-gated plan, and confirm the live target after apply. For
+application changes, confirm the automatic `deploy-dev.yml` run, build stamp,
+warmup, and route smoke at `https://dev.queenzone.org`. Infrastructure merge,
+apply, application deploy, and live verification remain separate completion
+states.

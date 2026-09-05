@@ -19,9 +19,10 @@ Full estate inventory for OpenTofu: [`opentofu-inventory.md`](opentofu-inventory
 ## Development database sizing
 
 The isolated development database, `queenzone-dev-db`, is deliberately
-**Basic / 2 GB**. This is not a production capacity decision: production
-remains independently sized, while dev starts empty and receives the same EF
-schema only after a deliberate migration run.
+**Basic / 2 GB**. This is not a production capacity decision. While separate
+work completes its legacy baseline, the deployed dev application temporarily
+uses deterministic sample data and `deploy-dev.yml` skips migrations.
+Production remains independently sized.
 
 **Explicit product decision:** stay on a **single instance** of the current low-cost plan. Do **not** scale out App Service instances and do **not** add **Azure Cache for Redis** (or similar paid distributed cache) unless budget and traffic later justify revisiting this document.
 

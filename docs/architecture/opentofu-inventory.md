@@ -11,7 +11,7 @@ Issue: [#624](https://github.com/richardorchard/QueenZone.Modern/issues/624) (Op
 
 Sanitised machine-readable IDs and import hints live under [`infra/import/`](../../infra/import/).
 
-## Dev environment (Phases 1–2 verified; Phase 3 cutover declared 2026-09-04)
+## Dev environment (infrastructure and application deployment verified 2026-09-05)
 
 Issue #1265 adds `infra/environments/dev` with a separate `dev.tfstate`.
 These resources are **provisioned and verified** in `australiaeast`:
@@ -29,17 +29,19 @@ succeeded after the resource-group bootstrap. Azure confirmed B1, one worker,
 Always On, .NET 10 and HTTPS-only. The default Azure hostname returned HTTP 200
 with its welcome page; a fresh remote-state plan returned no changes.
 
-Production's `queenzone-dev` App Service remains separate. Phase 2 declares
+Production's `queenzone-dev` App Service remains separate. Phase 2 provisioned
 an empty `queenzone-dev-db` database on the existing
 `queenzone-sql-server` and the separate `queenzonedev` storage account in
-the dev state. The database and account are pending the approval-gated apply;
-they are not imports and contain no production data. DNS/managed TLS remain
-Phase 3 decommissioned the unused `queenzone-dev` Static Web App and its
+the dev state. They are not imports and contain no production data. While
+separate work completes the legacy database baseline, dev runs the deployed
+application with deterministic sample data and skips EF migrations. Phase 3
+decommissioned the unused `queenzone-dev` Static Web App and its
 APK-distribution workflow. The production Cloudflare root now declares the
 `dev.queenzone.org` CNAME at
 `queenzone-devbox.azurewebsites.net`; it retains the same resource address and
-`prevent_destroy` protection. After that production apply, the dev root
-creates the hostname binding and Azure-managed certificate. See
+`prevent_destroy` protection. The dev hostname binding and Azure-managed
+certificate are applied; `https://dev.queenzone.org` serves the application
+and has passed repeated deployment warmup and public/API smoke checks. See
 [#1267](https://github.com/richardorchard/QueenZone.Modern/issues/1267) and the
 [dev provisioning runbook](opentofu-dev-environment.md) for the required apply
 order and verification steps. The CNAME remains DNS-only so Azure can renew its

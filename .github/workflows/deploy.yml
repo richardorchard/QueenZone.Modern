@@ -2,9 +2,8 @@ name: Deploy
 
 on:
   push:
-    branches:
-      - main
-      - master
+    tags:
+      - 'v*'
   workflow_dispatch:
 
 permissions:
@@ -21,7 +20,8 @@ concurrency:
   # leave the DB or App Service half-updated.
   cancel-in-progress: false
 
-# Runs after a PR merges to main. ci.yml already ran the full test/coverage/
+# Runs when a verified commit on main is promoted with a v* tag, or through
+# a manual dispatch from main. ci.yml already ran the full test/coverage/
 # e2e suite against this exact tree as a required status check before the
 # merge was allowed (see branch protection on main), so none of that re-runs
 # here. This workflow no longer rebuilds — it reuses the exact binaries
@@ -43,7 +43,7 @@ jobs:
   # uploaded.
   changes:
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main'
     outputs:
       code: ${{ steps.check.outputs.code }}
       migrations: ${{ steps.check.outputs.migrations }}
@@ -57,7 +57,10 @@ jobs:
       - name: Check for code changes
         id: check
         run: |
-          if [ "${{ github.event_name }}" != "push" ] || [ -z "${{ github.event.before }}" ]; then
+          # A production tag can span several merges since the previous release.
+          # Fail closed by running every deploy stage instead of diffing the tag
+          # creation event's all-zero `before` SHA.
+          if [ "${{ github.event_name }}" != "push" ] || [ "${{ github.ref_type }}" = "tag" ] || [ -z "${{ github.event.before }}" ]; then
             echo "code=true" >> "$GITHUB_OUTPUT"
             echo "migrations=true" >> "$GITHUB_OUTPUT"
             echo "mobile=true" >> "$GITHUB_OUTPUT"
@@ -69,15 +72,16 @@ jobs:
             >> "$GITHUB_OUTPUT"
 
   # Finds the ci.yml run that built+tested this exact code, so `deploy` can
-  # download its publish artifact instead of rebuilding. github.sha on main is
-  # the merge result, not the PR head that ci.yml ran against:
+  # download its publish artifact instead of rebuilding. A tag checkout resolves
+  # to its target commit; that commit on main is not always the PR head that
+  # ci.yml ran against:
   #   - merge commits (2 parents): second parent is the PR head
   #   - squash/rebase merges (1 parent): look up the associated PR head via API
   #   - direct pushes with no PR: fall back to github.sha itself
   resolve-ci-run:
     runs-on: ubuntu-latest
     needs: changes
-    if: github.ref == 'refs/heads/main' && needs.changes.outputs.code == 'true'
+    if: (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main') && needs.changes.outputs.code == 'true'
     outputs:
       run_id: ${{ steps.find.outputs.run_id }}
       head_sha: ${{ steps.sha.outputs.head_sha }}
@@ -92,7 +96,9 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          PARENTS=($(git rev-list --parents -n 1 HEAD))
+          # Peel both lightweight and annotated tags before inspecting parents.
+          TARGET_SHA=$(git rev-parse "${{ github.sha }}^{commit}")
+          PARENTS=($(git rev-list --parents -n 1 "$TARGET_SHA"))
           if [ "${#PARENTS[@]}" -ge 3 ]; then
             HEAD_SHA="${PARENTS[2]}"
             echo "Merge commit — using second parent as PR head SHA."
@@ -134,7 +140,7 @@ jobs:
     # Skip the restore/`database update` when the push did not touch EF paths
     # (issue #659). workflow_dispatch still fails closed (migrations=true).
     if: |
-      github.ref == 'refs/heads/main' &&
+      (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main') &&
       needs.changes.outputs.code == 'true' &&
       needs.changes.outputs.migrations == 'true'
     environment: dev
@@ -212,7 +218,7 @@ jobs:
     needs: [changes, resolve-ci-run]
     if: |
       always() &&
-      github.ref == 'refs/heads/main' &&
+      (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main') &&
       needs.changes.outputs.code == 'true' &&
       needs.resolve-ci-run.result == 'success'
     environment: deploy
@@ -342,7 +348,7 @@ jobs:
     # zip deploy still runs (issue #659).
     if: |
       always() &&
-      github.ref == 'refs/heads/main' &&
+      (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main') &&
       needs.changes.outputs.code == 'true' &&
       needs.resolve-ci-run.result == 'success' &&
       needs.configure-app-settings.result == 'success' &&
@@ -406,7 +412,7 @@ jobs:
     # even when `deploy` itself ran (run 31702420754 after #660).
     if: |
       always() &&
-      github.ref == 'refs/heads/main' &&
+      (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main') &&
       needs.changes.outputs.code == 'true' &&
       needs.resolve-ci-run.result == 'success' &&
       needs.deploy.result == 'success'
