@@ -60,10 +60,14 @@ jobs:
       - name: Check for code changes
         id: check
         run: |
-          # The provisioned database is empty and does not contain the legacy
-          # baseline tables expected by the existing EF migrations. Keep dev
-          # useful with deterministic sample data until that baseline exists.
-          echo "sample_data=true" >> "$GITHUB_OUTPUT"
+          # The curated refresh workflow flips this repository variable only
+          # after schema, data, privacy, size, smoke, and browser guards pass.
+          # Until then every deploy stays on deterministic sample data.
+          if [ "${{ vars.DEV_SNAPSHOT_READY }}" = "true" ]; then
+            echo "sample_data=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "sample_data=true" >> "$GITHUB_OUTPUT"
+          fi
 
           if [ "${{ github.event_name }}" != "push" ] || [ -z "${{ github.event.before }}" ]; then
             echo "code=true" >> "$GITHUB_OUTPUT"

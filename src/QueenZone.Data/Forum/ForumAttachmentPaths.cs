@@ -6,7 +6,9 @@ namespace QueenZone.Data;
 /// </summary>
 public static class ForumAttachmentPaths
 {
-    public const string LegacyAttachmentsCdnBaseUrl = "https://cdn2.queenzone.org/attachments";
+    public const string DefaultLegacyAttachmentsBaseUrl = "https://cdn2.queenzone.org/attachments";
+
+    public const string LegacyAttachmentsBaseUrlEnvironmentVariable = "QUEENZONE_FORUM_ATTACHMENTS_BASE_URL";
 
     public static string LegacyDownloadPath(int legacyPostId) =>
         $"/forum/attachment/legacy/{legacyPostId}";
@@ -21,6 +23,8 @@ public static class ForumAttachmentPaths
     public static string BuildLegacyCdnUrl(string fileName)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(fileName);
-        return $"{LegacyAttachmentsCdnBaseUrl}/{fileName.Trim().TrimStart('/')}";
+        var baseUrl = Environment.GetEnvironmentVariable(LegacyAttachmentsBaseUrlEnvironmentVariable)
+            ?? DefaultLegacyAttachmentsBaseUrl;
+        return $"{baseUrl.TrimEnd('/')}/{fileName.Trim().TrimStart('/')}";
     }
 }

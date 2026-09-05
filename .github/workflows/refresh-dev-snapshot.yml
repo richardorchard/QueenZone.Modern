@@ -1,0 +1,210 @@
+name: Refresh dev curated snapshot
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type REFRESH DEV SNAPSHOT
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: write
+  id-token: write
+
+concurrency:
+  group: refresh-dev-curated-snapshot
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    name: Curate, load, verify, and connect dev
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    environment: dev-data-refresh
+
+    steps:
+      - name: Require explicit confirmation
+        shell: bash
+        run: |
+          if [ "${{ github.ref }}" != "refs/heads/main" ]; then
+            echo "::error::The refresh may run only from main."
+            exit 1
+          fi
+          if [ "${{ vars.DEV_SNAPSHOT_APPROVAL_GATE_CONFIGURED }}" != "true" ]; then
+            echo "::error::Configure required reviewers on dev-data-refresh, then set DEV_SNAPSHOT_APPROVAL_GATE_CONFIGURED=true."
+            exit 1
+          fi
+          if [ "${{ inputs.confirmation }}" != "REFRESH DEV SNAPSHOT" ]; then
+            echo "::error::Confirmation must be exactly REFRESH DEV SNAPSHOT."
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+          cache: true
+          cache-dependency-path: |
+            **/*.csproj
+            .config/dotnet-tools.json
+
+      - name: Restore and build refresh tooling
+        run: |
+          dotnet restore QueenZone.sln
+          dotnet build QueenZone.sln --configuration Release --no-restore
+
+      - name: Fetch isolated refresh credentials
+        id: bitwarden-secrets
+        uses: bitwarden/sm-action@v3.0.1
+        with:
+          access_token: ${{ secrets.BITWARDEN_SECRETS_MANAGER_ACCESS_TOKEN }}
+          secrets: ${{ vars.BITWARDEN_DEV_SNAPSHOT_SECRETS }}
+
+      - name: Validate secret mapping
+        env:
+          DEV_SNAPSHOT_SOURCE_SQL_READONLY: ${{ steps.bitwarden-secrets.outputs.DEV_SNAPSHOT_SOURCE_SQL_READONLY }}
+          DEV_SNAPSHOT_TARGET_SQL: ${{ steps.bitwarden-secrets.outputs.DEV_SNAPSHOT_TARGET_SQL }}
+          DEV_SNAPSHOT_SOURCE_BLOB_READONLY: ${{ steps.bitwarden-secrets.outputs.DEV_SNAPSHOT_SOURCE_BLOB_READONLY }}
+          DEV_SNAPSHOT_TARGET_BLOB: ${{ steps.bitwarden-secrets.outputs.DEV_SNAPSHOT_TARGET_BLOB }}
+          DEV_SNAPSHOT_ADMIN_PASSWORD: ${{ steps.bitwarden-secrets.outputs.DEV_SNAPSHOT_ADMIN_PASSWORD }}
+          DEV_SNAPSHOT_MEMBER_PASSWORD: ${{ steps.bitwarden-secrets.outputs.DEV_SNAPSHOT_MEMBER_PASSWORD }}
+        shell: bash
+        run: |
+          required=(
+            DEV_SNAPSHOT_SOURCE_SQL_READONLY
+            DEV_SNAPSHOT_TARGET_SQL
+            DEV_SNAPSHOT_SOURCE_BLOB_READONLY
+            DEV_SNAPSHOT_TARGET_BLOB
+            DEV_SNAPSHOT_ADMIN_PASSWORD
+            DEV_SNAPSHOT_MEMBER_PASSWORD
+          )
+          for name in "${required[@]}"; do
+            if [ -z "${!name}" ]; then
+              echo "::error::$name is absent from BITWARDEN_DEV_SNAPSHOT_SECRETS."
+              exit 1
+            fi
+          done
+
+      - name: Azure login
+        id: azure-login
+        uses: azure/login@v3
+        with:
+          client-id: ${{ vars.ARM_CLIENT_ID }}
+          tenant-id: ${{ vars.ARM_TENANT_ID }}
+          subscription-id: ${{ vars.ARM_SUBSCRIPTION_ID }}
+
+      - name: Keep dev in sample-data mode during refresh
+        id: disconnect
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh variable set DEV_SNAPSHOT_READY --body false --repo "${{ github.repository }}"
+          az webapp config appsettings delete \
+            --name queenzone-devbox \
+            --resource-group Queenzone-Dev-RG \
+            --setting-names ConnectionStrings__QueenZoneLegacy \
+            --output none
+          az webapp config appsettings set \
+            --name queenzone-devbox \
+            --resource-group Queenzone-Dev-RG \
+            --settings DevSnapshot__Ready=false \
+            --output none
+
+      - name: Build curated SQL and Blob snapshot
+        env:
+          DEV_SNAPSHOT_SOURCE_SQL_READONLY: ${{ steps.bitwarden-secrets.outputs.DEV_SNAPSHOT_SOURCE_SQL_READONLY }}
+          DEV_SNAPSHOT_TARGET_SQL: ${{ steps.bitwarden-secrets.outputs.DEV_SNAPSHOT_TARGET_SQL }}
+          DEV_SNAPSHOT_SOURCE_BLOB_READONLY: ${{ steps.bitwarden-secrets.outputs.DEV_SNAPSHOT_SOURCE_BLOB_READONLY }}
+          DEV_SNAPSHOT_TARGET_BLOB: ${{ steps.bitwarden-secrets.outputs.DEV_SNAPSHOT_TARGET_BLOB }}
+          DEV_SNAPSHOT_ADMIN_PASSWORD: ${{ steps.bitwarden-secrets.outputs.DEV_SNAPSHOT_ADMIN_PASSWORD }}
+          DEV_SNAPSHOT_MEMBER_PASSWORD: ${{ steps.bitwarden-secrets.outputs.DEV_SNAPSHOT_MEMBER_PASSWORD }}
+        shell: pwsh
+        run: ./scripts/Refresh-DevSnapshot.ps1 -Apply
+
+      - name: Upload non-sensitive snapshot summary
+        uses: actions/upload-artifact@v7
+        with:
+          name: dev-snapshot-summary-${{ github.run_id }}
+          path: artifacts/dev-snapshot/summary.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Connect verified snapshot to dev
+        id: connect
+        env:
+          DEV_SQL: ${{ steps.bitwarden-secrets.outputs.DEV_SNAPSHOT_TARGET_SQL }}
+          DEV_BLOB: ${{ steps.bitwarden-secrets.outputs.DEV_SNAPSHOT_TARGET_BLOB }}
+        shell: bash
+        run: |
+          az webapp config appsettings set \
+            --name queenzone-devbox \
+            --resource-group Queenzone-Dev-RG \
+            --settings \
+              "ConnectionStrings__QueenZoneLegacy=$DEV_SQL" \
+              "ConnectionStrings__BlobStorage=$DEV_BLOB" \
+              "Admin__AllowedEmails__1=admin@dev.queenzone.invalid" \
+              "BlobUpload__PublicBaseUrl=https://queenzonedev.blob.core.windows.net" \
+              "QUEENZONE_PHOTO_PUBLIC_BASE_URL=https://queenzonedev.blob.core.windows.net" \
+              "QUEENZONE_PHOTO_BLOB_ENDPOINT=https://queenzonedev.blob.core.windows.net" \
+              "QUEENZONE_FORUM_ATTACHMENTS_BASE_URL=https://queenzonedev.blob.core.windows.net/attachments" \
+              "DevSnapshot__Ready=true" \
+            --output none
+
+      - name: Wait for restart and run public-route smoke
+        shell: bash
+        run: bash ./scripts/Invoke-PostDeploySmoke.sh --base-url https://dev.queenzone.org --max-attempts 32 --sleep-seconds 15
+
+      - name: Install browser
+        shell: pwsh
+        run: |
+          dotnet restore tests/QueenZone.Web.E2E/QueenZone.Web.E2E.csproj
+          dotnet build tests/QueenZone.Web.E2E/QueenZone.Web.E2E.csproj --configuration Release --no-restore
+          ./tests/QueenZone.Web.E2E/bin/Release/net10.0/playwright.ps1 install --with-deps chromium
+
+      - name: Real browser and API journey
+        env:
+          E2E_ARTIFACT_DIR: artifacts/dev-snapshot/e2e
+          E2E_EXPECTED_PHOTO_HOST: queenzonedev.blob.core.windows.net
+        shell: pwsh
+        run: |
+          ./scripts/Run-E2E.ps1 -Mode LiveSite -BaseUrl https://dev.queenzone.org -NoBuild -NoRestore -CategoryFilter LiveSiteContentApiTests
+          ./scripts/Run-E2E.ps1 -Mode LiveSite -BaseUrl https://dev.queenzone.org -NoBuild -NoRestore -CategoryFilter LiveSiteMediaCdnTests
+
+      - name: Mark the verified snapshot ready for future dev deploys
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: gh variable set DEV_SNAPSHOT_READY --body true --repo "${{ github.repository }}"
+
+      - name: Return dev to sample-data mode on failure
+        if: failure() && steps.azure-login.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh variable set DEV_SNAPSHOT_READY --body false --repo "${{ github.repository }}" || true
+          az webapp config appsettings delete \
+            --name queenzone-devbox \
+            --resource-group Queenzone-Dev-RG \
+            --setting-names ConnectionStrings__QueenZoneLegacy \
+            --output none || true
+          az webapp config appsettings set \
+            --name queenzone-devbox \
+            --resource-group Queenzone-Dev-RG \
+            --settings DevSnapshot__Ready=false \
+            --output none || true
+
+      - name: Upload browser failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: dev-snapshot-browser-failure-${{ github.run_id }}
+          path: artifacts/dev-snapshot/e2e
+          if-no-files-found: ignore
+          retention-days: 7

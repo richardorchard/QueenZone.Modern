@@ -338,7 +338,7 @@ git push origin vX.Y.Z
 
 The `v*` tag triggers the production workflow. That workflow resolves the tagged commit back to the PR head SHA and deploys the matching CI artifact, then applies migrations and runs production smoke checks. You can also open **Actions → Deploy → Run workflow**, select `main`, and run the same production deployment without creating a tag.
 
-Dev currently runs the real application with deterministic sample data. Its isolated `queenzone-dev-db` exists, but it does not yet contain the legacy baseline tables required by the existing EF migrations. `deploy-dev.yml` therefore removes the dev legacy-database connection and skips migrations until that baseline is provisioned. Dev blob storage, authentication, telemetry, artifact deployment, warmup, and public/API smoke checks are active; do not treat a successful dev deployment as proof of legacy SQL behavior yet.
+Dev runs deterministic sample data until the approval-gated [curated snapshot workflow](docs/architecture/dev-curated-snapshot.md) completes. That workflow builds a production-compatible legacy schema, loads a capped sanitised public sample, copies only manifest assets into `queenzonedev`, rebuilds search, and enables the dev-only connection after size, privacy, smoke, and browser checks pass. `DEV_SNAPSHOT_READY` keeps later `deploy-dev.yml` runs in sample mode until that proof exists.
 
 The planned public canonical domain for the site is `https://www.queenzone.org`. SEO features that emit absolute public URLs, such as sitemaps and robots.txt, should use that host in production configuration.
 
