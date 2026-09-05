@@ -8,10 +8,11 @@ tested CI artifact through `deploy-dev.yml`; recent runs have passed artifact
 resolution, deployment, warmup, and public/API smoke at
 `https://dev.queenzone.org`.
 
-Dev temporarily uses deterministic sample data while separate work completes
-the legacy database baseline. `queenzone-dev-db` and isolated blob storage are
-provisioned, but `deploy-dev.yml` currently removes the legacy connection and
-skips migrations. This is not yet proof of migration or legacy SQL behavior.
+Dev uses deterministic sample data until the approval-gated curated refresh in
+[`dev-curated-snapshot.md`](dev-curated-snapshot.md) passes. The refresh then
+sets `DEV_SNAPSHOT_READY=true`; later `deploy-dev.yml` runs retain and migrate
+the verified dev-only database. Infrastructure provisioned the targets, but a
+merged workflow alone is not proof that the first data refresh has run.
 
 Mobile staging still points at production until #1270. Production remains in
 `australiaeast` under its historical `queenzone-dev` resource name until #1272.

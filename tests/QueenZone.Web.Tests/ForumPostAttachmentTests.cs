@@ -2,6 +2,7 @@ using QueenZone.Data;
 
 namespace QueenZone.Web.Tests;
 
+[Collection(EnvironmentVariableCollection.Name)]
 public sealed class ForumPostAttachmentTests
 {
     [Fact]
@@ -104,5 +105,25 @@ public sealed class ForumPostAttachmentTests
         Assert.Equal(
             "https://cdn2.queenzone.org/attachments/scan.jpg",
             ForumAttachmentPaths.BuildLegacyCdnUrl("scan.jpg"));
+    }
+
+    [Fact]
+    public void BuildLegacyCdnUrl_UsesIsolatedDevOriginWhenConfigured()
+    {
+        var previous = Environment.GetEnvironmentVariable(ForumAttachmentPaths.LegacyAttachmentsBaseUrlEnvironmentVariable);
+        try
+        {
+            Environment.SetEnvironmentVariable(
+                ForumAttachmentPaths.LegacyAttachmentsBaseUrlEnvironmentVariable,
+                "https://queenzonedev.blob.core.windows.net/attachments");
+
+            Assert.Equal(
+                "https://queenzonedev.blob.core.windows.net/attachments/scan.jpg",
+                ForumAttachmentPaths.BuildLegacyCdnUrl("scan.jpg"));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(ForumAttachmentPaths.LegacyAttachmentsBaseUrlEnvironmentVariable, previous);
+        }
     }
 }
