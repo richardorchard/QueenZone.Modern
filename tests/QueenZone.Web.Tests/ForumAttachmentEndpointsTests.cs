@@ -210,6 +210,8 @@ internal sealed class MemoryBlobUploadService : IBlobUploadService
         {
             Stream = new MemoryStream(entry.Bytes),
             ContentType = entry.ContentType,
+            ETag = $"\"{entry.Bytes.Length:x8}\"",
+            ContentLength = entry.Bytes.LongLength,
         });
     }
 }

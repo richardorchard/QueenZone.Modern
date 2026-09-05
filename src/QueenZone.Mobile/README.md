@@ -280,6 +280,48 @@ list screen walk that same paged GET (`pageSize` 100) for the full catalog, then
 pass the ordered or once-shuffled queue to `FanPerformancePlayer.play` — not the
 `FlatList` pages already on screen.
 
+### Offline fan-performance downloads
+
+Signed-in members can download a recording from the listing or the detail/player.
+Downloads use the same authenticated audio GET (Bearer). The app never stores or
+plays a blob or CDN URL. Completed files live under app-private
+`Paths.document/fan-performances` with opaque ID filenames. A sibling `.part`
+file is promoted only after a successful download; cancel/fail deletes the
+partial. One download runs at a time. Repeated taps do not start a second copy.
+
+A versioned, account-scoped manifest (beside `ContentCache`, not inside it)
+stores only completed rows: performance id, local URI, title/performer, byte
+size, `sourceRevision` (the audio response **ETag**), completed time, and owning
+`memberId`. Startup reconcile drops missing or zero-length files and scrubs
+orphan `.part` files. There is no silent eviction — members remove a download
+explicitly. Size is shown when known. The manager checks `Paths.availableDiskSpace`
+with an 8 MB margin before writing.
+
+`FanPerformancePlayer.load` resolves every source through `resolveAudioSource`
+(listing, detail, Play All / Shuffle, next/previous). A valid same-member local
+file wins; otherwise the player streams with Bearer. Local playback needs the
+retained member identity, not a network token refresh. An undownloaded recording
+while offline shows an offline-specific message, not a generic failure.
+
+Download UI state (`queued` / `downloading` / `downloaded` / `failed` /
+`removing`) lives on `externalStore` under `DOWNLOAD_UI_CACHE_KEY_PREFIX`. The
+listing, detail/player, Downloads screen, and Play All all subscribe there.
+
+**Sign-out** stops playback, deletes every completed file and `.part`, then
+clears the manifest and invalidates the download UI prefix. Offline or timeout
+refresh failures keep the local member identity so same-account downloads stay
+playable; a definite `401` / `invalid_grant` still signs the member out and
+deletes downloads.
+
+**Cloud backup:** Expo’s high-level FileSystem API does not expose
+`NSURLIsExcludedFromBackupKey` (iOS) or Android backup-exclusion attributes.
+Until a CNG/native config sets those flags, downloaded audio in `Paths.document`
+may be included in device cloud backup. Do not treat that as a privacy
+guarantee.
+
+Non-goals: export/share, download-all, cross-device sync, public `songfiles`,
+web offline, or putting audio bytes in `ContentCache`.
+
 ### Fan-performance background playback
 
 Background playback and lock-screen controls use `expo-audio`

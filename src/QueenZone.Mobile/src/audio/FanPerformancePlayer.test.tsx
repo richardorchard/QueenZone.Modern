@@ -6,6 +6,11 @@ import { fanPerformanceFixture } from '../test/fixtures';
 import { renderWithProviders } from '../test/render';
 import { lockScreenAlbumTitle, lockScreenMetadata, lockScreenOptions } from './lockScreen';
 import { resolveLockScreenArtworkUrl } from './lockScreenArtwork';
+import { createMemoryStorage } from '../cache/storage';
+import { createMemoryDownloadHost, setDownloadFileHostForTests } from '../downloads/files';
+import { setDownloadManifestStorageForTests, upsertCompletedDownload } from '../downloads/manifest';
+import { OFFLINE_PLAYBACK_MESSAGE } from '../downloads/messages';
+import { resetDownloadUiForTests } from '../downloads/uiState';
 import { FanPerformancePlayerProvider, useFanPerformancePlayer } from './FanPerformancePlayer';
 
 const bundledArtworkUrl = 'file:///app/assets/icon.png';
@@ -107,7 +112,11 @@ function renderPlayer() {
 describe('FanPerformancePlayerProvider', () => {
   beforeEach(() => {
     mockSession.accessToken = 'member-token';
+    mockSession.profile = { memberId: 'member-1' } as never;
     mockSession.ensureAccessToken.mockImplementation(async () => mockSession.accessToken);
+    setDownloadManifestStorageForTests(createMemoryStorage());
+    setDownloadFileHostForTests(createMemoryDownloadHost());
+    resetDownloadUiForTests();
     mockStatus.playing = false;
     mockStatus.didJustFinish = false;
     mockStatus.currentTime = 0;
@@ -322,6 +331,46 @@ describe('FanPerformancePlayerProvider', () => {
     mockPlayer.clearLockScreenControls.mockClear();
     view.unmount();
     expect(mockPlayer.clearLockScreenControls).toHaveBeenCalled();
+  });
+
+  it('plays a same-member local file without a token refresh', async () => {
+    const host = createMemoryDownloadHost();
+    setDownloadFileHostForTests(host);
+    host.files.set('file:///documents/fan-performances/187', new Uint8Array([1, 2, 3, 4]));
+    await upsertCompletedDownload({
+      performanceId: '187',
+      localUri: 'file:///documents/fan-performances/187',
+      title: trackA.title,
+      performedBy: trackA.performedBy,
+      byteSize: 4,
+      sourceRevision: '"etag-1"',
+      completedAt: '2026-09-05T00:00:00.000Z',
+      memberId: 'member-1',
+    });
+    mockSession.ensureAccessToken.mockClear();
+    const user = userEvent.setup();
+    renderPlayer();
+    await user.press(screen.getByTestId('play-a'));
+    await waitFor(() =>
+      expect(mockPlayer.replace).toHaveBeenCalledWith({
+        uri: 'file:///documents/fan-performances/187',
+        name: trackA.title,
+      }),
+    );
+    expect(mockSession.ensureAccessToken).not.toHaveBeenCalled();
+    expect(JSON.stringify(mockPlayer.replace.mock.calls[0])).not.toContain('Bearer');
+  });
+
+  it('shows an offline-specific error when the recording is not downloaded', async () => {
+    const { getNetworkStateAsync } = jest.requireMock('expo-network') as {
+      getNetworkStateAsync: jest.Mock;
+    };
+    getNetworkStateAsync.mockResolvedValueOnce({ isConnected: false, isInternetReachable: false });
+    const user = userEvent.setup();
+    renderPlayer();
+    await user.press(screen.getByTestId('play-a'));
+    await waitFor(() => expect(screen.getByTestId('error')).toHaveTextContent(OFFLINE_PLAYBACK_MESSAGE));
+    expect(mockPlayer.replace).not.toHaveBeenCalled();
   });
 
   it('throws outside the provider', () => {

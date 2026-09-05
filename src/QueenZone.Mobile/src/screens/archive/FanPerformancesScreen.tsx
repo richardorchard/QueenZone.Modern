@@ -11,6 +11,7 @@ import {
 } from '../../api';
 import { useFanPerformancePlayer } from '../../audio/FanPerformancePlayer';
 import { formatTrackDuration } from '../../audio/formatDuration';
+import { DownloadAction } from '../../downloads/DownloadAction';
 import { usePagedContent } from '../../hooks/usePagedContent';
 import type { ArchiveStackParamList } from '../../navigation/types';
 import { useSession } from '../../session/SessionContext';
@@ -53,12 +54,12 @@ export function shuffleFanPerformances<T>(items: readonly T[], random: () => num
 
 export function FanPerformancesScreen({ navigation }: Props) {
   const { c } = useTheme();
-  const { accessToken, isRestoring } = useSession();
+  const { accessToken, isRestoring, profile } = useSession();
   const player = useFanPerformancePlayer();
   const paged = usePagedContent<FanPerformance>(
     useCallback((page, signal) => fetchFanPerformancesPage({ page, pageSize: 20, signal }), []),
   );
-  const canPlay = Boolean(accessToken);
+  const canPlay = Boolean(accessToken || profile?.memberId);
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [catalogError, setCatalogError] = useState<string | null>(null);
   const [pendingCatalogMode, setPendingCatalogMode] = useState<CatalogPlayMode | null>(null);
@@ -180,6 +181,20 @@ export function FanPerformancesScreen({ navigation }: Props) {
       ) : null}
       <View style={styles.submitRow}>
         <Button
+          label="Downloads"
+          size="sm"
+          variant="outline"
+          onPress={() => {
+            if (!canPlay) {
+              openSignIn(navigation, { tab: 'ArchiveTab', screen: 'FanPerformanceDownloads' });
+              return;
+            }
+            navigation.navigate('FanPerformanceDownloads');
+          }}
+          testID={testIds.fanPerformanceDownloads}
+          accessibilityLabel="Downloaded fan performances"
+        />
+        <Button
           label="Submit a performance"
           size="sm"
           variant="outline"
@@ -218,33 +233,44 @@ export function FanPerformancesScreen({ navigation }: Props) {
             meta={metaLine(item)}
             hint={!canPlay && !isRestoring ? 'Sign in to play' : undefined}
             leading={
-              <Pressable
-                testID={`${testIds.fanPerformancePlayPrefix}${item.id}`}
-                accessibilityRole="button"
-                accessibilityState={{ selected: playingThis }}
-                accessibilityLabel={
-                  canPlay
-                    ? playingThis
-                      ? `Pause ${item.title}`
-                      : `Play ${item.title}`
-                    : `Sign in to play ${item.title}`
-                }
-                onPress={() => onPlay(item)}
-                style={[
-                  styles.play,
-                  {
-                    borderColor: playingThis ? c.textPrimary : c.borderStrong,
-                    backgroundColor: playingThis ? c.textPrimary : c.surfaceRaised,
-                  },
-                  playingThis ? null : styles.playOffset,
-                ]}
-              >
-                {playingThis ? (
-                  <Pause size={20} color={c.surfacePage} fill={c.surfacePage} />
-                ) : (
-                  <Play size={20} color={c.textPrimary} fill={c.textPrimary} />
-                )}
-              </Pressable>
+              <View style={styles.leading}>
+                <Pressable
+                  testID={`${testIds.fanPerformancePlayPrefix}${item.id}`}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: playingThis }}
+                  accessibilityLabel={
+                    canPlay
+                      ? playingThis
+                        ? `Pause ${item.title}`
+                        : `Play ${item.title}`
+                      : `Sign in to play ${item.title}`
+                  }
+                  onPress={() => onPlay(item)}
+                  style={[
+                    styles.play,
+                    {
+                      borderColor: playingThis ? c.textPrimary : c.borderStrong,
+                      backgroundColor: playingThis ? c.textPrimary : c.surfaceRaised,
+                    },
+                    playingThis ? null : styles.playOffset,
+                  ]}
+                >
+                  {playingThis ? (
+                    <Pause size={20} color={c.surfacePage} fill={c.surfacePage} />
+                  ) : (
+                    <Play size={20} color={c.textPrimary} fill={c.textPrimary} />
+                  )}
+                </Pressable>
+                {canPlay || isRestoring ? (
+                  <DownloadAction
+                    track={item}
+                    compact
+                    onNeedSignIn={() =>
+                      openSignIn(navigation, { tab: 'ArchiveTab', screen: 'FanPerformances' })
+                    }
+                  />
+                ) : null}
+              </View>
             }
             onPress={() => navigation.navigate('FanPerformanceDetail', { id: item.id })}
             accessibilityLabel={`Open ${item.title}`}
@@ -273,6 +299,14 @@ const styles = StyleSheet.create({
   },
   submitRow: {
     marginTop: space.xs,
+    flexDirection: 'row',
+    gap: space.sm,
+    flexWrap: 'wrap',
+  },
+  leading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
   },
   play: {
     width: 48,

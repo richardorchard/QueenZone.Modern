@@ -234,7 +234,14 @@ async function postToken(apiBaseUrl: string, fields: Record<string, string>): Pr
   });
   const payload: unknown = await response.json().catch(() => null);
   if (!response.ok) {
-    const error = payload && typeof payload === 'object' ? (payload as { error_description?: unknown }) : null;
+    const error =
+      payload && typeof payload === 'object'
+        ? (payload as { error?: unknown; error_description?: unknown })
+        : null;
+    const code = typeof error?.error === 'string' ? error.error : '';
+    if (code === 'invalid_grant' || response.status === 401) {
+      throw new Error('invalid_grant');
+    }
     const description =
       typeof error?.error_description === 'string' ? error.error_description : 'Could not complete sign-in.';
     throw new Error(description);

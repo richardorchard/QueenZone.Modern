@@ -145,6 +145,10 @@ export function ProfileScreen({ navigation }: Props) {
         onPress={() => navigation.navigate('Inbox')}
       />
       <SettingsRow title="My submissions" onPress={() => navigation.navigate('MySubmissions')} />
+      <SettingsRow
+        title="Downloaded performances"
+        onPress={() => navigation.navigate('SavedList', { kind: 'offline' })}
+      />
       <SettingsRow title="Suggest news" onPress={() => openSuggestNews(navigation)} />
       <SettingsRow title="Contact" onPress={() => navigation.navigate('Contact')} />
       <View style={{ paddingHorizontal: space.xl, paddingTop: space.xl, paddingBottom: space.xl, gap: 10 }}>

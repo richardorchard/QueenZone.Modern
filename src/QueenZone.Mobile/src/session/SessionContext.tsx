@@ -25,6 +25,8 @@ import {
   smokeAuthRefreshPlaceholder,
 } from './smokeAuth';
 import { purgePrivateContentCache } from '../cache';
+import { purgeAllDownloads, reconcileDownloads } from '../downloads/manager';
+import { isTransientRefreshFailure } from './refreshFailure';
 import { resolvePushMemberId } from '../notifications/pushMemberId';
 import {
   configureOfflineQueueAuth,
@@ -154,8 +156,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const nextId = profile.memberId;
     if (previousId && nextId && previousId !== nextId) {
       void purgePrivateContentCache(previousId);
+      void purgeAllDownloads(previousId);
     }
     memberIdRef.current = nextId;
+    void reconcileDownloads(nextId).catch(() => {
+      // Offline reconcile can retry on the next launch.
+    });
     void writeStoredIdentityShell({
       displayName: profile.displayName,
       memberId: profile.memberId,
@@ -199,6 +205,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   );
 
   const clearLocal = useCallback(async () => {
+    await purgeAllDownloads(memberIdRef.current);
     memberIdRef.current = null;
     await purgePrivateContentCache();
     try {
@@ -229,8 +236,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       let tokens: AuthTokens;
       try {
         tokens = await refreshAccessToken(getAppConfig().apiBaseUrl, refresh);
-      } catch {
-        await clearLocal();
+      } catch (err) {
+        if (!isTransientRefreshFailure(err)) {
+          await clearLocal();
+        }
         return null;
       }
 
@@ -297,6 +306,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         const shell = profileFromIdentityShell(stored.identity);
         if (stored.identity?.memberId) {
           memberIdRef.current = stored.identity.memberId;
+          void reconcileDownloads(stored.identity.memberId).catch(() => {});
         }
 
         // Seed the grant and start a single-flight /token before the signed-in
@@ -314,7 +324,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         try {
           if (pendingRefresh) {
             const next = await pendingRefresh;
-            if (!next && !cancelled) {
+            if (!next && !cancelled && !sessionRef.current.accessToken && !memberIdRef.current) {
               await clearLocal();
             }
             return;
@@ -334,7 +344,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
               err instanceof ApiError && err.status === 401 && stored.expiresAt > Date.now();
             if (canRetryRefresh) {
               const next = await refreshWithStoredGrant();
-              if (!next && !cancelled) {
+              if (!next && !cancelled && !sessionRef.current.accessToken && !memberIdRef.current) {
                 await clearLocal();
               }
               return;
@@ -532,7 +542,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       try {
         const tokens = await refreshAccessToken(getAppConfig().apiBaseUrl, refresh);
         return await applyTokens(tokens);
-      } catch {
+      } catch (err) {
+        if (isTransientRefreshFailure(err)) {
+          return sessionRef.current.profile;
+        }
         await clearLocal();
         return null;
       }

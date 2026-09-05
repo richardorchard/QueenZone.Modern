@@ -88,8 +88,10 @@ public sealed class FanPerformanceEndpointTests
         Assert.Equal("audio/mpeg", file.ContentType);
         Assert.Equal("Reaching-Out.mp3", file.FileDownloadName);
         Assert.True(file.EnableRangeProcessing);
+        Assert.Equal("\"00000007\"", file.EntityTag?.Tag);
+        Assert.Equal(7, file.FileStream!.Length);
 
-        using var reader = new StreamReader(file.FileStream!);
+        using var reader = new StreamReader(file.FileStream);
         Assert.Equal("ID3fake", await reader.ReadToEndAsync());
     }
 
@@ -134,5 +136,14 @@ public sealed class FanPerformanceEndpointTests
                 Stream = new MemoryStream([1, 2, 3]),
                 ContentType = string.Empty,
             });
+    }
+
+    [Fact]
+    public void TryCreateEntityTag_ParsesQuotedAndBareValues()
+    {
+        Assert.Equal("\"abc\"", FanPerformanceEndpoints.TryCreateEntityTag("\"abc\"")?.Tag);
+        Assert.Equal("\"abc\"", FanPerformanceEndpoints.TryCreateEntityTag("abc")?.Tag);
+        Assert.Null(FanPerformanceEndpoints.TryCreateEntityTag(null));
+        Assert.Null(FanPerformanceEndpoints.TryCreateEntityTag("   "));
     }
 }

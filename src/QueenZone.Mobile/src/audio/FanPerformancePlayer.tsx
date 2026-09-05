@@ -13,10 +13,14 @@ import {
   useAudioPlayer,
   useAudioPlayerStatus,
 } from 'expo-audio';
-import { apiV1Url } from '../config';
 import { useSession } from '../session/SessionContext';
 import type { FanPerformance } from '../api';
-import { fanPerformanceAudioPath } from './formatDuration';
+import {
+  registerPlaybackStopper,
+  resolveAudioSource,
+  setActivePlaybackId,
+} from '../downloads';
+import { detectOffline } from '../downloads/network';
 import { audioSessionMode, lockScreenMetadata, lockScreenOptions } from './lockScreen';
 import { resolveLockScreenArtworkUrl } from './lockScreenArtwork';
 
@@ -40,7 +44,8 @@ type PlayerState = {
 const PlayerContext = createContext<PlayerState | undefined>(undefined);
 
 export function FanPerformancePlayerProvider({ children }: { children: ReactNode }) {
-  const { accessToken, ensureAccessToken } = useSession();
+  const { accessToken, ensureAccessToken, profile } = useSession();
+  const memberId = profile?.memberId ?? null;
   const player = useAudioPlayer(null, { updateInterval: 250 });
   const status = useAudioPlayerStatus(player);
   const [current, setCurrent] = useState<FanPerformance | null>(null);
@@ -68,33 +73,39 @@ export function FanPerformancePlayerProvider({ children }: { children: ReactNode
     (track: FanPerformance) => {
       const generation = ++loadGenerationRef.current;
       void (async () => {
-        const [token, artworkUrl] = await Promise.all([
-          ensureAccessToken(),
+        const [source, artworkUrl] = await Promise.all([
+          resolveAudioSource({
+            track,
+            memberId,
+            ensureAccessToken,
+            isOffline: await detectOffline(),
+          }),
           resolveLockScreenArtworkUrl().catch(() => undefined),
         ]);
         if (generation !== loadGenerationRef.current) {
           return;
         }
 
-        if (!token) {
-          setError('Sign in with a member account to stream recordings.');
+        if (source.kind === 'error') {
+          setError(source.message);
           return;
         }
 
         setError(null);
         setCurrent(track);
-        player.replace({
-          uri: apiV1Url(fanPerformanceAudioPath(track.id)),
-          headers: { Authorization: `Bearer ${token}` },
-          name: track.title,
-        });
+        setActivePlaybackId(String(track.id));
+        player.replace(
+          source.kind === 'local'
+            ? { uri: source.uri, name: track.title }
+            : { uri: source.uri, headers: source.headers, name: track.title },
+        );
         player.setActiveForLockScreen(true, lockScreenMetadata(track, artworkUrl), {
           ...lockScreenOptions,
         });
         player.play();
       })();
     },
-    [ensureAccessToken, player],
+    [ensureAccessToken, memberId, player],
   );
 
   const play = useCallback(
@@ -148,10 +159,22 @@ export function FanPerformancePlayerProvider({ children }: { children: ReactNode
     }
     player.pause();
     player.clearLockScreenControls();
+    setActivePlaybackId(null);
     setCurrent(null);
     setQueue([]);
     setError(null);
   }, [accessToken, player]);
+
+  useEffect(() => {
+    return registerPlaybackStopper(() => {
+      player.pause();
+      player.clearLockScreenControls();
+      setActivePlaybackId(null);
+      setCurrent(null);
+      setQueue([]);
+      setError(null);
+    });
+  }, [player]);
 
   useEffect(() => {
     return () => {

@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Security.Cryptography;
 
 namespace QueenZone.Storage;
 
@@ -55,10 +56,13 @@ internal sealed class InMemoryBlobStorageBackend : IBlobStorageBackend
             return Task.FromResult<BlobContent?>(null);
         }
 
+        var bytes = value.Value.Bytes;
         return Task.FromResult<BlobContent?>(new BlobContent
         {
-            Stream = new MemoryStream(value.Value.Bytes, writable: false),
+            Stream = new MemoryStream(bytes, writable: false),
             ContentType = value.Value.ContentType,
+            ETag = ComputeETag(bytes),
+            ContentLength = bytes.LongLength,
         });
     }
 
@@ -74,5 +78,11 @@ internal sealed class InMemoryBlobStorageBackend : IBlobStorageBackend
         }
 
         return null;
+    }
+
+    internal static string ComputeETag(byte[] bytes)
+    {
+        var hash = SHA256.HashData(bytes);
+        return $"\"{Convert.ToHexString(hash.AsSpan(0, 8)).ToLowerInvariant()}\"";
     }
 }

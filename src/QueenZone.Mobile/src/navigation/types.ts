@@ -59,6 +59,7 @@ export type ArchiveStackParamList = {
   FreddieTribute: undefined;
   FanPerformances: undefined;
   FanPerformanceDetail: { id: number };
+  FanPerformanceDownloads: undefined;
   FanPerformanceSubmit: undefined;
   Trivia: undefined;
   AboutArchive: undefined;

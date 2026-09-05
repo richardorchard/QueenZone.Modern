@@ -197,6 +197,14 @@ describe('FanPerformancesScreen', () => {
     random.mockRestore();
   });
 
+  it('opens Downloads from the listing when signed in', async () => {
+    mockSession.accessToken = 'member-token';
+    const { navigation } = renderList();
+    await waitFor(() => expect(screen.getByTestId(testIds.fanPerformanceDownloads)).toBeOnTheScreen());
+    await userEvent.setup().press(screen.getByTestId(testIds.fanPerformanceDownloads));
+    expect(navigation.navigate).toHaveBeenCalledWith('FanPerformanceDownloads');
+  });
+
   it('toggles pause when the listed track is already playing', async () => {
     mockSession.accessToken = 'member-token';
     mockPlayer.current = { id: track.id };
