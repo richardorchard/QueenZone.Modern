@@ -6,7 +6,6 @@ import {
   archiveDestinations,
   type ArchiveDestination,
 } from '../../content/archiveHub';
-import { media } from '../../content/media';
 import type { ArchiveStackParamList, RootTabParamList } from '../../navigation/types';
 import { useTheme } from '../../theme';
 import { ArchiveFooter } from '../../ui/ArchiveFooter';
@@ -74,7 +73,7 @@ export function ArchiveHubScreen({ navigation }: Props) {
           kicker={item.kicker}
           kickerRole={item.kickerRole}
           meta={item.meta}
-          image={media[item.image]}
+          icon={item.icon}
           onPress={() => open(item)}
         />
       )}
