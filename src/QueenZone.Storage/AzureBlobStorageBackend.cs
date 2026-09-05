@@ -56,6 +56,9 @@ internal sealed class AzureBlobStorageBackend(BlobServiceClient blobServiceClien
             {
                 Stream = stream,
                 ContentType = properties.Value.ContentType ?? "application/octet-stream",
+                ETag = properties.Value.ETag.ToString(),
+                ContentLength = properties.Value.ContentLength,
+                LastModified = properties.Value.LastModified,
             };
         }
         catch (RequestFailedException ex) when (ex.Status == 404)

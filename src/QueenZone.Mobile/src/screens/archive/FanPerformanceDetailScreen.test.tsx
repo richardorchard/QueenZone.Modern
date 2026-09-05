@@ -91,6 +91,7 @@ describe('FanPerformanceDetailScreen', () => {
     renderDetail();
     await waitFor(() => expect(screen.getByLabelText('Play')).toBeOnTheScreen());
     expect(screen.queryByRole('button', { name: 'Sign in' })).toBeNull();
+    expect(screen.getByTestId(`${testIds.fanPerformanceDownloadPrefix}${track.id}`)).toBeOnTheScreen();
   });
 
   it('shows contributor credit and sends a report when signed in', async () => {

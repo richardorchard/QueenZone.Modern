@@ -6,6 +6,7 @@ import { ApiError, fetchFanPerformanceDetail, fetchFanPerformancesPage, toPlainT
 import { reportFanPerformance } from '../../api/fanPerformanceSubmissions';
 import { useFanPerformancePlayer } from '../../audio/FanPerformancePlayer';
 import { formatTrackDuration } from '../../audio/formatDuration';
+import { DownloadAction } from '../../downloads/DownloadAction';
 import type { ArchiveStackParamList } from '../../navigation/types';
 import { useSession } from '../../session/SessionContext';
 import { openSignIn } from '../../session/signInNavigation';
@@ -179,6 +180,18 @@ function FanPerformancePlayerPanel({ navigation, route }: Props) {
               }}
             />
           </View>
+          <View style={styles.download}>
+            <DownloadAction
+              track={track}
+              onNeedSignIn={() =>
+                openSignIn(navigation, {
+                  tab: 'ArchiveTab',
+                  screen: 'FanPerformanceDetail',
+                  params: { id },
+                })
+              }
+            />
+          </View>
         </View>
       ) : isRestoring ? (
         <View style={styles.player} testID={testIds.fanPerformanceSessionRestoring}>
@@ -307,5 +320,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     gap: space.xl,
+  },
+  download: {
+    marginTop: space.base,
+    alignItems: 'flex-start',
   },
 });

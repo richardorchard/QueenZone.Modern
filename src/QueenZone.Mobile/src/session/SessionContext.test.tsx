@@ -303,6 +303,31 @@ describe('SessionProvider', () => {
     expect(screen.getByText('signed-out-avatar')).toBeOnTheScreen();
   });
 
+  it('keeps local member identity when an expired refresh fails offline', async () => {
+    readStored.mockResolvedValue({
+      ...authTokensFixture(),
+      expiresAt: Date.now() - 1_000,
+      identity: { displayName: 'Freddie', memberId: 'member-1' },
+    });
+    refreshAccessToken.mockRejectedValue(new TypeError('Network request failed'));
+    renderSession();
+    await waitFor(() => expect(screen.getByText('signed-in')).toBeOnTheScreen());
+    expect(clearStored).not.toHaveBeenCalled();
+    expect(screen.getByText('Freddie')).toBeOnTheScreen();
+  });
+
+  it('clears local state on a definite invalid_grant refresh failure', async () => {
+    readStored.mockResolvedValue({
+      ...authTokensFixture(),
+      expiresAt: Date.now() - 1_000,
+      identity: { displayName: 'Freddie', memberId: 'member-1' },
+    });
+    refreshAccessToken.mockRejectedValue(new Error('invalid_grant'));
+    renderSession();
+    await waitFor(() => expect(screen.getByText('signed-out')).toBeOnTheScreen());
+    expect(clearStored).toHaveBeenCalled();
+  });
+
   it('does not clear a stored grant when the app version changes', async () => {
     const stored = {
       ...authTokensFixture(),

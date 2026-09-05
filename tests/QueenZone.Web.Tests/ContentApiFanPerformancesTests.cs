@@ -170,7 +170,10 @@ public sealed class ContentApiFanPerformancesTests : IClassFixture<QueenZoneWebA
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("audio/mpeg", response.Content.Headers.ContentType?.MediaType);
         Assert.Contains("Reaching-Out.mp3", response.Content.Headers.ContentDisposition?.ToString());
-        Assert.Equal("ID3fake-audio"u8.ToArray(), await response.Content.ReadAsByteArrayAsync());
+        var body = await response.Content.ReadAsByteArrayAsync();
+        Assert.Equal("ID3fake-audio"u8.ToArray(), body);
+        Assert.Equal(body.LongLength, response.Content.Headers.ContentLength);
+        Assert.False(string.IsNullOrWhiteSpace(response.Headers.ETag?.Tag));
         Assert.Null(response.Headers.Location);
     }
 
@@ -188,6 +191,7 @@ public sealed class ContentApiFanPerformancesTests : IClassFixture<QueenZoneWebA
 
         Assert.Equal(HttpStatusCode.PartialContent, response.StatusCode);
         Assert.Equal("ID3f"u8.ToArray(), await response.Content.ReadAsByteArrayAsync());
+        Assert.False(string.IsNullOrWhiteSpace(response.Headers.ETag?.Tag));
     }
 
     [Fact]

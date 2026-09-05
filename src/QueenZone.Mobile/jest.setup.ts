@@ -7,6 +7,7 @@ jest.mock('@react-native-async-storage/async-storage', () =>
 
 jest.mock('expo-network', () => ({
   addNetworkStateListener: jest.fn(() => ({ remove: jest.fn() })),
+  getNetworkStateAsync: jest.fn(async () => ({ isConnected: true, isInternetReachable: true })),
 }));
 
 jest.mock('@sentry/react-native', () => ({
@@ -120,6 +121,54 @@ jest.mock('expo-file-system/legacy', () => ({
   EncodingType: { Base64: 'base64' },
   writeAsStringAsync: jest.fn(async () => {}),
 }));
+
+jest.mock('expo-file-system', () => {
+  class FakeFile {
+    uri: string;
+    exists = false;
+    size = 0;
+    constructor(...parts: unknown[]) {
+      this.uri = parts.map(String).join('/');
+    }
+    create() {
+      this.exists = true;
+    }
+    delete() {
+      this.exists = false;
+      this.size = 0;
+    }
+    move() {}
+    write() {}
+    static createDownloadTask() {
+      return { downloadAsync: async () => new FakeFile('file:///documents/x') };
+    }
+    static downloadFileAsync() {
+      return Promise.resolve(new FakeFile('file:///documents/x'));
+    }
+  }
+  class FakeDirectory {
+    uri: string;
+    exists = true;
+    constructor(...parts: unknown[]) {
+      this.uri = parts.map(String).join('/');
+    }
+    create() {
+      this.exists = true;
+    }
+    list() {
+      return [];
+    }
+  }
+  return {
+    File: FakeFile,
+    Directory: FakeDirectory,
+    Paths: {
+      document: { uri: 'file:///documents' },
+      cache: { uri: 'file:///cache' },
+      availableDiskSpace: 64 * 1024 * 1024,
+    },
+  };
+});
 
 jest.mock('expo-audio', () => ({
   setAudioModeAsync: jest.fn(async () => {}),

@@ -1,4 +1,5 @@
 using System.Net.Mime;
+using Microsoft.Net.Http.Headers;
 using QueenZone.Data;
 using QueenZone.Storage;
 
@@ -65,11 +66,30 @@ public static class FanPerformanceEndpoints
                 content.Stream,
                 contentType,
                 fileDownloadName: FanPerformanceRoutes.GetDownloadFileName(performance.Title),
+                lastModified: content.LastModified,
+                entityTag: TryCreateEntityTag(content.ETag),
                 enableRangeProcessing: true);
         }
         catch (NotSupportedException)
         {
             return Results.NotFound();
         }
+    }
+
+    internal static EntityTagHeaderValue? TryCreateEntityTag(string? etag)
+    {
+        if (string.IsNullOrWhiteSpace(etag))
+        {
+            return null;
+        }
+
+        if (EntityTagHeaderValue.TryParse(etag, out var parsed))
+        {
+            return parsed;
+        }
+
+        return EntityTagHeaderValue.TryParse($"\"{etag.Trim().Trim('"')}\"", out parsed)
+            ? parsed
+            : null;
     }
 }

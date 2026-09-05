@@ -1,4 +1,5 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { FanPerformanceDownloadsList } from '../../downloads/FanPerformanceDownloadsList';
 import { MemberGate } from '../../session/MemberGate';
 import type { HomeStackParamList } from '../../navigation/types';
 import { PlaceholderScreen } from '../../ui/PlaceholderScreen';
@@ -14,6 +15,14 @@ const titles: Record<HomeStackParamList['SavedList']['kind'], string> = {
 
 export function SavedListScreen({ route }: Props) {
   const title = titles[route.params.kind];
+  if (route.params.kind === 'offline') {
+    return (
+      <MemberGate title={title}>
+        <FanPerformanceDownloadsList />
+      </MemberGate>
+    );
+  }
+
   return (
     <MemberGate title={title}>
       <PlaceholderScreen
