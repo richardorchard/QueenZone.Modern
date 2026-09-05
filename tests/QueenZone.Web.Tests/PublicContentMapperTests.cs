@@ -148,6 +148,57 @@ public sealed class PublicContentMapperTests
     }
 
     [Fact]
+    public void ToForumThreadHeader_StripsHtmlFromTitleAndForumName()
+    {
+        var header = new ForumTopicHeader(1002, "Request <b>non-official</b> Queen related items", 3, "Sharing the Music <i>Request</i>");
+
+        var view = PublicContentMapper.ToForumThreadHeader(header);
+
+        Assert.Equal("Request non-official Queen related items", view.Title);
+        Assert.Equal("Sharing the Music Request", view.ForumName);
+    }
+
+    [Fact]
+    public void ToForumCategorySummary_StripsHtmlFromNameDescriptionAndLatestThreadTitle()
+    {
+        var category = new ForumCategoryItem(
+            9,
+            "Sharing the Music <i>Request</i>",
+            "Discuss &amp; <b>request</b> items",
+            3,
+            null,
+            "Request <b>non-official</b> Queen related items",
+            1);
+
+        var view = PublicContentMapper.ToForumCategorySummary(category);
+
+        Assert.Equal("Sharing the Music Request", view.Name);
+        Assert.Equal("Discuss & request items", view.Description);
+        Assert.Equal("Request non-official Queen related items", view.LatestThreadTitle);
+    }
+
+    [Fact]
+    public void ToForumThreadSummary_StripsHtmlFromTitle()
+    {
+        var topic = new ForumTopicItem(1002, "Request <b>non-official</b> Queen related items", new DateTime(2020, 10, 6, 0, 0, 0, DateTimeKind.Utc), "brian", 4, null, false);
+
+        var view = PublicContentMapper.ToForumThreadSummary(topic);
+
+        Assert.Equal("Request non-official Queen related items", view.Title);
+    }
+
+    [Fact]
+    public void ToForumRecentThreadSummary_StripsHtmlFromTitleAndCategoryName()
+    {
+        var item = new ForumRecentThreadItem(1002, "Request <b>non-official</b> items", 9, "Sharing the Music <i>Request</i>", 4, new DateTime(2020, 10, 6, 0, 0, 0, DateTimeKind.Utc));
+
+        var view = PublicContentMapper.ToForumRecentThreadSummary(item);
+
+        Assert.Equal("Request non-official items", view.Title);
+        Assert.Equal("Sharing the Music Request", view.CategoryName);
+    }
+
+    [Fact]
     public void ToForumPostViewModel_MapsAttachments()
     {
         var post = new ForumPostItem(

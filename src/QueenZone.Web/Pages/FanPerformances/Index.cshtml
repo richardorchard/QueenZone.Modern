@@ -6,6 +6,11 @@
 <section class="qz-section">
   <div class="qz-container">
     <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
+
+    <p class="qz-submit-cta">
+      Got a Queen cover or tribute of your own? <a class="qz-button qz-button--cta" href="/submit/fan-performance">Submit your performance</a>
+    </p>
+
     <partial name="_FanPerformanceList" model="Model.PerformanceList" />
     <partial name="_ArchivePagination" model="FanPerformanceRoutes.GetPaginationViewModel(Model.CurrentPage, Model.TotalPages)" />
   </div>

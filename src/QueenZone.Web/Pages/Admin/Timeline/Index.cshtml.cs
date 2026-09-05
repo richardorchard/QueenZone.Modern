@@ -28,12 +28,17 @@ public sealed class IndexModel(
 
     public string? StatusMessageKind { get; private set; }
 
+    public ArchivePaginationViewModel? Pagination { get; private set; }
+
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
         Events = await historyRepository.GetPageAsync(BuildFilter(), PageNumber, PageSize, cancellationToken);
         StatusMessage = TempData[MessageKey] as string;
         StatusMessageKind = TempData[MessageKindKey] as string;
         ViewData["Title"] = "Timeline";
+
+        var totalPages = ArchivePagination.GetTotalPages(Events.TotalCount, PageSize);
+        Pagination = AdminTimelineRoutes.GetListPaginationViewModel(Events.Page, totalPages, Published, Q);
     }
 
     public async Task<IActionResult> OnPostAsync(
@@ -62,7 +67,7 @@ public sealed class IndexModel(
         await InvalidatePublicHistoryCacheAsync(outputCacheStore, publicQueryCache, cancellationToken);
         TempData[MessageKey] = "Deleted timeline event.";
         TempData[MessageKindKey] = "success";
-        return Redirect("/admin/timeline");
+        return Redirect(BuildReturnUrl());
     }
 
     public async Task<IActionResult> OnPostTogglePublishAsync(
@@ -74,8 +79,10 @@ public sealed class IndexModel(
         await InvalidatePublicHistoryCacheAsync(outputCacheStore, publicQueryCache, cancellationToken);
         TempData[MessageKey] = !isPublished ? "Timeline event published." : "Timeline event unpublished.";
         TempData[MessageKindKey] = "success";
-        return Redirect("/admin/timeline");
+        return Redirect(BuildReturnUrl());
     }
+
+    private string BuildReturnUrl() => AdminTimelineRoutes.GetListPath(PageNumber, Published, Q);
 
     internal static async Task InvalidatePublicHistoryCacheAsync(
         IOutputCacheStore outputCacheStore,

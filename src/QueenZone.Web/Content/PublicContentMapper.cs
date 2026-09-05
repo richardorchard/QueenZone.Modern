@@ -1,3 +1,5 @@
+using System.Net;
+using System.Text.RegularExpressions;
 using QueenZone.Data;
 
 namespace QueenZone.Web;
@@ -6,7 +8,7 @@ namespace QueenZone.Web;
 /// Centralized mapping from repository DTOs to stable public view models.
 /// Call once at the Web edge; page models and Razor views should consume view models only.
 /// </summary>
-public static class PublicContentMapper
+public static partial class PublicContentMapper
 {
     public static NewsArchiveItem ToNewsArchiveItem(
         NewsItem item,
@@ -105,59 +107,73 @@ public static class PublicContentMapper
             item.AuthorName,
             item.Tags);
 
-    public static ForumCategorySummary ToForumCategorySummary(ForumCategoryItem category) =>
-        new(
+    public static ForumCategorySummary ToForumCategorySummary(ForumCategoryItem category)
+    {
+        var name = CleanForumText(category.Name);
+        return new(
             category.Id,
-            category.Name,
-            category.Description,
+            name,
+            CleanForumTextOrNull(category.Description),
             category.PostCount,
             category.LastActivityAt,
-            category.LatestThreadTitle,
-            ForumRoutes.GetCategoryCanonicalPath(category.Id, category.Name));
+            CleanForumTextOrNull(category.LatestThreadTitle),
+            ForumRoutes.GetCategoryCanonicalPath(category.Id, name));
+    }
 
     public static IReadOnlyList<ForumCategorySummary> ToForumCategorySummaries(
         IEnumerable<ForumCategoryItem> categories) =>
         categories.Select(ToForumCategorySummary).ToList();
 
-    public static ForumThreadSummary ToForumThreadSummary(ForumTopicItem topic) =>
-        new(
+    public static ForumThreadSummary ToForumThreadSummary(ForumTopicItem topic)
+    {
+        var title = CleanForumText(topic.Title);
+        return new(
             topic.Id,
-            topic.Title,
+            title,
             topic.LastActivityAt,
             topic.AuthorUsername,
             topic.ReplyCount,
             topic.LastPostUsername,
             topic.IsSticky,
-            ForumRoutes.GetTopicCanonicalPath(topic.Id, topic.Title));
+            ForumRoutes.GetTopicCanonicalPath(topic.Id, title));
+    }
 
     public static IReadOnlyList<ForumThreadSummary> ToForumThreadSummaries(
         IEnumerable<ForumTopicItem> topics) =>
         topics.Select(ToForumThreadSummary).ToList();
 
-    public static ForumRecentThreadSummary ToForumRecentThreadSummary(ForumRecentThreadItem item) =>
-        new(
+    public static ForumRecentThreadSummary ToForumRecentThreadSummary(ForumRecentThreadItem item)
+    {
+        var title = CleanForumText(item.Title);
+        var categoryName = CleanForumText(item.CategoryName);
+        return new(
             item.TopicId,
-            item.Title,
-            ForumRoutes.GetTopicCanonicalPath(item.TopicId, item.Title),
+            title,
+            ForumRoutes.GetTopicCanonicalPath(item.TopicId, title),
             item.CategoryId,
-            item.CategoryName,
-            ForumRoutes.GetCategoryCanonicalPath(item.CategoryId, item.CategoryName),
+            categoryName,
+            ForumRoutes.GetCategoryCanonicalPath(item.CategoryId, categoryName),
             item.ReplyCount,
             item.LastActivityAt);
+    }
 
     public static IReadOnlyList<ForumRecentThreadSummary> ToForumRecentThreadSummaries(
         IEnumerable<ForumRecentThreadItem> items) =>
         items.Select(ToForumRecentThreadSummary).ToList();
 
-    public static ForumThreadHeader ToForumThreadHeader(ForumTopicHeader header) =>
-        new(
+    public static ForumThreadHeader ToForumThreadHeader(ForumTopicHeader header)
+    {
+        var title = CleanForumText(header.Title);
+        var forumName = CleanForumText(header.ForumName);
+        return new(
             header.TopicId,
-            header.Title.Trim(),
+            title,
             header.ForumId,
-            header.ForumName.Trim(),
-            ForumRoutes.GetCategoryCanonicalPath(header.ForumId, header.ForumName),
-            ForumRoutes.GetTopicCanonicalPath(header.TopicId, header.Title),
+            forumName,
+            ForumRoutes.GetCategoryCanonicalPath(header.ForumId, forumName),
+            ForumRoutes.GetTopicCanonicalPath(header.TopicId, title),
             header.HasPoll);
+    }
 
     public static ForumPostViewModel ToForumPostViewModel(ForumPostItem post) =>
         new(
@@ -233,4 +249,30 @@ public static class PublicContentMapper
                 attachment.ThumbnailUrl))
             .ToList();
     }
+
+    /// <summary>
+    /// Legacy forum titles/names occasionally contain raw HTML (e.g. <c>&lt;b&gt;</c>) that was
+    /// meant for display in the old vBulletin-style templates. These fields are rendered as plain
+    /// text here, so strip tags rather than showing the literal markup.
+    /// </summary>
+    private static string CleanForumText(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var plain = ForumHtmlTagRegex().Replace(value, string.Empty);
+        plain = WebUtility.HtmlDecode(plain);
+        return ForumWhitespaceRegex().Replace(plain, " ").Trim();
+    }
+
+    private static string? CleanForumTextOrNull(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : CleanForumText(value);
+
+    [GeneratedRegex("<[^>]+>", RegexOptions.IgnoreCase)]
+    private static partial Regex ForumHtmlTagRegex();
+
+    [GeneratedRegex("\\s+")]
+    private static partial Regex ForumWhitespaceRegex();
 }
