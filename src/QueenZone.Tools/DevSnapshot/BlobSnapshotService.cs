@@ -10,6 +10,13 @@ internal sealed record PhotoCandidate(int Id, int CategoryId, string? Url, strin
 
 internal sealed record PhotoSelection(IReadOnlyList<int> PhotoIds, IReadOnlyList<SnapshotBlob> Blobs);
 
+internal sealed record MissingForumBlobReference(long? LegacyPostId, Guid? AttachmentId);
+
+[ExcludeFromCodeCoverage]
+internal sealed record ReferencedBlobSelection(
+    IReadOnlyList<SnapshotBlob> Blobs,
+    IReadOnlyList<MissingForumBlobReference> MissingForumBlobs);
+
 [ExcludeFromCodeCoverage]
 internal sealed class BlobSnapshotService(
     DevSnapshotConfig config,
@@ -87,22 +94,29 @@ internal sealed class BlobSnapshotService(
         return new PhotoSelection(ids, blobs);
     }
 
-    public async Task<IReadOnlyList<SnapshotBlob>> GetForumAndEditorialBlobsAsync(SqlSnapshotCopySession session)
+    public async Task<ReferencedBlobSelection> GetForumAndEditorialBlobsAsync(SqlSnapshotCopySession session)
     {
         var references = await session.GetBlobReferencesAsync();
         var result = new List<SnapshotBlob>();
+        var missingForumBlobs = new List<MissingForumBlobReference>();
         foreach (var reference in references)
         {
             var blob = await ResolveAsync(reference.Container, reference.Name, reference.Budget, reference.Source);
             if (blob is null)
             {
+                if (string.Equals(reference.Budget, "forum", StringComparison.OrdinalIgnoreCase))
+                {
+                    missingForumBlobs.Add(ParseMissingForumBlobReference(reference.Source));
+                    continue;
+                }
+
                 throw new InvalidOperationException($"Referenced source blob is missing: {reference.Container}/{reference.Name} ({reference.Source}).");
             }
 
             result.Add(blob);
         }
 
-        return result;
+        return new ReferencedBlobSelection(result, missingForumBlobs);
     }
 
     public void EnsureBudgets(IEnumerable<SnapshotBlob> manifest)
@@ -177,5 +191,24 @@ internal sealed class BlobSnapshotService(
 
         var absolute = isHttpUrl ? path : PhotoImageUrl.BuildBlobStorageUrl(path);
         return PhotoImageUrl.TryParseBlobLocation(absolute, out container, out name);
+    }
+
+    internal static MissingForumBlobReference ParseMissingForumBlobReference(string source)
+    {
+        const string legacyPrefix = "ModernForumPost:";
+        if (source.StartsWith(legacyPrefix, StringComparison.Ordinal)
+            && long.TryParse(source[legacyPrefix.Length..], out var legacyPostId))
+        {
+            return new MissingForumBlobReference(legacyPostId, null);
+        }
+
+        const string attachmentPrefix = "ForumPostAttachments:";
+        if (source.StartsWith(attachmentPrefix, StringComparison.Ordinal)
+            && Guid.TryParse(source[attachmentPrefix.Length..], out var attachmentId))
+        {
+            return new MissingForumBlobReference(null, attachmentId);
+        }
+
+        throw new InvalidOperationException($"Unknown forum blob reference source: {source}.");
     }
 }

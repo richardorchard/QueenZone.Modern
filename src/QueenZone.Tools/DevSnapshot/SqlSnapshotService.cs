@@ -418,6 +418,61 @@ internal sealed class SqlSnapshotCopySession(
         await CopyTableAsync("ForumPollOptions", "SELECT o.* FROM dbo.ForumPollOptions o JOIN dbo.ForumPolls p ON p.Id=o.PollId JOIN #SelectedThread x ON x.Id=p.ThreadId;");
     }
 
+    public async Task RemoveMissingForumBlobReferencesAsync(IReadOnlyList<MissingForumBlobReference> missing)
+    {
+        var legacyPostIds = missing.Where(item => item.LegacyPostId.HasValue)
+            .Select(item => item.LegacyPostId!.Value)
+            .Distinct()
+            .ToArray();
+        var attachmentIds = missing.Where(item => item.AttachmentId.HasValue)
+            .Select(item => item.AttachmentId!.Value)
+            .Distinct()
+            .ToArray();
+        var affectedPostIds = legacyPostIds.ToHashSet();
+
+        foreach (var batch in attachmentIds.Chunk(500))
+        {
+            await using (var select = target.CreateCommand())
+            {
+                var parameters = AddIdParameters(select, batch);
+                select.CommandText = $"SELECT DISTINCT PostId FROM dbo.ForumPostAttachments WHERE Id IN ({parameters});";
+                select.CommandTimeout = 1200;
+                await using var reader = await select.ExecuteReaderAsync();
+                while (await reader.ReadAsync()) affectedPostIds.Add(reader.GetInt64(0));
+            }
+
+            await using var delete = target.CreateCommand();
+            var deleteParameters = AddIdParameters(delete, batch);
+            delete.CommandText = $"DELETE FROM dbo.ForumPostAttachments WHERE Id IN ({deleteParameters});";
+            delete.CommandTimeout = 1200;
+            await delete.ExecuteNonQueryAsync();
+        }
+
+        foreach (var batch in legacyPostIds.Chunk(500))
+        {
+            await using var update = target.CreateCommand();
+            var parameters = AddIdParameters(update, batch);
+            update.CommandText = $"UPDATE dbo.ModernForumPost SET Attachment=NULL, FileSize=NULL WHERE Id IN ({parameters});";
+            update.CommandTimeout = 1200;
+            await update.ExecuteNonQueryAsync();
+        }
+
+        foreach (var batch in affectedPostIds.Chunk(500))
+        {
+            await using var update = target.CreateCommand();
+            var parameters = AddIdParameters(update, batch);
+            update.CommandText = $"""
+                UPDATE p
+                SET AttachCount = CASE WHEN NULLIF(LTRIM(RTRIM(p.Attachment)), '') IS NULL THEN 0 ELSE 1 END
+                    + (SELECT COUNT(*) FROM dbo.ForumPostAttachments a WHERE a.PostId=p.Id)
+                FROM dbo.ModernForumPost p
+                WHERE p.Id IN ({parameters});
+                """;
+            update.CommandTimeout = 1200;
+            await update.ExecuteNonQueryAsync();
+        }
+    }
+
     public async Task SeedSyntheticAccountsAsync(string adminPassword, string memberPassword)
     {
         var hasher = new PasswordHasher<object>();
@@ -534,6 +589,18 @@ internal sealed class SqlSnapshotCopySession(
         command.CommandText = sql;
         command.CommandTimeout = 1200;
         await command.ExecuteNonQueryAsync();
+    }
+
+    private static string AddIdParameters<T>(SqlCommand command, IReadOnlyList<T> ids)
+    {
+        var names = new string[ids.Count];
+        for (var index = 0; index < ids.Count; index++)
+        {
+            names[index] = $"@id{index}";
+            command.Parameters.AddWithValue(names[index], ids[index]!);
+        }
+
+        return string.Join(",", names);
     }
 
     private static string Escape(string value) => value.Replace("]", "]]", StringComparison.Ordinal);

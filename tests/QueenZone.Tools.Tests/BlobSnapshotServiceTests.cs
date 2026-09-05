@@ -25,4 +25,29 @@ public sealed class BlobSnapshotServiceTests
     [InlineData("ftp://example.test/freddie/image.jpg")]
     public void TryParseGalleryLocation_RejectsPathsWithoutBlobNames(string path) =>
         Assert.False(BlobSnapshotService.TryParseGalleryLocation(path, out _, out _));
+
+    [Fact]
+    public void ParseMissingForumBlobReference_ParsesLegacyPostId()
+    {
+        var result = BlobSnapshotService.ParseMissingForumBlobReference("ModernForumPost:43558");
+
+        Assert.Equal(43558, result.LegacyPostId);
+        Assert.Null(result.AttachmentId);
+    }
+
+    [Fact]
+    public void ParseMissingForumBlobReference_ParsesModernAttachmentId()
+    {
+        var id = Guid.NewGuid();
+
+        var result = BlobSnapshotService.ParseMissingForumBlobReference($"ForumPostAttachments:{id}");
+
+        Assert.Null(result.LegacyPostId);
+        Assert.Equal(id, result.AttachmentId);
+    }
+
+    [Fact]
+    public void ParseMissingForumBlobReference_RejectsUnknownSources() =>
+        Assert.Throws<InvalidOperationException>(
+            () => BlobSnapshotService.ParseMissingForumBlobReference("NEWS_T:123"));
 }
