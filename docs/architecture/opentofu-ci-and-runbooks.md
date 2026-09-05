@@ -33,13 +33,13 @@ hanging or failing unpredictably later.
 | [`opentofu-plan.yml`](../../.github/workflows/opentofu-plan.yml) | Pull request touching `infra/**` | `opentofu-plan` (Reader) | No — read-only plan, posts a PR comment |
 | [`opentofu-apply.yml`](../../.github/workflows/opentofu-apply.yml) | Push to `main` touching `infra/**`, or manual dispatch | `opentofu-plan` for its own `plan` job, then `opentofu-apply` (Contributor) for `apply` | Yes, only after the required reviewer approves the `opentofu-apply` environment |
 | [`opentofu-drift.yml`](../../.github/workflows/opentofu-drift.yml) | Daily schedule, or manual dispatch | `opentofu-plan` (Reader) only | No — structurally incapable of applying |
-| [`deploy-dev.yml`](../../.github/workflows/deploy-dev.yml) migrate | Push to `main`/`master`, or manual dispatch | `dev-migrate`; Bitwarden mapping targets `queenzone-dev-db` | Skipped until `DEV_SNAPSHOT_READY=true`; dev schema only and never production |
+| [`deploy-dev.yml`](../../.github/workflows/deploy-dev.yml) migrate | Push to `main`/`master`, or manual dispatch | `dev-migrate`; Bitwarden mapping targets `queenzone-dev-db` | Skipped until App Service `DevSnapshot__Ready=true`; dev schema only and never production |
 | [`refresh-dev-snapshot.yml`](../../.github/workflows/refresh-dev-snapshot.yml) | Manual confirmation plus `dev-data-refresh` approval | Separate production-read-only and dev-write SQL/Blob credentials | Reads production; resets and populates dev only |
 | [`deploy-dev.yml`](../../.github/workflows/deploy-dev.yml) configure/deploy | Push to `main`/`master`, or manual dispatch | `dev-deploy`; OIDC Website Contributor scope is limited to `queenzone-devbox` | Dev App Service only; never production |
 | [`deploy.yml`](../../.github/workflows/deploy.yml) | Push of a `v*` promotion tag, or manual dispatch from `main` | Existing production `dev`/`deploy` environments | Yes — production migration, App Service deployment, and smoke checks |
 
 The dev application runs with deterministic sample data while
-`DEV_SNAPSHOT_READY` is absent or false. The curated refresh sets it only after
+App Service `DevSnapshot__Ready` is absent or false. The curated refresh sets it only after
 the schema, sampled data, search rebuild, privacy/size guards, public smoke, and
 browser checks pass. See [`dev-curated-snapshot.md`](dev-curated-snapshot.md).
 

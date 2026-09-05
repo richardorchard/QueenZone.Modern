@@ -46,29 +46,50 @@ jobs:
   changes:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
+    environment: dev-deploy
+    permissions:
+      contents: read
+      id-token: write
     outputs:
       code: ${{ steps.check.outputs.code }}
       migrations: ${{ steps.check.outputs.migrations }}
       mobile: ${{ steps.check.outputs.mobile }}
-      sample_data: ${{ steps.check.outputs.sample_data }}
+      sample_data: ${{ steps.snapshot-state.outputs.sample_data }}
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v3
+        with:
+          client-id: ${{ vars.ARM_CLIENT_ID }}
+          tenant-id: ${{ vars.ARM_TENANT_ID }}
+          subscription-id: ${{ vars.ARM_SUBSCRIPTION_ID }}
+
+      - name: Read dev snapshot readiness
+        id: snapshot-state
+        shell: bash
+        run: |
+          snapshot_ready=$(az webapp config appsettings list \
+            --name queenzone-devbox \
+            --resource-group Queenzone-Dev-RG \
+            --query "[?name=='DevSnapshot__Ready'].value | [0]" \
+            -o tsv | tr -d '\r')
+
+          if [ "$snapshot_ready" = "true" ]; then
+            echo "sample_data=false" >> "$GITHUB_OUTPUT"
+            echo "Verified curated snapshot is enabled."
+          else
+            echo "sample_data=true" >> "$GITHUB_OUTPUT"
+            echo "Curated snapshot is not verified; keeping deterministic sample data."
+          fi
+
       - name: Self-test change classifier
         run: bash ./scripts/classify-pipeline-changes.sh --self-test
       - name: Check for code changes
         id: check
         run: |
-          # The curated refresh workflow flips this repository variable only
-          # after schema, data, privacy, size, smoke, and browser guards pass.
-          # Until then every deploy stays on deterministic sample data.
-          if [ "${{ vars.DEV_SNAPSHOT_READY }}" = "true" ]; then
-            echo "sample_data=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "sample_data=true" >> "$GITHUB_OUTPUT"
-          fi
-
           if [ "${{ github.event_name }}" != "push" ] || [ -z "${{ github.event.before }}" ]; then
             echo "code=true" >> "$GITHUB_OUTPUT"
             echo "migrations=true" >> "$GITHUB_OUTPUT"

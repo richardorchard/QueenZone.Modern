@@ -10,7 +10,6 @@ on:
 
 permissions:
   contents: read
-  actions: write
   id-token: write
 
 concurrency:
@@ -104,11 +103,8 @@ jobs:
 
       - name: Keep dev in sample-data mode during refresh
         id: disconnect
-        env:
-          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          gh variable set DEV_SNAPSHOT_READY --body false --repo "${{ github.repository }}"
           az webapp config appsettings delete \
             --name queenzone-devbox \
             --resource-group Queenzone-Dev-RG \
@@ -157,7 +153,7 @@ jobs:
               "QUEENZONE_PHOTO_PUBLIC_BASE_URL=https://queenzonedev.blob.core.windows.net" \
               "QUEENZONE_PHOTO_BLOB_ENDPOINT=https://queenzonedev.blob.core.windows.net" \
               "QUEENZONE_FORUM_ATTACHMENTS_BASE_URL=https://queenzonedev.blob.core.windows.net/attachments" \
-              "DevSnapshot__Ready=true" \
+              "DevSnapshot__Ready=false" \
             --output none
 
       - name: Wait for restart and run public-route smoke
@@ -181,18 +177,22 @@ jobs:
           ./scripts/Run-E2E.ps1 -Mode LiveSite -BaseUrl https://dev.queenzone.org -NoBuild -NoRestore -CategoryFilter LiveSiteMediaCdnTests
 
       - name: Mark the verified snapshot ready for future dev deploys
-        env:
-          GH_TOKEN: ${{ github.token }}
         shell: bash
-        run: gh variable set DEV_SNAPSHOT_READY --body true --repo "${{ github.repository }}"
+        run: |
+          az webapp config appsettings set \
+            --name queenzone-devbox \
+            --resource-group Queenzone-Dev-RG \
+            --settings DevSnapshot__Ready=true \
+            --output none
+
+      - name: Verify site after ready-state restart
+        shell: bash
+        run: bash ./scripts/Invoke-PostDeploySmoke.sh --base-url https://dev.queenzone.org --max-attempts 32 --sleep-seconds 15
 
       - name: Return dev to sample-data mode on failure
         if: failure() && steps.azure-login.outcome == 'success'
-        env:
-          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          gh variable set DEV_SNAPSHOT_READY --body false --repo "${{ github.repository }}" || true
           az webapp config appsettings delete \
             --name queenzone-devbox \
             --resource-group Queenzone-Dev-RG \
