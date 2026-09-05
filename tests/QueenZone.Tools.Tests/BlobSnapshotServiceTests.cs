@@ -6,13 +6,14 @@ public sealed class BlobSnapshotServiceTests
     [InlineData("/Freddie_Mercury/2512001754.jpg", "freddie-mercury", "2512001754.jpg")]
     [InlineData("Freddie_Mercury/2512001754.jpg", "freddie-mercury", "2512001754.jpg")]
     [InlineData("https://cdn.queenzone.org/Freddie_Mercury/2512001754.jpg", "freddie-mercury", "2512001754.jpg")]
-    public void ParseGalleryLocation_AcceptsLegacyPathsAndHttpUrls(
+    public void TryParseGalleryLocation_AcceptsLegacyPathsAndHttpUrls(
         string path,
         string expectedContainer,
         string expectedName)
     {
-        var (container, name) = BlobSnapshotService.ParseGalleryLocation(path);
+        var parsed = BlobSnapshotService.TryParseGalleryLocation(path, out var container, out var name);
 
+        Assert.True(parsed);
         Assert.Equal(expectedContainer, container);
         Assert.Equal(expectedName, name);
     }
@@ -20,6 +21,8 @@ public sealed class BlobSnapshotServiceTests
     [Theory]
     [InlineData("")]
     [InlineData("photo.jpg")]
-    public void ParseGalleryLocation_RejectsPathsWithoutContainer(string path) =>
-        Assert.Throws<InvalidOperationException>(() => BlobSnapshotService.ParseGalleryLocation(path));
+    [InlineData("/fan-pics/")]
+    [InlineData("ftp://example.test/freddie/image.jpg")]
+    public void TryParseGalleryLocation_RejectsPathsWithoutBlobNames(string path) =>
+        Assert.False(BlobSnapshotService.TryParseGalleryLocation(path, out _, out _));
 }
