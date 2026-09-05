@@ -36,12 +36,15 @@ internal static class DevSnapshotCommand
             DevSnapshotSafety.EnsureBlobBoundaries(sourceBlob, targetBlob, config.TargetStorageAccount);
 
             await using var session = await sql.OpenCopySessionAsync(sourceSql);
+            Console.WriteLine("Preparing curated SQL selections.");
             await session.PrepareSelectionsAsync();
 
             var blobs = new BlobSnapshotService(config, sourceBlob, targetBlob);
+            Console.WriteLine("Selecting gallery assets.");
             var photoSelection = await blobs.SelectPhotosAsync(await session.GetPhotoCandidatesAsync());
             await session.SetSelectedPhotosAsync(photoSelection.PhotoIds);
 
+            Console.WriteLine("Resolving forum and editorial assets.");
             var manifest = photoSelection.Blobs
                 .Concat(await blobs.GetForumAndEditorialBlobsAsync(session))
                 .DistinctBy(blob => $"{blob.Container}/{blob.Name}", StringComparer.OrdinalIgnoreCase)
@@ -50,12 +53,16 @@ internal static class DevSnapshotCommand
                 .ToArray();
             blobs.EnsureBudgets(manifest);
 
+            Console.WriteLine("Resetting and copying curated SQL rows.");
             await session.ResetTargetAsync();
             await session.CopyRowsAsync();
+            Console.WriteLine("Resetting and copying curated blobs.");
             await blobs.ResetTargetAndCopyAsync(manifest);
+            Console.WriteLine("Seeding synthetic dev accounts.");
             await session.SeedSyntheticAccountsAsync(
                 RequiredEnvironment("DEV_SNAPSHOT_ADMIN_PASSWORD"),
                 RequiredEnvironment("DEV_SNAPSHOT_MEMBER_PASSWORD"));
+            Console.WriteLine("Finalizing and verifying the curated snapshot.");
             await session.FinalizeTargetAsync();
 
             await WriteJsonAsync(options.ManifestPath, manifest);
