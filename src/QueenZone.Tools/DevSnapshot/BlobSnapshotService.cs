@@ -36,8 +36,13 @@ internal sealed class BlobSnapshotService(
                     break;
                 }
 
-                var location = ParseGalleryLocation(path);
-                var blob = await ResolveAsync(location.Container, location.Name, "gallery", $"PIC_FILES_T:{candidate.Id}:{kind}");
+                if (!TryParseGalleryLocation(path, out var container, out var name))
+                {
+                    candidateBlobs.Clear();
+                    break;
+                }
+
+                var blob = await ResolveAsync(container, name, "gallery", $"PIC_FILES_T:{candidate.Id}:{kind}");
                 if (blob is null)
                 {
                     candidateBlobs.Clear();
@@ -159,16 +164,18 @@ internal sealed class BlobSnapshotService(
         }
     }
 
-    internal static (string Container, string Name) ParseGalleryLocation(string path)
+    internal static bool TryParseGalleryLocation(string path, out string container, out string name)
     {
         var isHttpUrl = Uri.TryCreate(path, UriKind.Absolute, out var uri)
             && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
-        var absolute = isHttpUrl ? path : PhotoImageUrl.BuildBlobStorageUrl(path);
-        if (!PhotoImageUrl.TryParseBlobLocation(absolute, out var container, out var name))
+        if (uri?.IsAbsoluteUri == true && !isHttpUrl && !path.StartsWith("/", StringComparison.Ordinal))
         {
-            throw new InvalidOperationException($"Invalid gallery blob path: {path}");
+            container = string.Empty;
+            name = string.Empty;
+            return false;
         }
 
-        return (container, name);
+        var absolute = isHttpUrl ? path : PhotoImageUrl.BuildBlobStorageUrl(path);
+        return PhotoImageUrl.TryParseBlobLocation(absolute, out container, out name);
     }
 }
