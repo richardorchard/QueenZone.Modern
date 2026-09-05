@@ -100,15 +100,27 @@ internal sealed class SqlSnapshotService(DevSnapshotConfig config, string target
             throw new InvalidOperationException($"Forum sample represents {representedCategories} of {categoryCount} categories.");
         }
 
-        var forumPosts = checked((int)await CountAsync(target, "ModernForumPost"));
-        if (forumPosts > config.ForumTargetPostCount)
+        var forumThreads = checked((int)await CountAsync(target, "ModernForumThread"));
+        if (forumThreads > config.ForumThreadCount)
         {
-            throw new SnapshotSizeException($"Forum sample has {forumPosts} posts; ceiling is {config.ForumTargetPostCount}.");
+            throw new SnapshotSizeException($"Forum sample has {forumThreads} threads; ceiling is {config.ForumThreadCount}.");
         }
 
-        if (forumPosts < config.ForumMinimumPostCount)
+        var forumPosts = checked((int)await CountAsync(target, "ModernForumPost"));
+
+        var newsRows = await CountAsync(target, "NEWS_T");
+        if (newsRows > config.NewsArticleCount)
         {
-            throw new InvalidOperationException($"Forum sample has {forumPosts} posts; minimum is {config.ForumMinimumPostCount}.");
+            throw new SnapshotSizeException($"News sample has {newsRows} articles; ceiling is {config.NewsArticleCount}.");
+        }
+
+        var legacyArticleRows = await CountAsync(target, "Q_ARTICLE_T");
+        var articleFileRows = await CountAsync(target, "ARTICLE_T");
+        if (legacyArticleRows > config.ArticleCount || articleFileRows > config.ArticleCount)
+        {
+            throw new SnapshotSizeException(
+                $"Article sample exceeds the {config.ArticleCount}-row per-source ceiling " +
+                $"(Q_ARTICLE_T={legacyArticleRows}, ARTICLE_T={articleFileRows}).");
         }
 
         var usedMb = await ScalarAsync<decimal>(target, """
@@ -123,7 +135,7 @@ internal sealed class SqlSnapshotService(DevSnapshotConfig config, string target
         var requiredRows = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
         foreach (var table in new[]
         {
-            "NEWS_T", "Q_ARTICLE_T", "Q_BIO_T", "QueenHistoryEvents", "TriviaFacts",
+            "NEWS_T", "ARTICLE_T", "Q_ARTICLE_T", "Q_BIO_T", "QueenHistoryEvents", "TriviaFacts",
             "PIC_FILES_T", "ModernForumThread", "ModernForumPost", "SearchDocument",
         })
         {
@@ -149,7 +161,7 @@ internal sealed class SqlSnapshotService(DevSnapshotConfig config, string target
             config.SourceDatabase,
             config.TargetDatabase,
             categoryCount,
-            checked((int)requiredRows["ModernForumThread"]),
+            forumThreads,
             forumPosts,
             checked((int)requiredRows["PIC_FILES_T"]),
             checked((int)await CountAsync(target, "MemberAccounts")),
@@ -236,57 +248,89 @@ internal sealed class SqlSnapshotCopySession(
         await ExecuteSourceAsync("""
             CREATE TABLE #SelectedThread (Id bigint NOT NULL PRIMARY KEY);
             CREATE TABLE #SelectedPhoto (Id int NOT NULL PRIMARY KEY);
+            CREATE TABLE #SelectedNews (Id int NOT NULL PRIMARY KEY);
+            CREATE TABLE #SelectedLegacyArticle (Id int NOT NULL PRIMARY KEY);
+            CREATE TABLE #SelectedArticleFile (Id int NOT NULL PRIMARY KEY);
+            CREATE TABLE #SelectedEditorialArticle (Id uniqueidentifier NOT NULL PRIMARY KEY);
             """);
 
         await ExecuteSourceAsync("""
+            INSERT #SelectedNews(Id)
+            SELECT TOP (@NewsArticleCount) NEWS_ID
+            FROM dbo.NEWS_T
+            WHERE DISPLAY=1
+            ORDER BY [DATE] DESC, NEWS_ID DESC;
+
+            INSERT #SelectedLegacyArticle(Id)
+            SELECT TOP (@ArticleCount) Q_ARTICLE_ID
+            FROM dbo.Q_ARTICLE_T
+            WHERE DISPLAY=1
+            ORDER BY DATE_CREATED DESC, Q_ARTICLE_ID DESC;
+
+            INSERT #SelectedArticleFile(Id)
+            SELECT TOP (@ArticleCount) ID
+            FROM dbo.ARTICLE_T
+            WHERE display=1
+            ORDER BY COALESCE(PUBLICATION_DATE, Date_d) DESC, ID DESC;
+
+            INSERT #SelectedEditorialArticle(Id)
+            SELECT e.Id
+            FROM dbo.EditorialArticles e
+            JOIN #SelectedLegacyArticle a ON a.Id=e.LegacyArticleId;
+
+            INSERT #SelectedEditorialArticle(Id)
+            SELECT TOP (@ArticleCount) e.Id
+            FROM dbo.EditorialArticles e
+            WHERE NOT EXISTS (SELECT 1 FROM #SelectedEditorialArticle x WHERE x.Id=e.Id)
+            ORDER BY COALESCE(e.LivePublishedAt, e.PublishedAt, e.UpdatedAt) DESC, e.Id DESC;
+
             ;WITH Ranked AS
             (
-                SELECT t.Id, t.LegacyTopicId, t.CategoryId, ISNULL(s.PostCount, t.ReplyCount + 1) AS PostCount,
-                       ROW_NUMBER() OVER (PARTITION BY t.CategoryId ORDER BY t.StartedAt, t.Id) AS OldRank,
-                       ROW_NUMBER() OVER (PARTITION BY t.CategoryId ORDER BY t.StartedAt DESC, t.Id DESC) AS NewRank,
-                       ROW_NUMBER() OVER (PARTITION BY t.CategoryId ORDER BY t.ReplyCount DESC, t.Id) AS LargeRank,
-                       ROW_NUMBER() OVER (PARTITION BY t.CategoryId ORDER BY ABS(t.ReplyCount - 50), t.Id) AS MediumRank,
-                       ROW_NUMBER() OVER (PARTITION BY t.CategoryId ORDER BY CASE WHEN t.IsSticky=1 THEN 0 ELSE 1 END, t.Id) AS StickyRank,
-                       ROW_NUMBER() OVER (PARTITION BY t.CategoryId ORDER BY CASE WHEN t.IsHidden=1 THEN 0 ELSE 1 END, t.Id) AS HiddenRank,
-                       COUNT_BIG(*) OVER (PARTITION BY t.CategoryId) AS CategoryRows,
-                       ROW_NUMBER() OVER (PARTITION BY t.CategoryId ORDER BY t.StartedAt, t.Id) AS ChronologicalRank
+                SELECT t.Id, t.LegacyTopicId, t.CategoryId, t.StartedAt, t.LastActivityAt,
+                       ROW_NUMBER() OVER
+                           (PARTITION BY t.CategoryId ORDER BY COALESCE(t.LastActivityAt, t.StartedAt) DESC, t.Id DESC) AS CategoryRank
                 FROM dbo.ModernForumThread t
-                LEFT JOIN dbo.ModernForumThreadReadStats s ON s.ThreadId=t.Id
+                WHERE t.IsHidden=0
             ), Mandatory AS
             (
                 SELECT DISTINCT Id
                 FROM Ranked
-                WHERE LegacyTopicId=455095 OR OldRank=1 OR NewRank=1 OR LargeRank=1 OR MediumRank=1
-                   OR (StickyRank=1 AND EXISTS (SELECT 1 FROM dbo.ModernForumThread x WHERE x.CategoryId=Ranked.CategoryId AND x.IsSticky=1))
-                   OR (HiddenRank=1 AND EXISTS (SELECT 1 FROM dbo.ModernForumThread x WHERE x.CategoryId=Ranked.CategoryId AND x.IsHidden=1))
-                   OR ChronologicalRank=(CategoryRows+1)/2
+                WHERE LegacyTopicId=455095 OR CategoryRank=1
             )
             INSERT #SelectedThread(Id) SELECT Id FROM Mandatory;
 
-            DECLARE @MandatoryPosts bigint =
-                (SELECT ISNULL(SUM(ISNULL(s.PostCount, t.ReplyCount + 1)),0)
-                 FROM #SelectedThread x JOIN dbo.ModernForumThread t ON t.Id=x.Id
-                 LEFT JOIN dbo.ModernForumThreadReadStats s ON s.ThreadId=t.Id);
-
-            ;WITH Fill AS
-            (
-                SELECT t.Id, ISNULL(s.PostCount, t.ReplyCount + 1) AS PostCount,
-                       SUM(CONVERT(bigint, ISNULL(s.PostCount, t.ReplyCount + 1))) OVER
-                           (ORDER BY ABS(CONVERT(bigint,CHECKSUM(t.LegacyTopicId))), t.Id ROWS UNBOUNDED PRECEDING) AS RunningPosts
-                FROM dbo.ModernForumThread t
-                LEFT JOIN dbo.ModernForumThreadReadStats s ON s.ThreadId=t.Id
-                WHERE NOT EXISTS (SELECT 1 FROM #SelectedThread x WHERE x.Id=t.Id)
-            )
             INSERT #SelectedThread(Id)
-            SELECT Id FROM Fill WHERE @MandatoryPosts + RunningPosts <= @ForumTargetPostCount;
-            """, ("@ForumTargetPostCount", config.ForumTargetPostCount));
+            SELECT TOP
+                (CASE WHEN @ForumThreadCount > (SELECT COUNT(*) FROM #SelectedThread)
+                      THEN @ForumThreadCount - (SELECT COUNT(*) FROM #SelectedThread) ELSE 0 END)
+                t.Id
+            FROM dbo.ModernForumThread t
+            WHERE t.IsHidden=0
+              AND t.LegacyTopicId IN
+                  (SELECT FORUM_TOPIC_ID FROM dbo.NEWS_T n JOIN #SelectedNews x ON x.Id=n.NEWS_ID
+                   WHERE FORUM_TOPIC_ID IS NOT NULL)
+              AND NOT EXISTS (SELECT 1 FROM #SelectedThread x WHERE x.Id=t.Id)
+            ORDER BY COALESCE(t.LastActivityAt, t.StartedAt) DESC, t.Id DESC;
 
-        var selectedPosts = await SqlSnapshotService.ScalarAsync<long>(source, """
-            SELECT COUNT_BIG(*) FROM dbo.ModernForumPost p JOIN #SelectedThread t ON t.Id=p.ThreadId;
-            """);
-        if (selectedPosts < config.ForumMinimumPostCount)
+            INSERT #SelectedThread(Id)
+            SELECT TOP
+                (CASE WHEN @ForumThreadCount > (SELECT COUNT(*) FROM #SelectedThread)
+                      THEN @ForumThreadCount - (SELECT COUNT(*) FROM #SelectedThread) ELSE 0 END)
+                t.Id
+            FROM dbo.ModernForumThread t
+            WHERE t.IsHidden=0
+              AND NOT EXISTS (SELECT 1 FROM #SelectedThread x WHERE x.Id=t.Id)
+            ORDER BY COALESCE(t.LastActivityAt, t.StartedAt) DESC, t.Id DESC;
+            """,
+            ("@NewsArticleCount", config.NewsArticleCount),
+            ("@ArticleCount", config.ArticleCount),
+            ("@ForumThreadCount", config.ForumThreadCount));
+
+        var selectedThreads = await SqlSnapshotService.ScalarAsync<int>(source, "SELECT COUNT(*) FROM #SelectedThread;");
+        if (selectedThreads > config.ForumThreadCount)
         {
-            throw new InvalidOperationException($"Selection produced only {selectedPosts} forum posts.");
+            throw new InvalidOperationException(
+                $"Required category, news, and forum-guideline topics exceed the {config.ForumThreadCount}-thread limit.");
         }
     }
 
@@ -297,11 +341,13 @@ internal sealed class SqlSnapshotCopySession(
             ;WITH Ranked AS
             (
                 SELECT p.PIC_ID, p.Cat_ID, p.Url, p.Thumb_URL,
-                       ROW_NUMBER() OVER (PARTITION BY p.Cat_ID ORDER BY ABS(CONVERT(bigint,CHECKSUM(p.PIC_ID))), p.PIC_ID) AS SampleRank
+                       ROW_NUMBER() OVER (PARTITION BY p.Cat_ID ORDER BY p.Date_time DESC, p.PIC_ID DESC) AS SampleRank
                 FROM dbo.PIC_FILES_T p WHERE p.DISPLAY=1
             ), Required AS
             (
-                SELECT IMAGE_GALLERY_PIC_ID AS PIC_ID FROM dbo.NEWS_T WHERE DISPLAY=1 AND IMAGE_GALLERY_PIC_ID IS NOT NULL
+                SELECT IMAGE_GALLERY_PIC_ID AS PIC_ID
+                FROM dbo.NEWS_T n JOIN #SelectedNews x ON x.Id=n.NEWS_ID
+                WHERE n.DISPLAY=1 AND n.IMAGE_GALLERY_PIC_ID IS NOT NULL
             )
             SELECT r.PIC_ID, r.Cat_ID, r.Url, r.Thumb_URL, r.SampleRank,
                    CONVERT(bit, CASE WHEN q.PIC_ID IS NULL THEN 0 ELSE 1 END) IsRequired
@@ -361,10 +407,19 @@ internal sealed class SqlSnapshotCopySession(
             JOIN dbo.ModernForumPost p ON p.Id=a.PostId JOIN #SelectedThread t ON t.Id=p.ThreadId;
             """, result);
 
-        await ReadEditorialBlobsAsync("SELECT IMAGE_BLOB_KEY, CONCAT('NEWS_T:', NEWS_ID) FROM dbo.NEWS_T WHERE DISPLAY=1 AND IMAGE_BLOB_KEY IS NOT NULL;", result);
         await ReadEditorialBlobsAsync("""
-            SELECT ImageBlobKey, CONCAT('EditorialArticles:', Id) FROM dbo.EditorialArticles WHERE ImageBlobKey IS NOT NULL
-            UNION ALL SELECT LiveImageBlobKey, CONCAT('EditorialArticles-live:', Id) FROM dbo.EditorialArticles WHERE LiveImageBlobKey IS NOT NULL;
+            SELECT n.IMAGE_BLOB_KEY, CONCAT('NEWS_T:', n.NEWS_ID)
+            FROM dbo.NEWS_T n JOIN #SelectedNews x ON x.Id=n.NEWS_ID
+            WHERE n.DISPLAY=1 AND n.IMAGE_BLOB_KEY IS NOT NULL;
+            """, result);
+        await ReadEditorialBlobsAsync("""
+            SELECT e.ImageBlobKey, CONCAT('EditorialArticles:', e.Id)
+            FROM dbo.EditorialArticles e JOIN #SelectedEditorialArticle x ON x.Id=e.Id
+            WHERE e.ImageBlobKey IS NOT NULL
+            UNION ALL
+            SELECT e.LiveImageBlobKey, CONCAT('EditorialArticles-live:', e.Id)
+            FROM dbo.EditorialArticles e JOIN #SelectedEditorialArticle x ON x.Id=e.Id
+            WHERE e.LiveImageBlobKey IS NOT NULL;
             """, result);
         return result;
     }
@@ -397,16 +452,18 @@ internal sealed class SqlSnapshotCopySession(
             SELECT NEWS_ID,TITLE,EXCERPT,ARTICLE,[DATE],USER_ID,DISPLAY,[TYPE],QUEEN_ONLINE,SOURCE_URL,SLUG,CREATED_AT,UPDATED_AT,
                    CASE WHEN EDITOR_EMAIL IS NULL THEN NULL ELSE CONCAT('editor-',NEWS_ID,'@dev.queenzone.invalid') END AS EDITOR_EMAIL,
                    IMAGE_BLOB_KEY,IMAGE_GALLERY_PIC_ID,FORUM_TOPIC_ID
-            FROM dbo.NEWS_T;
+            FROM dbo.NEWS_T n JOIN #SelectedNews x ON x.Id=n.NEWS_ID;
             """);
         await CopyTableAsync("FREDDIE_T", "SELECT ID,Name,Thought,CAST(NULL AS varchar(60)) Email,Freddie_Date,Freddie_Time,Country,DISPLAY FROM dbo.FREDDIE_T;");
         await CopyTableAsync("Q_STAGE_T", "SELECT Q_STAGE_ID,TITLE,PERFORMED_BY,DESCRIPTION,URL,THESIZE,DATE_ADDED,DISPLAY,CAST(NULL AS varchar(300)) CONTACT,USER_ID,ALLOW_RATING FROM dbo.Q_STAGE_T;");
         await CopyTableAsync("EditorialArticles", """
-            SELECT Id,LegacyArticleId,SourceSubmissionId,Title,Slug,Excerpt,Body,AuthorName,Category,Tags,Source,ImageBlobKey,Status,PublishedAt,UpdatedAt,
-                   CONCAT('editor-',CONVERT(varchar(36),Id),'@dev.queenzone.invalid') UpdatedBy,
-                   LiveTitle,LiveSlug,LiveExcerpt,LiveBody,LiveAuthorName,LiveCategory,LiveTags,LiveSource,LiveImageBlobKey,LivePublishedAt
-            FROM dbo.EditorialArticles;
+            SELECT e.Id,e.LegacyArticleId,e.SourceSubmissionId,e.Title,e.Slug,e.Excerpt,e.Body,e.AuthorName,e.Category,e.Tags,e.Source,e.ImageBlobKey,e.Status,e.PublishedAt,e.UpdatedAt,
+                   CONCAT('editor-',CONVERT(varchar(36),e.Id),'@dev.queenzone.invalid') UpdatedBy,
+                   e.LiveTitle,e.LiveSlug,e.LiveExcerpt,e.LiveBody,e.LiveAuthorName,e.LiveCategory,e.LiveTags,e.LiveSource,e.LiveImageBlobKey,e.LivePublishedAt
+            FROM dbo.EditorialArticles e JOIN #SelectedEditorialArticle x ON x.Id=e.Id;
             """);
+        await CopyTableAsync("ARTICLE_T", "SELECT a.* FROM dbo.ARTICLE_T a JOIN #SelectedArticleFile x ON x.Id=a.ID;");
+        await CopyTableAsync("Q_ARTICLE_T", "SELECT a.* FROM dbo.Q_ARTICLE_T a JOIN #SelectedLegacyArticle x ON x.Id=a.Q_ARTICLE_ID;");
         await CopyTableAsync("PIC_CAT_T", "SELECT * FROM dbo.PIC_CAT_T;");
         await CopyTableAsync("PIC_FILES_T", "SELECT p.* FROM dbo.PIC_FILES_T p JOIN #SelectedPhoto x ON x.Id=p.PIC_ID;");
         await CopyTableAsync("USERS_T", SanitizedLegacyUsersSql);
@@ -687,9 +744,9 @@ internal sealed class SqlSnapshotCopySession(
         WHERE EXISTS (SELECT 1 FROM dbo.ModernForumThread t JOIN #SelectedThread x ON x.Id=t.Id WHERE t.StartedByLegacyUserId=u.USER_ID)
            OR EXISTS (SELECT 1 FROM dbo.ModernForumPost p JOIN #SelectedThread x ON x.Id=p.ThreadId WHERE p.AuthorLegacyUserId=u.USER_ID)
            OR EXISTS (SELECT 1 FROM dbo.PIC_FILES_T p JOIN #SelectedPhoto x ON x.Id=p.PIC_ID WHERE p.user_id=u.USER_ID)
-           OR EXISTS (SELECT 1 FROM dbo.NEWS_T n WHERE n.USER_ID=u.USER_ID)
-           OR EXISTS (SELECT 1 FROM dbo.ARTICLE_T a WHERE a.User_id=u.USER_ID)
-           OR EXISTS (SELECT 1 FROM dbo.Q_ARTICLE_T a WHERE a.USER_ID=u.USER_ID)
+           OR EXISTS (SELECT 1 FROM dbo.NEWS_T n JOIN #SelectedNews x ON x.Id=n.NEWS_ID WHERE n.USER_ID=u.USER_ID)
+           OR EXISTS (SELECT 1 FROM dbo.ARTICLE_T a JOIN #SelectedArticleFile x ON x.Id=a.ID WHERE a.User_id=u.USER_ID)
+           OR EXISTS (SELECT 1 FROM dbo.Q_ARTICLE_T a JOIN #SelectedLegacyArticle x ON x.Id=a.Q_ARTICLE_ID WHERE a.USER_ID=u.USER_ID)
            OR EXISTS (SELECT 1 FROM dbo.Q_STAGE_T a WHERE a.USER_ID=u.USER_ID)
            OR EXISTS (SELECT 1 FROM dbo.Q_KNOWLEDGE_BASE_T a WHERE a.USER_ID=u.USER_ID)
            OR EXISTS (SELECT 1 FROM dbo.Q_MUSIC_CHART_T a WHERE a.USER_ID=u.USER_ID)

@@ -109,7 +109,9 @@ does not block merges, and runs only on a schedule or through `workflow_dispatch
 
 They run against a same-day SQL Express mirror on the self-hosted Windows runner.
 `scripts/Sync-LegacyDbToSqlExpress.ps1` refreshes it from live Azure SQL via a `sqlpackage`
-extract/publish. Read probes then run from the macOS runner over the LAN. Self-cleaning write probes
+extract/publish. It publishes into a staging database and replaces the named mirror only after a
+successful publish and required-table check. A failed extract or publish therefore leaves the previous
+mirror intact. Read probes then run from the macOS runner over the LAN. Self-cleaning write probes
 run locally on Windows after the read checks pass:
 
 | Probe surface | How nightly runs it |

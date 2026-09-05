@@ -41,21 +41,19 @@ public sealed class DevSnapshotOptionsTests
     }
 
     [Fact]
-    public void Config_applies_forum_target_override_and_validates_minimum()
+    public void Config_requires_positive_record_limits()
     {
-        var previous = Environment.GetEnvironmentVariable("DEV_SNAPSHOT_FORUM_TARGET_POST_COUNT");
         var path = WriteConfig("queenzone-db", "queenzone-dev-db", "queenzonedev", ["NEWS_T"], ["Q_PM_T"]);
         try
         {
-            Environment.SetEnvironmentVariable("DEV_SNAPSHOT_FORUM_TARGET_POST_COUNT", "100000");
-            Assert.Equal(100000, DevSnapshotConfig.Load(path).ForumTargetPostCount);
-
-            Environment.SetEnvironmentVariable("DEV_SNAPSHOT_FORUM_TARGET_POST_COUNT", "99999");
-            Assert.Throws<InvalidOperationException>(() => DevSnapshotConfig.Load(path));
+            var config = DevSnapshotConfig.Load(path);
+            Assert.Equal(500, config.ForumThreadCount);
+            Assert.Equal(500, config.NewsArticleCount);
+            Assert.Equal(500, config.ArticleCount);
+            Assert.Equal(100, config.PhotosPerCategory);
         }
         finally
         {
-            Environment.SetEnvironmentVariable("DEV_SNAPSHOT_FORUM_TARGET_POST_COUNT", previous);
             File.Delete(path);
         }
     }
@@ -119,8 +117,10 @@ public sealed class DevSnapshotOptionsTests
               "sourceDatabase": "{{source}}",
               "targetDatabase": "{{target}}",
               "targetStorageAccount": "{{storage}}",
-              "forumTargetPostCount": 150000,
-              "forumMinimumPostCount": 100000,
+              "forumThreadCount": 500,
+              "newsArticleCount": 500,
+              "articleCount": 500,
+              "photosPerCategory": 100,
               "galleryBudgetBytes": 524288000,
               "forumAttachmentBudgetBytes": 524288000,
               "databaseMaximumUsedMb": 1536,

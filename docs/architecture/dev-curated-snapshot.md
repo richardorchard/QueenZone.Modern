@@ -46,10 +46,14 @@ not this identity, perform the snapshot data work.
 ## What is selected
 
 Selection rules live in [`config/dev-snapshot.json`](../../config/dev-snapshot.json).
-Small public archive/reference tables are copied in full. Tables with mixed
+Small public archive/reference tables are copied in full. Larger dated content
+uses newest-first limits from the checked-in configuration. Tables with mixed
 public/private columns use explicit projections:
 
-- `NEWS_T` and `EditorialArticles` retain published content but replace editor emails.
+- the newest 500 published `NEWS_T` rows and newest 500 published rows from each legacy article
+  source are copied. Editorial article overlays for selected legacy articles
+  are retained, plus the newest 500 other editorial records. Editor emails are
+  replaced.
 - `FREDDIE_T.Email` and `Q_STAGE_T.CONTACT` are cleared.
 - only referenced `USERS_T` rows are copied; password, email, IP, birth date,
   profile, contact, and transfer fields are cleared or replaced.
@@ -59,16 +63,16 @@ public/private columns use explicit projections:
 - external logins, auth grants, private messages, mailing lists, IP/security
   data, submissions, tokens, operational queues, and audit rows remain empty.
 
-Forum selection is deterministic and relationally complete. It includes every
-category; old, middle, and recent threads; sticky and hidden threads when those
-states exist; and short, medium, and large threads. Each chosen thread brings
-all posts, stored attachment rows, poll definitions, and required authors. The
-known public forum-guidelines topic is included for smoke testing. Production's
-current `ModernForumThread` schema has no persisted lock column, so the snapshot
-cannot truthfully select a locked source row; lock behaviour remains covered by
-synthetic application tests until that state is persisted.
+Forum selection is deterministic, newest-first, and relationally complete. It
+selects 500 visible threads by latest activity, reserving space for the newest
+thread in every public category, forum topics linked from selected news, and the known public
+forum-guidelines topic used by smoke tests. Remaining places are filled by the
+newest threads globally. Each chosen thread brings all posts, stored attachment
+rows, poll definitions, and required authors. Production's current
+`ModernForumThread` schema has no persisted lock column, so lock behaviour
+remains covered by synthetic application tests until that state is persisted.
 
-Photo candidates are spread deterministically across every public category.
+Photo candidates are the newest records in every public category.
 Only rows whose original and thumbnail blobs exist and fit the budget are
 loaded. Gallery pictures referenced by news are mandatory. Blob references from
 sampled forum posts and published editorial content are also mandatory.
@@ -84,8 +88,10 @@ dev allowlist; no production credential or external-login identifier is used.
 ## Limits
 
 - database used space after migrations and search rebuild: **1,536 MB**
-- initial forum ceiling: **150,000 posts**
-- automatic size retry: **100,000 posts**
+- newest forum threads: **500**, including all posts for each thread
+- newest news articles: **500**
+- newest rows from each legacy article source: **500**
+- newest photos per public category: **100**
 - gallery originals and thumbnails: **500 MB**
 - forum attachments: **500 MB**
 
