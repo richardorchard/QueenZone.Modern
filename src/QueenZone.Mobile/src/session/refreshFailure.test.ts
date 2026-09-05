@@ -1,7 +1,26 @@
 import assert from 'node:assert/strict';
+import { register } from 'node:module';
 import { describe, it } from 'node:test';
-import { ApiError } from '../api/errors.ts';
-import { isDefiniteAuthRefreshFailure, isTransientRefreshFailure } from './refreshFailure.ts';
+import { pathToFileURL } from 'node:url';
+
+register(
+  `data:text/javascript,${encodeURIComponent(`
+    export async function resolve(specifier, context, nextResolve) {
+      if (specifier.startsWith('.') && !/\\\\.(?:[cm]?[jt]s|json)$/.test(specifier)) {
+        try {
+          return await nextResolve(specifier + '.ts', context);
+        } catch {
+          return nextResolve(specifier, context);
+        }
+      }
+      return nextResolve(specifier, context);
+    }
+  `)}`,
+  pathToFileURL('./'),
+);
+
+const { ApiError } = await import('../api/errors.ts');
+const { isDefiniteAuthRefreshFailure, isTransientRefreshFailure } = await import('./refreshFailure.ts');
 
 describe('refresh failure classification', () => {
   it('treats 401 and invalid_grant as definite auth failure', () => {

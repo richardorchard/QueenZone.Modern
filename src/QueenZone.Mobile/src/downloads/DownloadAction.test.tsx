@@ -1,9 +1,8 @@
 import { screen, userEvent, waitFor } from '@testing-library/react-native';
 import { createMemoryStorage } from '../cache/storage';
 import { resetExternalStoreForTests } from '../cache/externalStore';
-import { fanPerformanceFixture } from '../test/fixtures';
+import { fanPerformanceFixture, memberProfileFixture } from '../test/fixtures';
 import { createMockSession } from '../test/mockSession';
-import { memberProfileFixture } from '../test/fixtures';
 import { renderWithProviders } from '../test/render';
 import { testIds } from '../test/testIds';
 import { createMemoryDownloadHost, setDownloadFileHostForTests } from './files';
@@ -40,15 +39,30 @@ describe('DownloadAction', () => {
   });
 
   it('starts a download and ignores a second tap while queued', async () => {
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const host = createMemoryDownloadHost({
+      downloadImpl: async ({ destUri }) => {
+        await held;
+        host.files.set(destUri, new Uint8Array([1, 2, 3, 4]));
+      },
+    });
+    setDownloadFileHostForTests(host);
+
     renderWithProviders(<DownloadAction track={track} />, { navigation: false });
     const user = userEvent.setup();
-    await user.press(screen.getByTestId(`${testIds.fanPerformanceDownloadPrefix}${track.id}`));
-    await user.press(screen.getByTestId(`${testIds.fanPerformanceDownloadPrefix}${track.id}`));
+    const button = () => screen.getByTestId(`${testIds.fanPerformanceDownloadPrefix}${track.id}`);
+    await user.press(button());
     await waitFor(() =>
-      expect(
-        screen.getByLabelText(new RegExp(`(Downloading ${track.title}|${track.title} downloaded)`)),
-      ).toBeOnTheScreen(),
+      expect(screen.getByLabelText(new RegExp(`(queued|Downloading) ${track.title}`))).toBeOnTheScreen(),
     );
+    await user.press(button());
+    expect(screen.getByLabelText(new RegExp(`(queued|Downloading) ${track.title}`))).toBeOnTheScreen();
+
+    release();
+    await waitFor(() => expect(screen.getByLabelText(`${track.title} downloaded, 4 B`)).toBeOnTheScreen());
   });
 
   it('announces a failed download and retries', async () => {

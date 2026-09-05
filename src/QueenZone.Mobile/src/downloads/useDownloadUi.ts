@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import { downloadUiCacheKey, downloadUiCachePrefix } from '../cache/keys';
 import { usePrefixVersion, useStoreVersion } from '../cache/useExternalStore';
 import { useSession } from '../session/SessionContext';
@@ -24,11 +23,9 @@ export function useDownloadUi(performanceId: number | string): DownloadUiSnapsho
 export function useDownloadUiList(): DownloadUiSnapshot[] {
   const memberId = useDownloadMemberId();
   const prefix = memberId ? downloadUiCachePrefix(memberId) : '';
-  const version = usePrefixVersion(prefix);
-  return useMemo(() => {
-    if (!memberId) {
-      return [];
-    }
-    return listDownloadUiSnapshots(memberId);
-  }, [memberId, version]);
+  usePrefixVersion(prefix);
+  if (!memberId) {
+    return [];
+  }
+  return listDownloadUiSnapshots(memberId);
 }

@@ -31,7 +31,6 @@ describe('SavedListScreen', () => {
         navigation={fakeNavigation() as never}
         route={{ key: 'saved', name: 'SavedList', params: { kind: 'offline' } } as never}
       />,
-      { navigation: false },
     );
     expect(screen.getByTestId(testIds.fanPerformanceDownloadsScreen)).toBeOnTheScreen();
     expect(screen.getByText('No downloaded recordings yet.')).toBeOnTheScreen();
