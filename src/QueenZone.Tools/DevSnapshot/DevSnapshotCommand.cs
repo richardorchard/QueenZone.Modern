@@ -62,6 +62,11 @@ internal static class DevSnapshotCommand
                 Console.WriteLine($"Removing {referencedSelection.MissingForumBlobs.Count} broken forum attachment references from the target.");
                 await session.RemoveMissingForumBlobReferencesAsync(referencedSelection.MissingForumBlobs);
             }
+            if (referencedSelection.MissingEditorialBlobs.Count > 0)
+            {
+                Console.WriteLine($"Removing {referencedSelection.MissingEditorialBlobs.Count} broken editorial image references from the target.");
+                await session.RemoveMissingEditorialBlobReferencesAsync(referencedSelection.MissingEditorialBlobs);
+            }
 
             Console.WriteLine("Resetting and copying curated blobs.");
             await blobs.ResetTargetAndCopyAsync(manifest);
