@@ -168,6 +168,45 @@ describe('MySubmissionsScreen', () => {
     expect(screen.getByText('Published on the fan stage')).toBeOnTheScreen();
   });
 
+  it('shows reviewer notes on a rejected fan performance', async () => {
+    fetchMock.mockImplementation(async (input) => {
+      const url = String(input);
+      if (url === photosUrl) {
+        return jsonResponse({ ...photoPayload, items: [], totalCount: 0, totalPages: 0 });
+      }
+      if (url === newsUrl) {
+        return jsonResponse({ ...newsPayload, items: [], totalCount: 0, totalPages: 0 });
+      }
+      if (url === articlesUrl) {
+        return jsonResponse({ ...articlePayload, items: [], totalCount: 0, totalPages: 0 });
+      }
+      if (url === fanPerformancesUrl) {
+        return jsonResponse({
+          ...fanPerformancePayload,
+          items: [
+            {
+              ...fanPerformancePayload.items[0],
+              status: { status: 'rejected', statusLabel: 'Rejected', statusTone: 'danger' },
+              notes: 'Please upload a clearer recording.',
+              rejectionReason: 'Audio quality',
+              promotedStageId: null,
+              publishedPath: null,
+            },
+          ],
+        });
+      }
+      throw new Error(`unexpected fetch ${url}`);
+    });
+
+    renderSubmissions();
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getByRole('tab', { name: 'Fan performances' })).toBeOnTheScreen());
+    await user.press(screen.getByRole('tab', { name: 'Fan performances' }));
+    await waitFor(() => expect(screen.getByText('Rejected')).toBeOnTheScreen());
+    expect(screen.getByText('Please upload a clearer recording.')).toBeOnTheScreen();
+    expect(screen.queryByText('Published on the fan stage')).toBeNull();
+  });
+
   it('shows a load error and retries', async () => {
     fetchMock.mockImplementationOnce(async () => jsonResponse({ detail: 'Could not load your submissions.' }, 500));
     fetchMock.mockImplementationOnce(async () => jsonResponse(newsPayload));
