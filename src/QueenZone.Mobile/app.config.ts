@@ -99,12 +99,15 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       // Baked at prebuild into EXConstants so published JS bundles still
       // initialize Sentry when Metro does not inherit EXPO_PUBLIC_SENTRY_DSN.
       sentryDsn: (process.env.EXPO_PUBLIC_SENTRY_DSN ?? '').trim() || undefined,
+      // Baked so Release smoke/journeys can still accept queenzone://smoke-auth
+      // while store Release (no flag) stays closed (#1322).
+      smokeEmbed: smokeEmbed || undefined,
     },
     plugins: [
       // app.json registers @sentry/react-native/expo; keep a single configured
       // copy here so org/project env still apply and the plugin is not doubled.
-      // Smoke embed also drops expo-dev-client so Debug launch is the app, not
-      // the development-server launcher (#1225).
+      // Smoke embed also drops expo-dev-client so Release (and Debug) launch
+      // is the app, not the development-server launcher (#1225 / #1322).
       ...(filterExpoPluginsForSmokeEmbed(
         (config.plugins ?? []).filter((plugin) => {
           const name = Array.isArray(plugin) ? plugin[0] : plugin;

@@ -62,3 +62,48 @@ describe('device-smoke harness (#1281)', () => {
     assert.match(workflow, /maestro --version/);
   });
 });
+
+describe('device-smoke Release embed (#1322)', () => {
+  it('builds and installs Release-embedded binaries, never Debug/dev-client', () => {
+    const workflow = readRepo('mobile-device-smoke.yml', workflowsDir);
+    const script = readRepo('run-mobile-device-smoke.sh', scriptsDir);
+
+    assert.match(workflow, /assembleRelease/);
+    assert.match(workflow, /apk\/release\/app-release\.apk/);
+    assert.match(workflow, /-configuration Release/);
+    assert.match(workflow, /Products\/Release-iphonesimulator/);
+    assert.match(workflow, /QUEENZONE_MOBILE_SMOKE_EMBED/);
+    assert.match(workflow, /SENTRY_DISABLE_AUTO_UPLOAD/);
+    assert.doesNotMatch(workflow, /\.\/gradlew assembleDebug/);
+    assert.doesNotMatch(workflow, /apk\/debug\/app-debug\.apk/);
+    assert.doesNotMatch(workflow, /-configuration Debug/);
+    assert.doesNotMatch(workflow, /Products\/Debug-iphonesimulator/);
+    assert.doesNotMatch(workflow, /npx expo start|expo start --|metro start|packager start/i);
+
+    assert.match(script, /assembleRelease/);
+    assert.match(script, /android_release_apk/);
+    assert.match(script, /-configuration Release/);
+    assert.match(script, /Release-iphonesimulator/);
+    assert.match(script, /QUEENZONE_MOBILE_SMOKE_EMBED=1/);
+    assert.doesNotMatch(script, /\.\/gradlew assembleDebug/);
+    assert.doesNotMatch(script, /apk\/debug\/app-debug\.apk/);
+    assert.doesNotMatch(script, /-configuration Debug/);
+    assert.doesNotMatch(script, /Products\/Debug-iphonesimulator/);
+    assert.doesNotMatch(script, /npx expo start|expo start --|metro start|packager start/i);
+  });
+
+  it('documents Release-embedded device smoke in the mobile README', () => {
+    const readme = readFileSync(new URL('../../README.md', import.meta.url), 'utf8');
+    assert.match(readme, /Release-embedded/);
+    assert.match(readme, /assembleRelease/);
+    assert.match(readme, /never install `app-debug\.apk`/);
+  });
+
+  it('keeps home-screen as the launch assertion', () => {
+    const launch = readMaestro('flows/01-launch.yaml');
+    assert.match(launch, /id: home-screen/);
+    assert.match(readMaestro('smoke.yaml'), /flows\/01-launch\.yaml/);
+    assert.match(readMaestro('flows/10-forum-attach.yaml'), /id: home-screen/);
+    assert.match(readMaestro('journeys.yaml'), /flows\/10-forum-attach\.yaml/);
+  });
+});
