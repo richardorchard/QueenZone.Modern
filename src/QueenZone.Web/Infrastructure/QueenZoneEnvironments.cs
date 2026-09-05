@@ -3,7 +3,8 @@ namespace QueenZone.Web;
 /// <summary>
 /// Named predicates over <see cref="IHostEnvironment.EnvironmentName"/>, so that adding a new
 /// automated-test environment (for example <see cref="E2E"/>) is a change in this file instead
-/// of every call site that previously compared against an environment name string literal.
+/// of every call site that previously compared against an environment name string literal. The
+/// deployed dev App Service deliberately remains production-shaped and is not a test host.
 /// </summary>
 public static class QueenZoneEnvironments
 {

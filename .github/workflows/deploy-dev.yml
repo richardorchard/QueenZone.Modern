@@ -246,19 +246,32 @@ jobs:
       - name: Check and set required application settings via ARM
         id: apply-settings
         env:
+          ADMIN_ALLOWED_EMAIL: ${{ steps.bitwarden-secrets.outputs.ADMIN_ALLOWED_EMAIL }}
+          APPLICATIONINSIGHTS_CONNECTION_STRING: ${{ steps.bitwarden-secrets.outputs.APPLICATIONINSIGHTS_CONNECTION_STRING }}
+          AUTH_MICROSOFT_CLIENT_ID: ${{ steps.bitwarden-secrets.outputs.AUTH_MICROSOFT_CLIENT_ID }}
+          AUTH_MICROSOFT_CLIENT_SECRET: ${{ steps.bitwarden-secrets.outputs.AUTH_MICROSOFT_CLIENT_SECRET }}
+          AZURE_AD_CLIENT_ID: ${{ steps.bitwarden-secrets.outputs.AZURE_AD_CLIENT_ID }}
+          AZURE_AD_CLIENT_SECRET: ${{ steps.bitwarden-secrets.outputs.AZURE_AD_CLIENT_SECRET }}
           BLOB_STORAGE_CONNECTION_STRING: ${{ steps.bitwarden-secrets.outputs.BLOB_STORAGE_CONNECTION_STRING }}
           DEV_DATABASE_CONNECTION_STRING: ${{ steps.bitwarden-secrets.outputs.QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING }}
           MOBILE_AUTH_SIGNING_KEY: ${{ steps.bitwarden-secrets.outputs.MOBILE_AUTH_SIGNING_KEY }}
         run: |
-          if [ -z "$DEV_DATABASE_CONNECTION_STRING" ]; then
-            echo "::error::QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING is not configured for dev."
-            exit 1
-          fi
-
-          if [ -z "$BLOB_STORAGE_CONNECTION_STRING" ]; then
-            echo "::error::BLOB_STORAGE_CONNECTION_STRING is not configured for dev."
-            exit 1
-          fi
+          required=(
+            ADMIN_ALLOWED_EMAIL
+            APPLICATIONINSIGHTS_CONNECTION_STRING
+            AUTH_MICROSOFT_CLIENT_ID
+            AUTH_MICROSOFT_CLIENT_SECRET
+            AZURE_AD_CLIENT_ID
+            AZURE_AD_CLIENT_SECRET
+            BLOB_STORAGE_CONNECTION_STRING
+            DEV_DATABASE_CONNECTION_STRING
+          )
+          for name in "${required[@]}"; do
+            if [ -z "${!name}" ]; then
+              echo "::error::$name is not configured for dev."
+              exit 1
+            fi
+          done
 
           if [ "${#MOBILE_AUTH_SIGNING_KEY}" -lt 32 ]; then
             echo "::error::MOBILE_AUTH_SIGNING_KEY must map to a Bitwarden secret of at least 32 characters."
@@ -266,12 +279,26 @@ jobs:
           fi
 
           desired=$(printf '%s\n' \
+            "Admin__AllowedEmails__0=$ADMIN_ALLOWED_EMAIL" \
+            "APPLICATIONINSIGHTS_CONNECTION_STRING=$APPLICATIONINSIGHTS_CONNECTION_STRING" \
+            "Authentication__Microsoft__ClientId=$AUTH_MICROSOFT_CLIENT_ID" \
+            "Authentication__Microsoft__ClientSecret=$AUTH_MICROSOFT_CLIENT_SECRET" \
+            "AzureAd__CallbackPath=/signin-oidc" \
+            "AzureAd__ClientId=$AZURE_AD_CLIENT_ID" \
+            "AzureAd__ClientSecret=$AZURE_AD_CLIENT_SECRET" \
+            "AzureAd__Instance=https://login.microsoftonline.com/" \
+            "AzureAd__TenantId=c9f094fd-23bf-4a35-a406-bcaacd7e1a8e" \
+            "BlobUpload__PublicBaseUrl=https://queenzonedev.blob.core.windows.net" \
+            "ConnectionStrings__BlobStorage=$BLOB_STORAGE_CONNECTION_STRING" \
+            "ConnectionStrings__QueenZoneLegacy=$DEV_DATABASE_CONNECTION_STRING" \
+            "MobileAuth__SigningKey=$MOBILE_AUTH_SIGNING_KEY" \
+            "Site__PublicBaseUrl=https://dev.queenzone.org" \
             "WEBSITE_WARMUP_PATH=/health" | sort)
 
           current=$(az webapp config appsettings list \
             --name queenzone-devbox \
             --resource-group Queenzone-Dev-RG \
-            --query "[?name=='WEBSITE_WARMUP_PATH'].[join('=', [name, value])]" \
+            --query "[?name=='Admin__AllowedEmails__0' || name=='APPLICATIONINSIGHTS_CONNECTION_STRING' || name=='Authentication__Microsoft__ClientId' || name=='Authentication__Microsoft__ClientSecret' || name=='AzureAd__CallbackPath' || name=='AzureAd__ClientId' || name=='AzureAd__ClientSecret' || name=='AzureAd__Instance' || name=='AzureAd__TenantId' || name=='BlobUpload__PublicBaseUrl' || name=='ConnectionStrings__BlobStorage' || name=='ConnectionStrings__QueenZoneLegacy' || name=='MobileAuth__SigningKey' || name=='Site__PublicBaseUrl' || name=='WEBSITE_WARMUP_PATH'].[join('=', [name, value])]" \
             -o tsv | tr -d '\r' | sort)
 
           strict_warmup_status=$(az webapp config appsettings list \
@@ -286,24 +313,6 @@ jobs:
             --name queenzone-devbox \
             --resource-group Queenzone-Dev-RG \
             --query "[?name=='WEBSITE_RUN_FROM_PACKAGE'].value | [0]" \
-            -o tsv | tr -d '\r')
-
-          current_mobile_auth_signing_key=$(az webapp config appsettings list \
-            --name queenzone-devbox \
-            --resource-group Queenzone-Dev-RG \
-            --query "[?name=='MobileAuth__SigningKey'].value | [0]" \
-            -o tsv | tr -d '\r')
-
-          current_database_connection_string=$(az webapp config appsettings list \
-            --name queenzone-devbox \
-            --resource-group Queenzone-Dev-RG \
-            --query "[?name=='ConnectionStrings__QueenZoneLegacy'].value | [0]" \
-            -o tsv | tr -d '\r')
-
-          current_blob_storage_connection_string=$(az webapp config appsettings list \
-            --name queenzone-devbox \
-            --resource-group Queenzone-Dev-RG \
-            --query "[?name=='ConnectionStrings__BlobStorage'].value | [0]" \
             -o tsv | tr -d '\r')
 
           changed=false
@@ -329,34 +338,22 @@ jobs:
             az webapp config appsettings set \
               --name queenzone-devbox \
               --resource-group Queenzone-Dev-RG \
-              --settings WEBSITE_WARMUP_PATH=/health \
-              --output none
-            changed=true
-          fi
-
-          if [ "$current_mobile_auth_signing_key" != "$MOBILE_AUTH_SIGNING_KEY" ]; then
-            az webapp config appsettings set \
-              --name queenzone-devbox \
-              --resource-group Queenzone-Dev-RG \
-              --settings "MobileAuth__SigningKey=$MOBILE_AUTH_SIGNING_KEY" \
-              --output none
-            changed=true
-          fi
-
-          if [ "$current_database_connection_string" != "$DEV_DATABASE_CONNECTION_STRING" ]; then
-            az webapp config appsettings set \
-              --name queenzone-devbox \
-              --resource-group Queenzone-Dev-RG \
-              --settings "ConnectionStrings__QueenZoneLegacy=$DEV_DATABASE_CONNECTION_STRING" \
-              --output none
-            changed=true
-          fi
-
-          if [ "$current_blob_storage_connection_string" != "$BLOB_STORAGE_CONNECTION_STRING" ]; then
-            az webapp config appsettings set \
-              --name queenzone-devbox \
-              --resource-group Queenzone-Dev-RG \
-              --settings "ConnectionStrings__BlobStorage=$BLOB_STORAGE_CONNECTION_STRING" \
+              --settings \
+                "Admin__AllowedEmails__0=$ADMIN_ALLOWED_EMAIL" \
+                "APPLICATIONINSIGHTS_CONNECTION_STRING=$APPLICATIONINSIGHTS_CONNECTION_STRING" \
+                "Authentication__Microsoft__ClientId=$AUTH_MICROSOFT_CLIENT_ID" \
+                "Authentication__Microsoft__ClientSecret=$AUTH_MICROSOFT_CLIENT_SECRET" \
+                "AzureAd__CallbackPath=/signin-oidc" \
+                "AzureAd__ClientId=$AZURE_AD_CLIENT_ID" \
+                "AzureAd__ClientSecret=$AZURE_AD_CLIENT_SECRET" \
+                "AzureAd__Instance=https://login.microsoftonline.com/" \
+                "AzureAd__TenantId=c9f094fd-23bf-4a35-a406-bcaacd7e1a8e" \
+                "BlobUpload__PublicBaseUrl=https://queenzonedev.blob.core.windows.net" \
+                "ConnectionStrings__BlobStorage=$BLOB_STORAGE_CONNECTION_STRING" \
+                "ConnectionStrings__QueenZoneLegacy=$DEV_DATABASE_CONNECTION_STRING" \
+                "MobileAuth__SigningKey=$MOBILE_AUTH_SIGNING_KEY" \
+                "Site__PublicBaseUrl=https://dev.queenzone.org" \
+                "WEBSITE_WARMUP_PATH=/health" \
               --output none
             changed=true
           fi
