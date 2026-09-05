@@ -1,5 +1,5 @@
 import type { BadgeRole } from '../ui/Badge';
-import type { MediaKey } from './media';
+import type { ArchiveIconName } from '../ui/icons/archiveSectionIcons';
 
 /** Spec §4.3b Archive hub destinations, plus Trivia (#1101). */
 export const ARCHIVE_HUB_IDS = [
@@ -22,10 +22,10 @@ export type ArchiveDestination = {
   kicker: string;
   kickerRole: BadgeRole;
   meta: string[];
-  image: MediaKey;
+  icon: ArchiveIconName;
 };
 
-/** Static hub rows — titles, kickers, roles, bundled images, and copy. Not live counts. */
+/** Static hub rows — titles, kickers, roles, section icons, and copy. Not live counts. */
 export const archiveDestinations: ArchiveDestination[] = [
   {
     id: 'stories',
@@ -33,7 +33,7 @@ export const archiveDestinations: ArchiveDestination[] = [
     kicker: 'Long-form',
     kickerRole: 'restored',
     meta: ['104 features', 'Editorial'],
-    image: 'portrait',
+    icon: 'articles',
   },
   {
     id: 'timeline',
@@ -41,7 +41,7 @@ export const archiveDestinations: ArchiveDestination[] = [
     kicker: 'History',
     kickerRole: 'archive',
     meta: ['1970 — 1991', '480 entries'],
-    image: 'stage',
+    icon: 'timeline',
   },
   {
     id: 'biography',
@@ -49,7 +49,7 @@ export const archiveDestinations: ArchiveDestination[] = [
     kicker: 'The band',
     kickerRole: 'community',
     meta: ['Nine chapters'],
-    image: 'studio',
+    icon: 'biography',
   },
   {
     id: 'discography',
@@ -57,7 +57,7 @@ export const archiveDestinations: ArchiveDestination[] = [
     kicker: 'Records',
     kickerRole: 'community',
     meta: ['15 studio albums', 'Sleeves & tracklists'],
-    image: 'studio',
+    icon: 'discography',
   },
   {
     id: 'tribute',
@@ -65,7 +65,7 @@ export const archiveDestinations: ArchiveDestination[] = [
     kicker: 'In memoriam',
     kickerRole: 'featured',
     meta: ['1946 — 1991', "Members' memories"],
-    image: 'portrait',
+    icon: 'tribute',
   },
   {
     id: 'fan-performances',
@@ -73,7 +73,7 @@ export const archiveDestinations: ArchiveDestination[] = [
     kicker: 'Community',
     kickerRole: 'community',
     meta: ['212 submissions', 'Video & audio'],
-    image: 'crowd',
+    icon: 'fan-performances',
   },
   {
     id: 'recently-restored',
@@ -81,7 +81,7 @@ export const archiveDestinations: ArchiveDestination[] = [
     kicker: 'Preserved',
     kickerRole: 'restored',
     meta: ['1,240 photographs', '340 articles'],
-    image: 'hero',
+    icon: 'restored',
   },
   {
     id: 'trivia',
@@ -89,7 +89,7 @@ export const archiveDestinations: ArchiveDestination[] = [
     kicker: 'Queen facts',
     kickerRole: 'archive',
     meta: ['Random facts'],
-    image: 'studio',
+    icon: 'trivia',
   },
   {
     id: 'about',
@@ -97,6 +97,6 @@ export const archiveDestinations: ArchiveDestination[] = [
     kicker: 'The old site',
     kickerRole: 'community',
     meta: ['How the archive was rebuilt'],
-    image: 'crowd',
+    icon: 'old-site',
   },
 ];
