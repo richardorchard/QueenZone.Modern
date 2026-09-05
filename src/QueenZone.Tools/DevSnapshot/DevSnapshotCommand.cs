@@ -36,26 +36,45 @@ internal static class DevSnapshotCommand
             DevSnapshotSafety.EnsureBlobBoundaries(sourceBlob, targetBlob, config.TargetStorageAccount);
 
             await using var session = await sql.OpenCopySessionAsync(sourceSql);
+            Console.WriteLine("Preparing curated SQL selections.");
             await session.PrepareSelectionsAsync();
 
             var blobs = new BlobSnapshotService(config, sourceBlob, targetBlob);
+            Console.WriteLine("Selecting gallery assets.");
             var photoSelection = await blobs.SelectPhotosAsync(await session.GetPhotoCandidatesAsync());
             await session.SetSelectedPhotosAsync(photoSelection.PhotoIds);
 
+            Console.WriteLine("Resolving forum and editorial assets.");
+            var referencedSelection = await blobs.GetForumAndEditorialBlobsAsync(session);
             var manifest = photoSelection.Blobs
-                .Concat(await blobs.GetForumAndEditorialBlobsAsync(session))
+                .Concat(referencedSelection.Blobs)
                 .DistinctBy(blob => $"{blob.Container}/{blob.Name}", StringComparer.OrdinalIgnoreCase)
                 .OrderBy(blob => blob.Container, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(blob => blob.Name, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
             blobs.EnsureBudgets(manifest);
 
+            Console.WriteLine("Resetting and copying curated SQL rows.");
             await session.ResetTargetAsync();
             await session.CopyRowsAsync();
+            if (referencedSelection.MissingForumBlobs.Count > 0)
+            {
+                Console.WriteLine($"Removing {referencedSelection.MissingForumBlobs.Count} broken forum attachment references from the target.");
+                await session.RemoveMissingForumBlobReferencesAsync(referencedSelection.MissingForumBlobs);
+            }
+            if (referencedSelection.MissingEditorialBlobs.Count > 0)
+            {
+                Console.WriteLine($"Removing {referencedSelection.MissingEditorialBlobs.Count} broken editorial image references from the target.");
+                await session.RemoveMissingEditorialBlobReferencesAsync(referencedSelection.MissingEditorialBlobs);
+            }
+
+            Console.WriteLine("Resetting and copying curated blobs.");
             await blobs.ResetTargetAndCopyAsync(manifest);
+            Console.WriteLine("Seeding synthetic dev accounts.");
             await session.SeedSyntheticAccountsAsync(
                 RequiredEnvironment("DEV_SNAPSHOT_ADMIN_PASSWORD"),
                 RequiredEnvironment("DEV_SNAPSHOT_MEMBER_PASSWORD"));
+            Console.WriteLine("Finalizing and verifying the curated snapshot.");
             await session.FinalizeTargetAsync();
 
             await WriteJsonAsync(options.ManifestPath, manifest);

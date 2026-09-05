@@ -226,6 +226,8 @@ internal sealed class SqlSnapshotCopySession(
     SqlConnection source,
     SqlConnection target) : IAsyncDisposable
 {
+    private const int SourceCommandTimeoutSeconds = 600;
+
     public async Task PrepareSelectionsAsync()
     {
         // Keep temp-table creation outside the parameterized command below.
@@ -416,6 +418,104 @@ internal sealed class SqlSnapshotCopySession(
         await CopyTableAsync("ForumPollOptions", "SELECT o.* FROM dbo.ForumPollOptions o JOIN dbo.ForumPolls p ON p.Id=o.PollId JOIN #SelectedThread x ON x.Id=p.ThreadId;");
     }
 
+    public async Task RemoveMissingForumBlobReferencesAsync(IReadOnlyList<MissingForumBlobReference> missing)
+    {
+        var legacyPostIds = missing.Where(item => item.LegacyPostId.HasValue)
+            .Select(item => item.LegacyPostId!.Value)
+            .Distinct()
+            .ToArray();
+        var attachmentIds = missing.Where(item => item.AttachmentId.HasValue)
+            .Select(item => item.AttachmentId!.Value)
+            .Distinct()
+            .ToArray();
+        var affectedPostIds = legacyPostIds.ToHashSet();
+
+        foreach (var batch in attachmentIds.Chunk(500))
+        {
+            await using (var select = target.CreateCommand())
+            {
+                var parameters = AddIdParameters(select, batch);
+                select.CommandText = $"SELECT DISTINCT PostId FROM dbo.ForumPostAttachments WHERE Id IN ({parameters});";
+                select.CommandTimeout = 1200;
+                await using var reader = await select.ExecuteReaderAsync();
+                while (await reader.ReadAsync()) affectedPostIds.Add(reader.GetInt64(0));
+            }
+
+            await using var delete = target.CreateCommand();
+            var deleteParameters = AddIdParameters(delete, batch);
+            delete.CommandText = $"DELETE FROM dbo.ForumPostAttachments WHERE Id IN ({deleteParameters});";
+            delete.CommandTimeout = 1200;
+            await delete.ExecuteNonQueryAsync();
+        }
+
+        foreach (var batch in legacyPostIds.Chunk(500))
+        {
+            await using var update = target.CreateCommand();
+            var parameters = AddIdParameters(update, batch);
+            update.CommandText = $"UPDATE dbo.ModernForumPost SET Attachment=NULL, FileSize=NULL WHERE Id IN ({parameters});";
+            update.CommandTimeout = 1200;
+            await update.ExecuteNonQueryAsync();
+        }
+
+        foreach (var batch in affectedPostIds.Chunk(500))
+        {
+            await using var update = target.CreateCommand();
+            var parameters = AddIdParameters(update, batch);
+            update.CommandText = $"""
+                UPDATE p
+                SET AttachCount = CASE WHEN NULLIF(LTRIM(RTRIM(p.Attachment)), '') IS NULL THEN 0 ELSE 1 END
+                    + (SELECT COUNT(*) FROM dbo.ForumPostAttachments a WHERE a.PostId=p.Id)
+                FROM dbo.ModernForumPost p
+                WHERE p.Id IN ({parameters});
+                """;
+            update.CommandTimeout = 1200;
+            await update.ExecuteNonQueryAsync();
+        }
+    }
+
+    public async Task RemoveMissingEditorialBlobReferencesAsync(IReadOnlyList<MissingEditorialBlobReference> missing)
+    {
+        var legacyNewsIds = missing.Where(item => item.LegacyNewsId.HasValue)
+            .Select(item => item.LegacyNewsId!.Value)
+            .Distinct()
+            .ToArray();
+        var draftArticleIds = missing.Where(item => item.EditorialArticleId.HasValue && !item.IsLive)
+            .Select(item => item.EditorialArticleId!.Value)
+            .Distinct()
+            .ToArray();
+        var liveArticleIds = missing.Where(item => item.EditorialArticleId.HasValue && item.IsLive)
+            .Select(item => item.EditorialArticleId!.Value)
+            .Distinct()
+            .ToArray();
+
+        foreach (var batch in legacyNewsIds.Chunk(500))
+        {
+            await using var update = target.CreateCommand();
+            var parameters = AddIdParameters(update, batch);
+            update.CommandText = $"UPDATE dbo.NEWS_T SET IMAGE_BLOB_KEY=NULL WHERE NEWS_ID IN ({parameters});";
+            update.CommandTimeout = 1200;
+            await update.ExecuteNonQueryAsync();
+        }
+
+        foreach (var batch in draftArticleIds.Chunk(500))
+        {
+            await using var update = target.CreateCommand();
+            var parameters = AddIdParameters(update, batch);
+            update.CommandText = $"UPDATE dbo.EditorialArticles SET ImageBlobKey=NULL WHERE Id IN ({parameters});";
+            update.CommandTimeout = 1200;
+            await update.ExecuteNonQueryAsync();
+        }
+
+        foreach (var batch in liveArticleIds.Chunk(500))
+        {
+            await using var update = target.CreateCommand();
+            var parameters = AddIdParameters(update, batch);
+            update.CommandText = $"UPDATE dbo.EditorialArticles SET LiveImageBlobKey=NULL WHERE Id IN ({parameters});";
+            update.CommandTimeout = 1200;
+            await update.ExecuteNonQueryAsync();
+        }
+    }
+
     public async Task SeedSyntheticAccountsAsync(string adminPassword, string memberPassword)
     {
         var hasher = new PasswordHasher<object>();
@@ -450,7 +550,7 @@ internal sealed class SqlSnapshotCopySession(
         var columns = await GetInsertableColumnsAsync(table);
         await using var command = source.CreateCommand();
         command.CommandText = query;
-        command.CommandTimeout = 600;
+        command.CommandTimeout = SourceCommandTimeoutSeconds;
         await using var reader = await command.ExecuteReaderAsync(CommandBehavior.SequentialAccess);
         var sourceColumns = Enumerable.Range(0, reader.FieldCount).Select(reader.GetName).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var mapped = columns.Where(sourceColumns.Contains).ToArray();
@@ -492,6 +592,7 @@ internal sealed class SqlSnapshotCopySession(
     {
         await using var command = source.CreateCommand();
         command.CommandText = sql;
+        command.CommandTimeout = SourceCommandTimeoutSeconds;
         await using var reader = await command.ExecuteReaderAsync();
         while (await reader.ReadAsync())
         {
@@ -503,6 +604,7 @@ internal sealed class SqlSnapshotCopySession(
     {
         await using var command = source.CreateCommand();
         command.CommandText = sql;
+        command.CommandTimeout = SourceCommandTimeoutSeconds;
         await using var reader = await command.ExecuteReaderAsync();
         while (await reader.ReadAsync())
         {
@@ -519,7 +621,7 @@ internal sealed class SqlSnapshotCopySession(
     {
         await using var command = source.CreateCommand();
         command.CommandText = sql;
-        command.CommandTimeout = 600;
+        command.CommandTimeout = SourceCommandTimeoutSeconds;
         foreach (var parameter in parameters) command.Parameters.AddWithValue(parameter.Name, parameter.Value);
         await command.ExecuteNonQueryAsync();
     }
@@ -530,6 +632,18 @@ internal sealed class SqlSnapshotCopySession(
         command.CommandText = sql;
         command.CommandTimeout = 1200;
         await command.ExecuteNonQueryAsync();
+    }
+
+    private static string AddIdParameters<T>(SqlCommand command, IReadOnlyList<T> ids)
+    {
+        var names = new string[ids.Count];
+        for (var index = 0; index < ids.Count; index++)
+        {
+            names[index] = $"@id{index}";
+            command.Parameters.AddWithValue(names[index], ids[index]!);
+        }
+
+        return string.Join(",", names);
     }
 
     private static string Escape(string value) => value.Replace("]", "]]", StringComparison.Ordinal);
