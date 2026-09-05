@@ -164,19 +164,46 @@ internal sealed class SqlSnapshotService(DevSnapshotConfig config, string target
     private static async Task EnsureDatabaseAsync(SqlConnection connection, string expected, bool requireReadOnly)
     {
         await using var command = connection.CreateCommand();
-        command.CommandText = "SELECT DB_NAME(), HAS_PERMS_BY_NAME(DB_NAME(), 'DATABASE', 'UPDATE');";
+        command.CommandText = """
+            SELECT DB_NAME(), CONVERT(bit, CASE WHEN
+                HAS_PERMS_BY_NAME(DB_NAME(), 'DATABASE', 'INSERT') = 1
+                OR HAS_PERMS_BY_NAME(DB_NAME(), 'DATABASE', 'UPDATE') = 1
+                OR HAS_PERMS_BY_NAME(DB_NAME(), 'DATABASE', 'DELETE') = 1
+                OR HAS_PERMS_BY_NAME(DB_NAME(), 'DATABASE', 'EXECUTE') = 1
+                OR HAS_PERMS_BY_NAME(DB_NAME(), 'DATABASE', 'ALTER') = 1
+                OR HAS_PERMS_BY_NAME(DB_NAME(), 'DATABASE', 'CONTROL') = 1
+                OR EXISTS
+                (
+                    SELECT 1
+                    FROM sys.tables t JOIN sys.schemas s ON s.schema_id=t.schema_id
+                    WHERE HAS_PERMS_BY_NAME(QUOTENAME(s.name) + '.' + QUOTENAME(t.name), 'OBJECT', 'INSERT') = 1
+                       OR HAS_PERMS_BY_NAME(QUOTENAME(s.name) + '.' + QUOTENAME(t.name), 'OBJECT', 'UPDATE') = 1
+                       OR HAS_PERMS_BY_NAME(QUOTENAME(s.name) + '.' + QUOTENAME(t.name), 'OBJECT', 'DELETE') = 1
+                       OR HAS_PERMS_BY_NAME(QUOTENAME(s.name) + '.' + QUOTENAME(t.name), 'OBJECT', 'ALTER') = 1
+                       OR HAS_PERMS_BY_NAME(QUOTENAME(s.name) + '.' + QUOTENAME(t.name), 'OBJECT', 'CONTROL') = 1
+                )
+                OR EXISTS
+                (
+                    SELECT 1
+                    FROM sys.procedures p JOIN sys.schemas s ON s.schema_id=p.schema_id
+                    WHERE HAS_PERMS_BY_NAME(QUOTENAME(s.name) + '.' + QUOTENAME(p.name), 'OBJECT', 'EXECUTE') = 1
+                       OR HAS_PERMS_BY_NAME(QUOTENAME(s.name) + '.' + QUOTENAME(p.name), 'OBJECT', 'ALTER') = 1
+                       OR HAS_PERMS_BY_NAME(QUOTENAME(s.name) + '.' + QUOTENAME(p.name), 'OBJECT', 'CONTROL') = 1
+                )
+                THEN 1 ELSE 0 END);
+            """;
         await using var reader = await command.ExecuteReaderAsync();
         await reader.ReadAsync();
         var actual = reader.GetString(0);
-        var canUpdate = !reader.IsDBNull(1) && reader.GetInt32(1) == 1;
+        var canMutate = !reader.IsDBNull(1) && reader.GetBoolean(1);
         if (!string.Equals(actual, expected, StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException($"Database boundary failed: expected {expected}, got {actual}.");
         }
 
-        if (requireReadOnly && canUpdate)
+        if (requireReadOnly && canMutate)
         {
-            throw new InvalidOperationException("Production SQL credential has UPDATE permission. A dedicated read-only credential is required.");
+            throw new InvalidOperationException("Production SQL credential has mutation, DDL, control, or execute permission. A dedicated read-only credential is required.");
         }
     }
 

@@ -15,9 +15,10 @@ The refresh has four separate credentials:
 | `DEV_SNAPSHOT_SOURCE_BLOB_READONLY` | account SAS for production Blob Storage with service `b`, resource types needed for list/read, and permissions exactly `rl` |
 | `DEV_SNAPSHOT_TARGET_BLOB` | read/write/delete on `queenzonedev` only |
 
-The tool checks the SQL database names, rejects a production credential with
-database `UPDATE` permission, rejects source Blob account keys or write-capable
-SAS permissions, and requires the target storage account name `queenzonedev`.
+The tool checks the SQL database names and rejects database- or object-level
+mutation, DDL/control, or stored-procedure execution rights on production. It
+also rejects source Blob account keys or write-capable SAS permissions and
+requires the target storage account name `queenzonedev`.
 Application runtime credentials are separate. The dev app receives only the dev
 SQL and Blob connection strings.
 

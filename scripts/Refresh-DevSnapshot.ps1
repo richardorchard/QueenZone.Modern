@@ -44,10 +44,35 @@ function Assert-SqlBoundary([string] $ConnectionString, [string] $Database, [boo
     try {
         $connection.Open()
         $command = $connection.CreateCommand()
-        $command.CommandText = "SELECT HAS_PERMS_BY_NAME(DB_NAME(), 'DATABASE', 'UPDATE')"
-        $canUpdate = [int]$command.ExecuteScalar() -eq 1
-        if ($ReadOnly -and $canUpdate) {
-            throw "Production SQL credential has UPDATE permission. Use a dedicated read-only credential."
+        $command.CommandText = @"
+SELECT CONVERT(bit, CASE WHEN
+    HAS_PERMS_BY_NAME(DB_NAME(), 'DATABASE', 'INSERT') = 1
+    OR HAS_PERMS_BY_NAME(DB_NAME(), 'DATABASE', 'UPDATE') = 1
+    OR HAS_PERMS_BY_NAME(DB_NAME(), 'DATABASE', 'DELETE') = 1
+    OR HAS_PERMS_BY_NAME(DB_NAME(), 'DATABASE', 'EXECUTE') = 1
+    OR HAS_PERMS_BY_NAME(DB_NAME(), 'DATABASE', 'ALTER') = 1
+    OR HAS_PERMS_BY_NAME(DB_NAME(), 'DATABASE', 'CONTROL') = 1
+    OR EXISTS
+    (
+        SELECT 1 FROM sys.tables t JOIN sys.schemas s ON s.schema_id=t.schema_id
+        WHERE HAS_PERMS_BY_NAME(QUOTENAME(s.name) + '.' + QUOTENAME(t.name), 'OBJECT', 'INSERT') = 1
+           OR HAS_PERMS_BY_NAME(QUOTENAME(s.name) + '.' + QUOTENAME(t.name), 'OBJECT', 'UPDATE') = 1
+           OR HAS_PERMS_BY_NAME(QUOTENAME(s.name) + '.' + QUOTENAME(t.name), 'OBJECT', 'DELETE') = 1
+           OR HAS_PERMS_BY_NAME(QUOTENAME(s.name) + '.' + QUOTENAME(t.name), 'OBJECT', 'ALTER') = 1
+           OR HAS_PERMS_BY_NAME(QUOTENAME(s.name) + '.' + QUOTENAME(t.name), 'OBJECT', 'CONTROL') = 1
+    )
+    OR EXISTS
+    (
+        SELECT 1 FROM sys.procedures p JOIN sys.schemas s ON s.schema_id=p.schema_id
+        WHERE HAS_PERMS_BY_NAME(QUOTENAME(s.name) + '.' + QUOTENAME(p.name), 'OBJECT', 'EXECUTE') = 1
+           OR HAS_PERMS_BY_NAME(QUOTENAME(s.name) + '.' + QUOTENAME(p.name), 'OBJECT', 'ALTER') = 1
+           OR HAS_PERMS_BY_NAME(QUOTENAME(s.name) + '.' + QUOTENAME(p.name), 'OBJECT', 'CONTROL') = 1
+    )
+    THEN 1 ELSE 0 END)
+"@
+        $canMutate = [bool]$command.ExecuteScalar()
+        if ($ReadOnly -and $canMutate) {
+            throw "Production SQL credential has mutation, DDL, control, or execute permission. Use a dedicated read-only credential."
         }
     }
     finally {
