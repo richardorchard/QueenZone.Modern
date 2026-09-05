@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 # Boot the Testing contract host and run the Maestro device smoke suite
-# against a Debug build baked at the loopback Testing origin (#872 Option A).
+# against a Release-embedded build baked at the loopback Testing origin
+# (#872 Option A, #1322). Never Debug / expo-dev-client — that waits for Metro.
+# Do not start a packager here.
 #
 # Never points Testing at a real database, blob store, live site, or OAuth.
 # Usage (repo root):
 #   ./scripts/run-mobile-device-smoke.sh --platform android
 #   ./scripts/run-mobile-device-smoke.sh --platform ios
-#   ./scripts/run-mobile-device-smoke.sh --platform android --skip-build --apk path/to/app-debug.apk
+#   ./scripts/run-mobile-device-smoke.sh --platform android --skip-build --apk path/to/app-release.apk
 #   ./scripts/run-mobile-device-smoke.sh --platform android --prove-failure
 #   ./scripts/run-mobile-device-smoke.sh --platform android --suite journeys
 #
@@ -287,6 +289,34 @@ push_attach_fixture() {
   echo "SMOKE_ATTACH_URL is set (length ${#SMOKE_ATTACH_URL}; path not printed)."
 }
 
+android_release_apk() {
+  local dir="$root/src/QueenZone.Mobile/android/app/build/outputs/apk/release"
+  if [ -f "$dir/app-release.apk" ]; then
+    printf '%s\n' "$dir/app-release.apk"
+    return 0
+  fi
+  if [ -f "$dir/app-release-unsigned.apk" ]; then
+    printf '%s\n' "$dir/app-release-unsigned.apk"
+    return 0
+  fi
+  return 1
+}
+
+ios_release_app() {
+  local dir="$root/src/QueenZone.Mobile/ios/build/Build/Products/Release-iphonesimulator"
+  if [ -d "$dir/QueenZone.app" ]; then
+    printf '%s\n' "$dir/QueenZone.app"
+    return 0
+  fi
+  local found
+  found="$(ls -d "$dir"/*.app 2>/dev/null | head -n 1 || true)"
+  if [ -n "$found" ] && [ -d "$found" ]; then
+    printf '%s\n' "$found"
+    return 0
+  fi
+  return 1
+}
+
 build_android() {
   (
     cd src/QueenZone.Mobile
@@ -295,14 +325,14 @@ build_android() {
     export SENTRY_DISABLE_AUTO_UPLOAD=true
     export QUEENZONE_MOBILE_SMOKE_EMBED=1
     export FORCE_BUNDLING=1
-    echo "Baking Android smoke APK for ${EXPO_PUBLIC_API_BASE_URL}"
+    echo "Baking Android Release smoke APK for ${EXPO_PUBLIC_API_BASE_URL}"
     npx expo prebuild --platform android
     (
       cd android
-      ./gradlew assembleDebug
+      ./gradlew assembleRelease
     )
   )
-  apk="$root/src/QueenZone.Mobile/android/app/build/outputs/apk/debug/app-debug.apk"
+  apk="$(android_release_apk || true)"
 }
 
 build_ios() {
@@ -313,7 +343,7 @@ build_ios() {
     export SENTRY_DISABLE_AUTO_UPLOAD=true
     export QUEENZONE_MOBILE_SMOKE_EMBED=1
     export FORCE_BUNDLING=1
-    echo "Baking iOS Simulator smoke app for ${EXPO_PUBLIC_API_BASE_URL}"
+    echo "Baking iOS Simulator Release smoke app for ${EXPO_PUBLIC_API_BASE_URL}"
     npx expo prebuild --platform ios --clean
     cd ios
     workspace="$(ls -d *.xcworkspace | head -n 1)"
@@ -322,12 +352,12 @@ build_ios() {
       -workspace "$workspace" \
       -scheme "$scheme" \
       -sdk iphonesimulator \
-      -configuration Debug \
+      -configuration Release \
       -derivedDataPath build \
       CODE_SIGNING_ALLOWED=NO \
       build
   )
-  app="$(ls -d "$root"/src/QueenZone.Mobile/ios/build/Build/Products/Debug-iphonesimulator/*.app | head -n 1)"
+  app="$(ios_release_app || true)"
 }
 
 if [ "$skip_host" != true ]; then
@@ -354,10 +384,10 @@ if [ "$skip_build" != true ]; then
 fi
 
 if [ "$platform" = "android" ] && [ -z "$apk" ]; then
-  apk="$root/src/QueenZone.Mobile/android/app/build/outputs/apk/debug/app-debug.apk"
+  apk="$(android_release_apk || true)"
 fi
 if [ "$platform" = "ios" ] && [ -z "$app" ]; then
-  app="$(ls -d "$root"/src/QueenZone.Mobile/ios/build/Build/Products/Debug-iphonesimulator/*.app 2>/dev/null | head -n 1 || true)"
+  app="$(ios_release_app || true)"
 fi
 
 if [ "$platform" = "android" ]; then

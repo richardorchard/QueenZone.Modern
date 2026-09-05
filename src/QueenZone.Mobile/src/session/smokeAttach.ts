@@ -1,13 +1,15 @@
 /**
- * Debug-only forum attach inject (#1072). Same gate as `queenzone://smoke-auth`:
- * `__DEV__` plus `appEnv === 'development'`. Release / staging / production
- * fail closed. The OEM Files sheet is not the journey gate.
+ * Forum attach inject (#1072, #1322). Same gate as `queenzone://smoke-auth`:
+ * `appEnv === 'development'` plus `__DEV__` or baked `smokeEmbed`.
+ * Store Release / staging / production fail closed. The OEM Files sheet
+ * is not the journey gate.
  */
 
 /** Same shape as `SmokeAuthGate` in smokeAuth.ts — no runtime import (node:test). */
 type SmokeAttachGate = {
   dev?: boolean;
   appEnv?: string;
+  smokeEmbed?: boolean;
 };
 
 export const smokeAttachHost = 'smoke-attach';
@@ -26,7 +28,8 @@ let pending: SmokeAttachAsset | null = null;
 
 export function isSmokeAttachEnabled(env: SmokeAttachGate = {}): boolean {
   const dev = env.dev ?? (typeof __DEV__ !== 'undefined' ? __DEV__ : false);
-  return dev === true && env.appEnv === 'development';
+  const embed = env.smokeEmbed === true;
+  return (dev === true || embed) && env.appEnv === 'development';
 }
 
 export function parseSmokeAttachAsset(url: string): SmokeAttachAsset | null {
