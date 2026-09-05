@@ -473,6 +473,49 @@ internal sealed class SqlSnapshotCopySession(
         }
     }
 
+    public async Task RemoveMissingEditorialBlobReferencesAsync(IReadOnlyList<MissingEditorialBlobReference> missing)
+    {
+        var legacyNewsIds = missing.Where(item => item.LegacyNewsId.HasValue)
+            .Select(item => item.LegacyNewsId!.Value)
+            .Distinct()
+            .ToArray();
+        var draftArticleIds = missing.Where(item => item.EditorialArticleId.HasValue && !item.IsLive)
+            .Select(item => item.EditorialArticleId!.Value)
+            .Distinct()
+            .ToArray();
+        var liveArticleIds = missing.Where(item => item.EditorialArticleId.HasValue && item.IsLive)
+            .Select(item => item.EditorialArticleId!.Value)
+            .Distinct()
+            .ToArray();
+
+        foreach (var batch in legacyNewsIds.Chunk(500))
+        {
+            await using var update = target.CreateCommand();
+            var parameters = AddIdParameters(update, batch);
+            update.CommandText = $"UPDATE dbo.NEWS_T SET IMAGE_BLOB_KEY=NULL WHERE NEWS_ID IN ({parameters});";
+            update.CommandTimeout = 1200;
+            await update.ExecuteNonQueryAsync();
+        }
+
+        foreach (var batch in draftArticleIds.Chunk(500))
+        {
+            await using var update = target.CreateCommand();
+            var parameters = AddIdParameters(update, batch);
+            update.CommandText = $"UPDATE dbo.EditorialArticles SET ImageBlobKey=NULL WHERE Id IN ({parameters});";
+            update.CommandTimeout = 1200;
+            await update.ExecuteNonQueryAsync();
+        }
+
+        foreach (var batch in liveArticleIds.Chunk(500))
+        {
+            await using var update = target.CreateCommand();
+            var parameters = AddIdParameters(update, batch);
+            update.CommandText = $"UPDATE dbo.EditorialArticles SET LiveImageBlobKey=NULL WHERE Id IN ({parameters});";
+            update.CommandTimeout = 1200;
+            await update.ExecuteNonQueryAsync();
+        }
+    }
+
     public async Task SeedSyntheticAccountsAsync(string adminPassword, string memberPassword)
     {
         var hasher = new PasswordHasher<object>();

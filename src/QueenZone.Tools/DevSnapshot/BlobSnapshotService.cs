@@ -12,10 +12,13 @@ internal sealed record PhotoSelection(IReadOnlyList<int> PhotoIds, IReadOnlyList
 
 internal sealed record MissingForumBlobReference(long? LegacyPostId, Guid? AttachmentId);
 
+internal sealed record MissingEditorialBlobReference(int? LegacyNewsId, Guid? EditorialArticleId, bool IsLive);
+
 [ExcludeFromCodeCoverage]
 internal sealed record ReferencedBlobSelection(
     IReadOnlyList<SnapshotBlob> Blobs,
-    IReadOnlyList<MissingForumBlobReference> MissingForumBlobs);
+    IReadOnlyList<MissingForumBlobReference> MissingForumBlobs,
+    IReadOnlyList<MissingEditorialBlobReference> MissingEditorialBlobs);
 
 [ExcludeFromCodeCoverage]
 internal sealed class BlobSnapshotService(
@@ -99,6 +102,7 @@ internal sealed class BlobSnapshotService(
         var references = await session.GetBlobReferencesAsync();
         var result = new List<SnapshotBlob>();
         var missingForumBlobs = new List<MissingForumBlobReference>();
+        var missingEditorialBlobs = new List<MissingEditorialBlobReference>();
         foreach (var reference in references)
         {
             var blob = await ResolveAsync(reference.Container, reference.Name, reference.Budget, reference.Source);
@@ -110,13 +114,14 @@ internal sealed class BlobSnapshotService(
                     continue;
                 }
 
-                throw new InvalidOperationException($"Referenced source blob is missing: {reference.Container}/{reference.Name} ({reference.Source}).");
+                missingEditorialBlobs.Add(ParseMissingEditorialBlobReference(reference.Source));
+                continue;
             }
 
             result.Add(blob);
         }
 
-        return new ReferencedBlobSelection(result, missingForumBlobs);
+        return new ReferencedBlobSelection(result, missingForumBlobs, missingEditorialBlobs);
     }
 
     public void EnsureBudgets(IEnumerable<SnapshotBlob> manifest)
@@ -210,5 +215,31 @@ internal sealed class BlobSnapshotService(
         }
 
         throw new InvalidOperationException($"Unknown forum blob reference source: {source}.");
+    }
+
+    internal static MissingEditorialBlobReference ParseMissingEditorialBlobReference(string source)
+    {
+        const string newsPrefix = "NEWS_T:";
+        if (source.StartsWith(newsPrefix, StringComparison.Ordinal)
+            && int.TryParse(source[newsPrefix.Length..], out var newsId))
+        {
+            return new MissingEditorialBlobReference(newsId, null, false);
+        }
+
+        const string articlePrefix = "EditorialArticles:";
+        if (source.StartsWith(articlePrefix, StringComparison.Ordinal)
+            && Guid.TryParse(source[articlePrefix.Length..], out var articleId))
+        {
+            return new MissingEditorialBlobReference(null, articleId, false);
+        }
+
+        const string liveArticlePrefix = "EditorialArticles-live:";
+        if (source.StartsWith(liveArticlePrefix, StringComparison.Ordinal)
+            && Guid.TryParse(source[liveArticlePrefix.Length..], out var liveArticleId))
+        {
+            return new MissingEditorialBlobReference(null, liveArticleId, true);
+        }
+
+        throw new InvalidOperationException($"Unknown editorial blob reference source: {source}.");
     }
 }

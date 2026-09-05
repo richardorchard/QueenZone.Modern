@@ -50,4 +50,33 @@ public sealed class BlobSnapshotServiceTests
     public void ParseMissingForumBlobReference_RejectsUnknownSources() =>
         Assert.Throws<InvalidOperationException>(
             () => BlobSnapshotService.ParseMissingForumBlobReference("NEWS_T:123"));
+
+    [Fact]
+    public void ParseMissingEditorialBlobReference_ParsesLegacyNewsId()
+    {
+        var result = BlobSnapshotService.ParseMissingEditorialBlobReference("NEWS_T:7023");
+
+        Assert.Equal(7023, result.LegacyNewsId);
+        Assert.Null(result.EditorialArticleId);
+        Assert.False(result.IsLive);
+    }
+
+    [Theory]
+    [InlineData("EditorialArticles:", false)]
+    [InlineData("EditorialArticles-live:", true)]
+    public void ParseMissingEditorialBlobReference_ParsesEditorialArticleId(string prefix, bool expectedIsLive)
+    {
+        var id = Guid.NewGuid();
+
+        var result = BlobSnapshotService.ParseMissingEditorialBlobReference($"{prefix}{id}");
+
+        Assert.Null(result.LegacyNewsId);
+        Assert.Equal(id, result.EditorialArticleId);
+        Assert.Equal(expectedIsLive, result.IsLive);
+    }
+
+    [Fact]
+    public void ParseMissingEditorialBlobReference_RejectsUnknownSources() =>
+        Assert.Throws<InvalidOperationException>(
+            () => BlobSnapshotService.ParseMissingEditorialBlobReference("ModernForumPost:43558"));
 }
