@@ -319,9 +319,24 @@ Feature work should happen on an agent-prefixed branch such as `grok/news-pagina
 
 ## Deployment
 
-The `Deploy` GitHub Actions workflow (`.github/workflows/deploy.yml`) deploys `main` to the `queenzone-dev` Azure App Service at `https://queenzone-dev.azurewebsites.net`.
+Every merge to `main` deploys automatically to the isolated dev environment through `.github/workflows/deploy-dev.yml`. The production `Deploy` workflow (`.github/workflows/deploy.yml`) runs only for a `v*` tag or a manual emergency dispatch. Despite its legacy Azure resource name, production is the `queenzone-dev` App Service at `https://www.queenzone.org`.
 
-CI/CD is split across two workflows. `.github/workflows/ci.yml` runs the required build, test, coverage, migration consistency, smoke, and Playwright checks on pull requests. After a checked PR merges, `.github/workflows/deploy.yml` rebuilds the same tree, applies pending EF Core migrations, deploys the published app, and runs the live-site smoke checks. The deploy workflow does not rerun the CI test suite.
+`.github/workflows/ci.yml` runs the required build, test, coverage, migration consistency, smoke, and Playwright checks on pull requests. The dev and production deploy workflows reuse the exact tested `web-publish` artifact; they do not rebuild or rerun CI.
+
+### Promote a verified dev release to production
+
+1. Merge the PR and wait for `deploy-dev.yml` to complete.
+2. Verify the change at `https://dev.queenzone.org`.
+3. Tag that exact commit on `main`, then push the tag:
+
+```powershell
+git checkout main
+git pull --ff-only origin main
+git tag vX.Y.Z <verified-commit-sha>
+git push origin vX.Y.Z
+```
+
+The `v*` tag triggers the production workflow. That workflow resolves the tagged commit back to the PR head SHA and deploys the matching CI artifact, then applies migrations and runs production smoke checks. Use the Actions `workflow_dispatch` control on `main` only for a manual or emergency redeploy.
 
 The planned public canonical domain for the site is `https://www.queenzone.org`. SEO features that emit absolute public URLs, such as sitemaps and robots.txt, should use that host in production configuration.
 
