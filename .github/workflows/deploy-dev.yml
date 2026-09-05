@@ -50,6 +50,7 @@ jobs:
       code: ${{ steps.check.outputs.code }}
       migrations: ${{ steps.check.outputs.migrations }}
       mobile: ${{ steps.check.outputs.mobile }}
+      sample_data: ${{ steps.check.outputs.sample_data }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -59,6 +60,11 @@ jobs:
       - name: Check for code changes
         id: check
         run: |
+          # The provisioned database is empty and does not contain the legacy
+          # baseline tables expected by the existing EF migrations. Keep dev
+          # useful with deterministic sample data until that baseline exists.
+          echo "sample_data=true" >> "$GITHUB_OUTPUT"
+
           if [ "${{ github.event_name }}" != "push" ] || [ -z "${{ github.event.before }}" ]; then
             echo "code=true" >> "$GITHUB_OUTPUT"
             echo "migrations=true" >> "$GITHUB_OUTPUT"
@@ -138,7 +144,8 @@ jobs:
     if: |
       github.ref == 'refs/heads/main' &&
       needs.changes.outputs.code == 'true' &&
-      needs.changes.outputs.migrations == 'true'
+      needs.changes.outputs.migrations == 'true' &&
+      needs.changes.outputs.sample_data != 'true'
     environment: dev-migrate
 
     steps:
@@ -253,8 +260,8 @@ jobs:
           AZURE_AD_CLIENT_ID: ${{ steps.bitwarden-secrets.outputs.AZURE_AD_CLIENT_ID }}
           AZURE_AD_CLIENT_SECRET: ${{ steps.bitwarden-secrets.outputs.AZURE_AD_CLIENT_SECRET }}
           BLOB_STORAGE_CONNECTION_STRING: ${{ steps.bitwarden-secrets.outputs.BLOB_STORAGE_CONNECTION_STRING }}
-          DEV_DATABASE_CONNECTION_STRING: ${{ steps.bitwarden-secrets.outputs.QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING }}
           MOBILE_AUTH_SIGNING_KEY: ${{ steps.bitwarden-secrets.outputs.MOBILE_AUTH_SIGNING_KEY }}
+          USE_SAMPLE_DATA: ${{ needs.changes.outputs.sample_data }}
         run: |
           required=(
             ADMIN_ALLOWED_EMAIL
@@ -264,7 +271,6 @@ jobs:
             AZURE_AD_CLIENT_ID
             AZURE_AD_CLIENT_SECRET
             BLOB_STORAGE_CONNECTION_STRING
-            DEV_DATABASE_CONNECTION_STRING
           )
           for name in "${required[@]}"; do
             if [ -z "${!name}" ]; then
@@ -290,16 +296,22 @@ jobs:
             "AzureAd__TenantId=c9f094fd-23bf-4a35-a406-bcaacd7e1a8e" \
             "BlobUpload__PublicBaseUrl=https://queenzonedev.blob.core.windows.net" \
             "ConnectionStrings__BlobStorage=$BLOB_STORAGE_CONNECTION_STRING" \
-            "ConnectionStrings__QueenZoneLegacy=$DEV_DATABASE_CONNECTION_STRING" \
             "MobileAuth__SigningKey=$MOBILE_AUTH_SIGNING_KEY" \
+            "QueenZoneHostFiltering__AllowedHosts=dev.queenzone.org;queenzone-devbox.azurewebsites.net" \
             "Site__PublicBaseUrl=https://dev.queenzone.org" \
             "WEBSITE_WARMUP_PATH=/health" | sort)
 
           current=$(az webapp config appsettings list \
             --name queenzone-devbox \
             --resource-group Queenzone-Dev-RG \
-            --query "[?name=='Admin__AllowedEmails__0' || name=='APPLICATIONINSIGHTS_CONNECTION_STRING' || name=='Authentication__Microsoft__ClientId' || name=='Authentication__Microsoft__ClientSecret' || name=='AzureAd__CallbackPath' || name=='AzureAd__ClientId' || name=='AzureAd__ClientSecret' || name=='AzureAd__Instance' || name=='AzureAd__TenantId' || name=='BlobUpload__PublicBaseUrl' || name=='ConnectionStrings__BlobStorage' || name=='ConnectionStrings__QueenZoneLegacy' || name=='MobileAuth__SigningKey' || name=='Site__PublicBaseUrl' || name=='WEBSITE_WARMUP_PATH'].[join('=', [name, value])]" \
+            --query "[?name=='Admin__AllowedEmails__0' || name=='APPLICATIONINSIGHTS_CONNECTION_STRING' || name=='Authentication__Microsoft__ClientId' || name=='Authentication__Microsoft__ClientSecret' || name=='AzureAd__CallbackPath' || name=='AzureAd__ClientId' || name=='AzureAd__ClientSecret' || name=='AzureAd__Instance' || name=='AzureAd__TenantId' || name=='BlobUpload__PublicBaseUrl' || name=='ConnectionStrings__BlobStorage' || name=='MobileAuth__SigningKey' || name=='QueenZoneHostFiltering__AllowedHosts' || name=='Site__PublicBaseUrl' || name=='WEBSITE_WARMUP_PATH'].[join('=', [name, value])]" \
             -o tsv | tr -d '\r' | sort)
+
+          database_connection=$(az webapp config appsettings list \
+            --name queenzone-devbox \
+            --resource-group Queenzone-Dev-RG \
+            --query "[?name=='ConnectionStrings__QueenZoneLegacy'].value | [0]" \
+            -o tsv | tr -d '\r')
 
           strict_warmup_status=$(az webapp config appsettings list \
             --name queenzone-devbox \
@@ -316,6 +328,15 @@ jobs:
             -o tsv | tr -d '\r')
 
           changed=false
+          if [ "$USE_SAMPLE_DATA" = "true" ] && [ -n "$database_connection" ]; then
+            az webapp config appsettings delete \
+              --name queenzone-devbox \
+              --resource-group Queenzone-Dev-RG \
+              --setting-names ConnectionStrings__QueenZoneLegacy \
+              --output none
+            changed=true
+          fi
+
           if [ -n "$strict_warmup_status" ]; then
             az webapp config appsettings delete \
               --name queenzone-devbox \
@@ -350,8 +371,8 @@ jobs:
                 "AzureAd__TenantId=c9f094fd-23bf-4a35-a406-bcaacd7e1a8e" \
                 "BlobUpload__PublicBaseUrl=https://queenzonedev.blob.core.windows.net" \
                 "ConnectionStrings__BlobStorage=$BLOB_STORAGE_CONNECTION_STRING" \
-                "ConnectionStrings__QueenZoneLegacy=$DEV_DATABASE_CONNECTION_STRING" \
                 "MobileAuth__SigningKey=$MOBILE_AUTH_SIGNING_KEY" \
+                "QueenZoneHostFiltering__AllowedHosts=dev.queenzone.org;queenzone-devbox.azurewebsites.net" \
                 "Site__PublicBaseUrl=https://dev.queenzone.org" \
                 "WEBSITE_WARMUP_PATH=/health" \
               --output none
@@ -468,4 +489,5 @@ jobs:
         run: |
           bash ./scripts/Invoke-PostDeploySmoke.sh \
             --base-url https://dev.queenzone.org \
+            --sample-data \
             --expect-build-version "${{ needs.resolve-ci-run.outputs.head_sha }}"
