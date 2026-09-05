@@ -228,10 +228,15 @@ internal sealed class SqlSnapshotCopySession(
 {
     public async Task PrepareSelectionsAsync()
     {
+        // Keep temp-table creation outside the parameterized command below.
+        // SqlClient executes parameterized text through sp_executesql; a temp
+        // table created inside that nested scope is dropped when it returns.
         await ExecuteSourceAsync("""
             CREATE TABLE #SelectedThread (Id bigint NOT NULL PRIMARY KEY);
             CREATE TABLE #SelectedPhoto (Id int NOT NULL PRIMARY KEY);
+            """);
 
+        await ExecuteSourceAsync("""
             ;WITH Ranked AS
             (
                 SELECT t.Id, t.LegacyTopicId, t.CategoryId, ISNULL(s.PostCount, t.ReplyCount + 1) AS PostCount,
