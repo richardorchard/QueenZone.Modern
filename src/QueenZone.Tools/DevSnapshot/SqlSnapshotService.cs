@@ -379,13 +379,15 @@ internal sealed class SqlSnapshotCopySession(
             EXEC sys.sp_executesql @sql;
             SET @sql='';
             SELECT @sql += 'DELETE FROM ' + QUOTENAME(SCHEMA_NAME(schema_id)) + '.' + QUOTENAME(name) + ';'
-            FROM sys.tables WHERE name <> '__EFMigrationsHistory';
+            FROM sys.tables;
             EXEC sys.sp_executesql @sql;
             """);
     }
 
     public async Task CopyRowsAsync()
     {
+        await CopyTableAsync("__EFMigrationsHistory", "SELECT * FROM dbo.[__EFMigrationsHistory];");
+
         foreach (var table in config.PublicTables)
         {
             await CopyTableAsync(table, $"SELECT * FROM dbo.[{Escape(table)}]");
