@@ -45,8 +45,9 @@ internal static class DevSnapshotCommand
             await session.SetSelectedPhotosAsync(photoSelection.PhotoIds);
 
             Console.WriteLine("Resolving forum and editorial assets.");
+            var referencedSelection = await blobs.GetForumAndEditorialBlobsAsync(session);
             var manifest = photoSelection.Blobs
-                .Concat(await blobs.GetForumAndEditorialBlobsAsync(session))
+                .Concat(referencedSelection.Blobs)
                 .DistinctBy(blob => $"{blob.Container}/{blob.Name}", StringComparer.OrdinalIgnoreCase)
                 .OrderBy(blob => blob.Container, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(blob => blob.Name, StringComparer.OrdinalIgnoreCase)
@@ -56,6 +57,12 @@ internal static class DevSnapshotCommand
             Console.WriteLine("Resetting and copying curated SQL rows.");
             await session.ResetTargetAsync();
             await session.CopyRowsAsync();
+            if (referencedSelection.MissingForumBlobs.Count > 0)
+            {
+                Console.WriteLine($"Removing {referencedSelection.MissingForumBlobs.Count} broken forum attachment references from the target.");
+                await session.RemoveMissingForumBlobReferencesAsync(referencedSelection.MissingForumBlobs);
+            }
+
             Console.WriteLine("Resetting and copying curated blobs.");
             await blobs.ResetTargetAndCopyAsync(manifest);
             Console.WriteLine("Seeding synthetic dev accounts.");
