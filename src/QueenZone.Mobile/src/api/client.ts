@@ -1,6 +1,6 @@
 import { apiV1Url } from '../config';
 import { reportApiFailure } from '../config/sentry';
-import { ApiError, isExpoFetchCanceled, isLostConnectionMessage, isOfflineFailure, isTimeoutFailure } from './errors';
+import { ApiError, isExpoFetchCanceled, isOfflineFailure, isTimeoutFailure } from './errors';
 import {
   classifyXhrFailure,
   interpretMultipartXhrResult,
