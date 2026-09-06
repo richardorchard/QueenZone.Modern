@@ -69,15 +69,17 @@ jobs:
             const matches = artifacts.filter((artifact) =>
               artifact.name.startsWith(PREFIX),
             );
-            const stale = matches.filter(
+            const expired = matches.filter((artifact) => artifact.expired === true);
+            const active = matches.filter((artifact) => artifact.expired !== true);
+            const stale = active.filter(
               (artifact) => new Date(artifact.created_at) < cutoff,
             );
-            const fresh = matches.filter(
+            const fresh = active.filter(
               (artifact) => new Date(artifact.created_at) >= cutoff,
             );
 
             core.info(
-              `Found ${matches.length} ${PREFIX}* artifact(s): ${stale.length} older than 8h, ${fresh.length} still fresh.`,
+              `Found ${matches.length} ${PREFIX}* artifact(s): ${stale.length} older than 8h, ${fresh.length} still fresh, ${expired.length} already expired (GitHub 1-day backstop).`,
             );
 
             for (const artifact of fresh) {
