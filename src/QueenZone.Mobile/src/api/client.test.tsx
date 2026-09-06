@@ -1,4 +1,11 @@
-import { ApiError, classifyFetchFailure, fetchJson, sendJson, sendMultipart } from './client';
+import {
+  ApiError,
+  classifyFetchFailure,
+  configureAuthenticatedGetRecovery,
+  fetchJson,
+  sendJson,
+  sendMultipart,
+} from './client';
 import { jsonResponse } from '../test/fixtures';
 
 jest.mock('../config', () => ({
@@ -8,6 +15,7 @@ jest.mock('../config', () => ({
 const fetchMock = jest.fn<Promise<Response>, [RequestInfo | URL, RequestInit?]>();
 
 beforeEach(() => {
+  configureAuthenticatedGetRecovery(null);
   fetchMock.mockReset();
   global.fetch = fetchMock as unknown as typeof fetch;
 });
@@ -36,6 +44,32 @@ describe('fetchJson', () => {
   it('returns undefined for 204', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(null, 204));
     await expect(fetchJson('/health')).resolves.toBeUndefined();
+  });
+
+  it('refreshes and replays an authenticated GET once after 401', async () => {
+    const recover = jest.fn(async () => 'fresh-token');
+    configureAuthenticatedGetRecovery(recover);
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({}, 401))
+      .mockResolvedValueOnce(jsonResponse({ ok: true }));
+
+    await expect(fetchJson('/me/messages', { accessToken: 'expired-token' })).resolves.toEqual({ ok: true });
+
+    expect(recover).toHaveBeenCalledTimes(1);
+    expect(recover).toHaveBeenCalledWith('expired-token');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[1]?.[1]?.headers).toMatchObject({ Authorization: 'Bearer fresh-token' });
+  });
+
+  it('does not loop when authenticated GET recovery cannot replace the token', async () => {
+    const recover = jest.fn(async () => 'expired-token');
+    configureAuthenticatedGetRecovery(recover);
+    fetchMock.mockResolvedValueOnce(jsonResponse({}, 401));
+
+    await expect(fetchJson('/me/messages', { accessToken: 'expired-token' })).rejects.toMatchObject({ status: 401 });
+
+    expect(recover).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it('prefers RFC 7807 detail over title', async () => {
