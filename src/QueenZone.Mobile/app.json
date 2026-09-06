@@ -102,8 +102,8 @@
               "minHeight": "110dp",
               "targetCellWidth": 3,
               "targetCellHeight": 2,
+              "previewImage": "./assets/android-widget-preview.png",
               "resizeMode": "horizontal|vertical",
-              "widgetFeatures": "reconfigurable",
               "updatePeriodMillis": 14400000
             }
           ]
