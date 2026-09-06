@@ -4300,6 +4300,13 @@ select.qz-input {
   border-radius: var(--radius-xs);
 }
 
+.archive-pagination [aria-current="page"] {
+  color: var(--qz-black);
+  background: var(--qz-gold);
+  border-color: var(--qz-gold);
+  font-weight: 600;
+}
+
 .qz-photo-cat-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
