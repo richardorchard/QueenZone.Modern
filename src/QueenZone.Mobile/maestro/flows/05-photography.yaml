@@ -18,9 +18,12 @@ appId: org.queenzone.mobile
     visible:
       id: photo-viewer-screen
     timeout: 20000
+# PhotoViewer hides the tab bar (navigation/visibility.ts) — leave via its
+# own close control, same pattern as 08-profile-signed-out.yaml's profile-back.
+# Close pops back to the category, not the tab root.
 - tapOn:
-    id: tab-photos
+    id: photo-viewer-close
 - extendedWaitUntil:
     visible:
-      id: photos-screen
+      id: photo-category-screen
     timeout: 15000

@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { RefreshControl } from 'react-native';
 import { fireEvent, screen, userEvent, waitFor, within } from '@testing-library/react-native';
 import {
@@ -283,6 +284,48 @@ describe('ThreadScreen watch control', () => {
     await user.press(screen.getByRole('radio', { name: 'A Night at the Opera' }));
     await user.press(screen.getByRole('button', { name: 'Vote' }));
     await waitFor(() => expect(votePoll).toHaveBeenCalledWith(1002, ['opt-a'], 'tok'));
+  });
+});
+
+function lastHeaderOptions(navigation: ReturnType<typeof fakeNavigation>) {
+  const calls = navigation.setOptions.mock.calls;
+  expect(calls.length).toBeGreaterThan(0);
+  return calls[calls.length - 1]?.[0] as { headerLeft?: () => ReactNode; title?: string };
+}
+
+describe('ThreadScreen header back control', () => {
+  beforeEach(() => {
+    mockSession.isSignedIn = false;
+    mockSession.accessToken = null;
+    mockNetworkTopic();
+    fetchPoll.mockResolvedValue({} as never);
+    fetchWatch.mockResolvedValue({ watching: false });
+  });
+
+  it('pops the forum stack when back has somewhere to go', async () => {
+    const navigation = fakeNavigation();
+    navigation.canGoBack.mockReturnValue(true);
+    renderThread(navigation);
+    await waitFor(() => expect(screen.getByTestId(testIds.forumThreadScreen)).toBeOnTheScreen());
+
+    const user = userEvent.setup();
+    renderWithProviders(<>{lastHeaderOptions(navigation).headerLeft?.()}</>, { navigation: false });
+    await user.press(screen.getByTestId(testIds.forumThreadBack));
+    expect(navigation.goBack).toHaveBeenCalledTimes(1);
+    expect(navigation.navigate).not.toHaveBeenCalled();
+  });
+
+  it('falls back to ForumIndex when the stack has no history', async () => {
+    const navigation = fakeNavigation();
+    navigation.canGoBack.mockReturnValue(false);
+    renderThread(navigation);
+    await waitFor(() => expect(screen.getByTestId(testIds.forumThreadScreen)).toBeOnTheScreen());
+
+    const user = userEvent.setup();
+    renderWithProviders(<>{lastHeaderOptions(navigation).headerLeft?.()}</>, { navigation: false });
+    await user.press(screen.getByTestId(testIds.forumThreadBack));
+    expect(navigation.goBack).not.toHaveBeenCalled();
+    expect(navigation.navigate).toHaveBeenCalledWith('ForumIndex');
   });
 });
 

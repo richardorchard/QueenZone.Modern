@@ -171,7 +171,12 @@ export function PhotoViewerScreen({ navigation, route }: Props) {
               justifyContent: 'space-between',
             }}
           >
-            <IconButton icon={X} accessibilityLabel="Close" onPress={() => navigation.goBack()} />
+            <IconButton
+              icon={X}
+              accessibilityLabel="Close"
+              testID={testIds.photoViewerClose}
+              onPress={() => navigation.goBack()}
+            />
             <Text style={[type.eyebrow, { color: c.textMuted }]}>
               {photoCounterLabel(photo.index, photo.count)}
             </Text>

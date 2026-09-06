@@ -9,6 +9,8 @@ import {
   type ForumPost,
 } from '../../api';
 import { usePagedContent } from '../../hooks/usePagedContent';
+import { HeaderBackButton } from '../../navigation/headerButtons';
+import { goBackOrFallback } from '../../navigation/nestedTab';
 import type { ForumStackParamList } from '../../navigation/types';
 import { resolvePushMemberId } from '../../notifications/pushMemberId';
 import { type OfflineQueueItem, useOfflineQueue } from '../../offlineQueue';
@@ -72,7 +74,15 @@ export function ThreadScreen({ navigation, route }: Props) {
   );
 
   useLayoutEffect(() => {
-    navigation.setOptions({ title: topic?.title ?? title ?? 'Thread' });
+    navigation.setOptions({
+      title: topic?.title ?? title ?? 'Thread',
+      headerLeft: () => (
+        <HeaderBackButton
+          testID={testIds.forumThreadBack}
+          onPress={() => goBackOrFallback(navigation, 'ForumIndex')}
+        />
+      ),
+    });
   }, [navigation, topic?.title, title]);
 
   const retry = useCallback(() => {
