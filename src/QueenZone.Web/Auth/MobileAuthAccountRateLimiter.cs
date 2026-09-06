@@ -4,7 +4,7 @@ using Microsoft.Extensions.Options;
 namespace QueenZone.Web;
 
 /// <summary>
-/// Process-local per-member cap for mobile sign-in completion and refresh-token grants.
+/// Process-local per-member cap for mobile sign-in completion, password grants, and refresh-token grants.
 /// Complements the IP policy on <c>/api/v1/auth</c>; does not log tokens or secrets.
 /// </summary>
 public sealed class MobileAuthAccountRateLimiter(

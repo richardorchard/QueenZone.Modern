@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using QueenZone.Data;
+using QueenZone.Data.Entities;
 using QueenZone.Storage;
 
 namespace QueenZone.Web.Tests;
@@ -448,6 +449,144 @@ public sealed class MobileAuthServiceTests
     }
 
     [Fact]
+    public async Task ExchangePasswordGrant_IssuesTokens_ForValidCredentials()
+    {
+        var members = new InMemoryMemberAccountRepository();
+        await SeedPasswordAccountAsync(members, "reviewer@example.com", "S3curePass!");
+        var service = CreateService(members);
+
+        var tokens = await service.ExchangePasswordGrantAsync(
+            MobileAuthOptions.DefaultClientId,
+            "reviewer@example.com",
+            "S3curePass!",
+            CancellationToken.None);
+
+        Assert.True(tokens.Success);
+        Assert.False(string.IsNullOrWhiteSpace(tokens.AccessToken));
+        Assert.False(string.IsNullOrWhiteSpace(tokens.RefreshToken));
+        Assert.Equal(15 * 60, tokens.ExpiresIn);
+        Assert.Equal(StatusCodes.Status200OK, tokens.StatusCode);
+    }
+
+    [Fact]
+    public async Task ExchangePasswordGrant_RejectsWrongPassword_WithoutAccountEnumeration()
+    {
+        var members = new InMemoryMemberAccountRepository();
+        await SeedPasswordAccountAsync(members, "reviewer@example.com", "S3curePass!");
+        var service = CreateService(members);
+
+        var wrong = await service.ExchangePasswordGrantAsync(
+            MobileAuthOptions.DefaultClientId,
+            "reviewer@example.com",
+            "not-the-password",
+            CancellationToken.None);
+        var unknown = await service.ExchangePasswordGrantAsync(
+            MobileAuthOptions.DefaultClientId,
+            "nobody@example.com",
+            "S3curePass!",
+            CancellationToken.None);
+
+        Assert.False(wrong.Success);
+        Assert.False(unknown.Success);
+        Assert.Equal("invalid_grant", wrong.Error);
+        Assert.Equal("invalid_grant", unknown.Error);
+        Assert.Equal(MobileAuthService.PasswordGrantInvalidDescription, wrong.ErrorDescription);
+        Assert.Equal(unknown.ErrorDescription, wrong.ErrorDescription);
+        Assert.DoesNotContain("reviewer@example.com", wrong.ErrorDescription ?? string.Empty, StringComparison.Ordinal);
+        Assert.DoesNotContain("nobody@example.com", unknown.ErrorDescription ?? string.Empty, StringComparison.Ordinal);
+        Assert.Null(wrong.AccessToken);
+        Assert.Null(unknown.RefreshToken);
+    }
+
+    [Fact]
+    public async Task ExchangePasswordGrant_RejectsUnknownClientAndMissingFields()
+    {
+        var members = new InMemoryMemberAccountRepository();
+        await SeedPasswordAccountAsync(members, "reviewer@example.com", "S3curePass!");
+        var service = CreateService(members);
+
+        var unknownClient = await service.ExchangePasswordGrantAsync(
+            "not-the-mobile-client",
+            "reviewer@example.com",
+            "S3curePass!",
+            CancellationToken.None);
+        var missingPassword = await service.ExchangePasswordGrantAsync(
+            MobileAuthOptions.DefaultClientId,
+            "reviewer@example.com",
+            "   ",
+            CancellationToken.None);
+
+        Assert.False(unknownClient.Success);
+        Assert.False(missingPassword.Success);
+        Assert.Equal("invalid_grant", unknownClient.Error);
+        Assert.Equal("invalid_grant", missingPassword.Error);
+        Assert.Equal(MobileAuthService.PasswordGrantInvalidDescription, unknownClient.ErrorDescription);
+        Assert.Equal(MobileAuthService.PasswordGrantInvalidDescription, missingPassword.ErrorDescription);
+    }
+
+    [Fact]
+    public async Task ExchangePasswordGrant_RejectsSuspendedAccount()
+    {
+        var members = new InMemoryMemberAccountRepository();
+        var registered = await SeedPasswordAccountAsync(members, "suspended@example.com", "S3curePass!");
+        registered.IsSuspended = true;
+        var service = CreateService(members);
+
+        var tokens = await service.ExchangePasswordGrantAsync(
+            MobileAuthOptions.DefaultClientId,
+            "suspended@example.com",
+            "S3curePass!",
+            CancellationToken.None);
+
+        Assert.False(tokens.Success);
+        Assert.Equal("invalid_grant", tokens.Error);
+        Assert.Equal(MemberAccountService.SuspendedSignInError, tokens.ErrorDescription);
+        Assert.Null(tokens.AccessToken);
+    }
+
+    [Fact]
+    public async Task ExchangePasswordGrant_FailsClosed_WhenProductionSigningKeyMissing()
+    {
+        var result = await CreateService(environmentName: "Production").ExchangePasswordGrantAsync(
+            MobileAuthOptions.DefaultClientId,
+            "reviewer@example.com",
+            "S3curePass!",
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal("temporarily_unavailable", result.Error);
+        Assert.Null(result.AccessToken);
+    }
+
+    [Fact]
+    public async Task ExchangePasswordGrant_RateLimitsRepeatedSignInForSameAccount()
+    {
+        var members = new InMemoryMemberAccountRepository();
+        await SeedPasswordAccountAsync(members, "rate@example.com", "S3curePass!");
+        var service = CreateService(
+            members,
+            authLimits: new AuthRateLimitingOptions { AccountPermitLimit = 1, AccountWindowMinutes = 60 });
+
+        var first = await service.ExchangePasswordGrantAsync(
+            MobileAuthOptions.DefaultClientId,
+            "rate@example.com",
+            "S3curePass!",
+            CancellationToken.None);
+        var second = await service.ExchangePasswordGrantAsync(
+            MobileAuthOptions.DefaultClientId,
+            "rate@example.com",
+            "S3curePass!",
+            CancellationToken.None);
+
+        Assert.True(first.Success);
+        Assert.False(second.Success);
+        Assert.Equal("temporarily_unavailable", second.Error);
+        Assert.Equal(StatusCodes.Status429TooManyRequests, second.StatusCode);
+        Assert.Equal(MobileAuthAccountRateLimiter.ClientMessage, second.ErrorDescription);
+        Assert.DoesNotContain("rate@example.com", second.ErrorDescription ?? string.Empty, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task CompleteExternalLogin_RateLimitsRepeatedSignInForSameAccount()
     {
         var logger = new RecordingAuthLogger();
@@ -554,6 +693,27 @@ public sealed class MobileAuthServiceTests
             CancellationToken.None);
         Assert.True(tokens.Success);
         return (service, tokens.RefreshToken!);
+    }
+
+    private static async Task<MemberAccount> SeedPasswordAccountAsync(
+        InMemoryMemberAccountRepository members,
+        string email,
+        string password)
+    {
+        var clock = TimeProvider.System;
+        var accounts = new MemberAccountService(
+            members,
+            new InMemoryLegacyMemberLookupRepository(new Dictionary<string, LegacyMemberMatch>()),
+            new AzureBlobUploadService(new InMemoryBlobStorageBackend(), Options.Create(new BlobUploadOptions())),
+            new MemberUploadQuotaService(
+                new Microsoft.Extensions.Caching.Memory.MemoryCache(
+                    new Microsoft.Extensions.Caching.Memory.MemoryCacheOptions()),
+                clock,
+                Options.Create(new UploadQuotaOptions { Enabled = false })));
+        var registered = await accounts.RegisterAsync(email, password, "Reviewer");
+        Assert.True(registered.Succeeded, registered.Error);
+        Assert.NotNull(registered.Account);
+        return registered.Account;
     }
 
     private static MobileAuthService CreateService(
