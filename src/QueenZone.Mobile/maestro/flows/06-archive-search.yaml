@@ -28,3 +28,11 @@ appId: org.queenzone.mobile
     visible:
       id: news-story-screen
     timeout: 20000
+# Story hides the tab bar. Leave through its header before 07-forum tries to
+# switch tabs, matching the other story flows fixed by #1374.
+- tapOn:
+    id: news-story-back
+- extendedWaitUntil:
+    visible:
+      id: search-screen
+    timeout: 15000

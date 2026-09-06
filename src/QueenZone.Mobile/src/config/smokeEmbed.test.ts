@@ -13,6 +13,8 @@ const smokeEmbed = require('../../plugins/smokeEmbed.cjs') as {
   applyAndroidBundleInDebug: (contents: string) => string;
   applyAndroidReleaseDebugSigning: (contents: string) => string;
   applyAndroidManifestCleartextTraffic: (manifest: unknown) => unknown;
+  applyAndroidSmokeGradleProperties: (properties: unknown[]) => unknown[];
+  ANDROID_GRADLE_JVM_ARGS: string;
   DEV_CLIENT_PACKAGES: string[];
   EMBED_FLAG: string;
 };
@@ -90,6 +92,28 @@ describe('applyAndroidManifestCleartextTraffic', () => {
   it('is a no-op when the manifest has no application element', () => {
     const manifest = { manifest: {} };
     assert.deepEqual(smokeEmbed.applyAndroidManifestCleartextTraffic(manifest), manifest);
+  });
+});
+
+describe('applyAndroidSmokeGradleProperties', () => {
+  it('replaces Expo\'s default Gradle heap for Release smoke packaging', () => {
+    const properties = [
+      { type: 'comment', value: 'Project-wide Gradle settings.' },
+      { type: 'property', key: 'org.gradle.jvmargs', value: '-Xmx2048m -XX:MaxMetaspaceSize=512m' },
+      { type: 'property', key: 'android.useAndroidX', value: 'true' },
+    ];
+
+    const patched = smokeEmbed.applyAndroidSmokeGradleProperties(properties) as {
+      type: string;
+      key?: string;
+      value: string;
+    }[];
+    const jvmArgs = patched.filter((item) => item.key === 'org.gradle.jvmargs');
+
+    assert.equal(jvmArgs.length, 1);
+    assert.equal(jvmArgs[0]?.value, smokeEmbed.ANDROID_GRADLE_JVM_ARGS);
+    assert.match(jvmArgs[0]?.value ?? '', /-Xmx6g/);
+    assert.ok(patched.some((item) => item.key === 'android.useAndroidX'));
   });
 });
 

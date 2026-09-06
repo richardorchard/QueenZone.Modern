@@ -439,8 +439,7 @@ elif [ "$suite" = "journeys" ]; then
   echo "Running on-demand Maestro journeys (#1071)."
 fi
 
-echo "Running Maestro ($flow). Flows are not retried."
-set +e
+echo "Running Maestro ($flow). App flows are not retried."
 maestro_args=(
   test "$flow"
   --format junit
@@ -455,9 +454,43 @@ if [ "$suite" = "journeys" ]; then
     -e "ATTACH_TOPIC_ID=${ATTACH_TOPIC_ID}"
   )
 fi
-maestro "${maestro_args[@]}"
+
+maestro_console_log="$results_dir/maestro-console.log"
+run_maestro_once() {
+  maestro "${maestro_args[@]}" 2>&1 | tee -a "$maestro_console_log"
+  return "${PIPESTATUS[0]}"
+}
+
+set +e
+run_maestro_once
 maestro_status=$?
 set -e
+
+# Hosted macOS occasionally exits Maestro's xcodebuild driver process before
+# XCTest starts listening. Run 34061996744 failed this way, while the same
+# Maestro/Xcode/Simulator combination started successfully hours earlier. A
+# missing JUnit file proves no app flow began. Reboot the Simulator and retry
+# only that infrastructure startup; assertion and in-flow failures stay
+# single-attempt.
+if [ "$platform" = "ios" ] \
+  && [ "$maestro_status" -ne 0 ] \
+  && [ ! -s "$results_dir/junit.xml" ] \
+  && grep -q "iOS driver not ready in time" "$maestro_console_log"; then
+  echo "Maestro iOS driver failed before any flow began; rebooting the Simulator and retrying driver startup once."
+  if [ -d "$results_dir/debug" ]; then
+    mv "$results_dir/debug" "$results_dir/debug-driver-startup-first"
+  fi
+  retry_udid="${IOS_SIM_UDID:-$(xcrun simctl list devices booted | grep -oE '[0-9A-F-]{36}' | head -n 1)}"
+  if [ -n "$retry_udid" ]; then
+    xcrun simctl shutdown "$retry_udid" || true
+    xcrun simctl boot "$retry_udid"
+    xcrun simctl bootstatus "$retry_udid" -b
+  fi
+  set +e
+  run_maestro_once
+  maestro_status=$?
+  set -e
+fi
 
 if [ "$maestro_status" -ne 0 ]; then
   echo "Maestro failed with status $maestro_status" >&2
