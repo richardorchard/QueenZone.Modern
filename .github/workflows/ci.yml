@@ -880,6 +880,9 @@ jobs:
       needs.changes.outputs.migrations == 'true' &&
       github.event_name == 'pull_request' &&
       github.event.pull_request.head.repo.full_name == github.repository
+    # GitHub Environment "dev" is the legacy name gating the shared
+    # legacy/production DB Bitwarden mapping -- not the actual dev App
+    # Service environment.
     environment: dev
     timeout-minutes: 45
 

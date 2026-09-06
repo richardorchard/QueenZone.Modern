@@ -246,6 +246,8 @@ GitHub Actions workflow `.github/workflows/ci.yml` blocks merge when these fail:
 
 PRs that only change `src/QueenZone.Mobile/` (or docs/infra/design) skip the .NET build, tests, coverage, smoke, e2e, and the App Service deploy. Mixed web + mobile PRs run both. See `scripts/classify-pipeline-changes.sh` and `docs/architecture/testing-policy.md`.
 
+There are two separate deploy workflows, not one: `deploy-dev.yml` auto-deploys every merge to `main` against the `dev` environment (App Service `queenzone-devbox`, `dev.queenzone.org`); `deploy.yml` deploys **production** and only triggers on a `v*` tag push (or manual dispatch) — see [epic #1264](https://github.com/richardorchard/QueenZone.Modern/issues/1264) Phase 4/5. Promote a change to production by tagging the already-merged, already-dev-verified commit: `git tag vX.Y.Z <sha> && git push --tags`. Note the production App Service is still named `queenzone-dev` (pre-Phase 7 legacy naming, [#1272](https://github.com/richardorchard/QueenZone.Modern/issues/1272)) — don't confuse it with the `dev` environment's `queenzone-devbox`. See `docs/architecture/azure-hosting-plan.md` ("Environments") for the full picture.
+
 Coverage exclusions are configured in `coverlet.runsettings`. EF Core files under `**/Migrations/**/*.cs` are excluded from coverage metrics.
 
 The changed-line gate compares `git diff origin/main...HEAD` for `*.cs` files. Large new modules (services, repositories, workers) usually need targeted unit or integration tests, often with fakes or SQLite/in-memory EF, or the gate will fail.

@@ -33,6 +33,9 @@ jobs:
     name: Resync mirror from live DB
     if: inputs.force_resync
     runs-on: [self-hosted, Windows]
+    # GitHub Environment "dev" is the legacy name gating the shared
+    # legacy/production DB Bitwarden mapping -- not the actual dev App
+    # Service environment.
     environment: dev
     timeout-minutes: 15
 
