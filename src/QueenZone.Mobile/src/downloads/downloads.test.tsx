@@ -286,7 +286,7 @@ describe('download manager', () => {
       downloadImpl: async ({ destUri, onProgress }) => {
         onProgress?.(256, 1024);
         await held;
-        host.files.set(destUri, new Uint8Array([1, 2, 3, 4]));
+        host.files.set(destUri, new Uint8Array(1024));
       },
     });
     setDownloadFileHostForTests(host);

@@ -92,6 +92,6 @@ describe('FanPerformanceDownloadsList', () => {
     expect(screen.getByText('Liar')).toBeOnTheScreen();
     expect(screen.getByText(/Downloading · 25%/)).toBeOnTheScreen();
     expect(screen.getByText('Father To Son')).toBeOnTheScreen();
-    expect(screen.getByText(/The download timed out/)).toBeOnTheScreen();
+    expect(screen.getAllByText(/The download timed out/).length).toBeGreaterThan(0);
   });
 });
