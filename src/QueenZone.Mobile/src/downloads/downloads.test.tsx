@@ -19,6 +19,8 @@ import {
 } from './manager';
 import {
   DOWNLOAD_EMPTY_PART_MESSAGE,
+  DOWNLOAD_FAILED_MESSAGE,
+  DOWNLOAD_INCOMPLETE_MESSAGE,
   DOWNLOAD_PART_MISSING_MESSAGE,
   DOWNLOAD_RATE_LIMITED_MESSAGE,
   DOWNLOAD_TOO_SMALL_MESSAGE,
@@ -186,6 +188,7 @@ describe('resolveAudioSource', () => {
 describe('download manager', () => {
   beforeEach(resetDownloads);
   afterEach(() => {
+    jest.restoreAllMocks();
     setDownloadFileHostForTests(null);
     setDownloadManifestStorageForTests(null);
     setDownloadProbeForTests(null);
@@ -217,8 +220,10 @@ describe('download manager', () => {
     const host = createMemoryDownloadHost({
       downloadImpl: async ({ destUri }) => {
         host.files.set(destUri, new TextEncoder().encode('{"title":"Unauthorized"}'));
+        return { uri: destUri };
       },
     });
+    const promote = jest.spyOn(host, 'promote');
     setDownloadFileHostForTests(host);
     setDownloadProbeForTests(async () => ({
       status: 206,
@@ -228,9 +233,40 @@ describe('download manager', () => {
 
     enqueueDownload(track, memberId, async () => 'member-token');
     await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(promote).not.toHaveBeenCalled();
     expect(await getCompletedDownload(memberId, '187')).toBeNull();
     expect(host.exists('file:///documents/fan-performances/187')).toBe(false);
     expect(getDownloadUiSnapshot(memberId, '187')?.status).toBe('failed');
+    expect(getDownloadUiSnapshot(memberId, '187')?.status).not.toBe('downloaded');
+  });
+
+  it('rejects an HTML error page saved as a tiny complete download', async () => {
+    const host = createMemoryDownloadHost({
+      downloadImpl: async ({ destUri, onProgress }) => {
+        const body = new TextEncoder().encode('<html><title>Too Many Requests</title></html>');
+        onProgress?.(body.byteLength, body.byteLength);
+        host.files.set(destUri, body);
+        return { uri: destUri };
+      },
+    });
+    const promote = jest.spyOn(host, 'promote');
+    setDownloadFileHostForTests(host);
+    setDownloadProbeForTests(async () => ({
+      status: 0,
+      sourceRevision: null,
+      byteSize: null,
+    }));
+
+    enqueueDownload(track, memberId, async () => 'member-token');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(promote).not.toHaveBeenCalled();
+    expect(await getCompletedDownload(memberId, '187')).toBeNull();
+    expect(host.exists('file:///documents/fan-performances/187')).toBe(false);
+    expect(getDownloadUiSnapshot(memberId, '187')).toMatchObject({
+      status: 'failed',
+      error: DOWNLOAD_TOO_SMALL_MESSAGE,
+    });
+    expect(getDownloadUiSnapshot(memberId, '187')?.status).not.toBe('downloaded');
   });
 
   it('deletes the partial and does not complete after a failed download', async () => {
@@ -445,6 +481,7 @@ describe('download manager', () => {
     const host = createMemoryDownloadHost({
       downloadImpl: async () => ({ uri: 'file:///documents/fan-performances/187.part' }),
     });
+    const promote = jest.spyOn(host, 'promote');
     setDownloadFileHostForTests(host);
     setDownloadProbeForTests(async () => ({
       status: 206,
@@ -455,12 +492,14 @@ describe('download manager', () => {
     enqueueDownload(track, memberId, async () => 'member-token');
     await new Promise((resolve) => setTimeout(resolve, 0));
 
+    expect(promote).not.toHaveBeenCalled();
     expect(await getCompletedDownload(memberId, '187')).toBeNull();
     expect(host.exists('file:///documents/fan-performances/187')).toBe(false);
     expect(getDownloadUiSnapshot(memberId, '187')).toMatchObject({
       status: 'failed',
       error: DOWNLOAD_PART_MISSING_MESSAGE,
     });
+    expect(getDownloadUiSnapshot(memberId, '187')?.error).not.toBe(DOWNLOAD_FAILED_MESSAGE);
     expect(Sentry.addBreadcrumb).toHaveBeenCalledWith(
       expect.objectContaining({
         category: 'download',
@@ -480,6 +519,7 @@ describe('download manager', () => {
         return { uri: destUri };
       },
     });
+    const promote = jest.spyOn(host, 'promote');
     setDownloadFileHostForTests(host);
     setDownloadProbeForTests(async () => ({
       status: 206,
@@ -490,12 +530,15 @@ describe('download manager', () => {
     enqueueDownload(track, memberId, async () => 'member-token');
     await new Promise((resolve) => setTimeout(resolve, 0));
 
+    expect(promote).not.toHaveBeenCalled();
     expect(await getCompletedDownload(memberId, '187')).toBeNull();
     expect(host.exists('file:///documents/fan-performances/187.part')).toBe(false);
     expect(getDownloadUiSnapshot(memberId, '187')).toMatchObject({
       status: 'failed',
       error: DOWNLOAD_EMPTY_PART_MESSAGE,
     });
+    expect(getDownloadUiSnapshot(memberId, '187')?.error).not.toBe(DOWNLOAD_FAILED_MESSAGE);
+    expect(getDownloadUiSnapshot(memberId, '187')?.status).not.toBe('downloaded');
   });
 
   it('prefers the returned task File URI when dest .part was not written', async () => {
@@ -529,6 +572,7 @@ describe('download manager', () => {
         return { uri: destUri };
       },
     });
+    const promote = jest.spyOn(host, 'promote');
     setDownloadFileHostForTests(host);
     setDownloadProbeForTests(async () => ({
       status: 0,
@@ -539,12 +583,14 @@ describe('download manager', () => {
     enqueueDownload(track, memberId, async () => 'member-token');
     await new Promise((resolve) => setTimeout(resolve, 0));
 
+    expect(promote).not.toHaveBeenCalled();
     expect(await getCompletedDownload(memberId, '187')).toBeNull();
     expect(host.exists('file:///documents/fan-performances/187')).toBe(false);
     expect(getDownloadUiSnapshot(memberId, '187')).toMatchObject({
       status: 'failed',
       error: DOWNLOAD_TOO_SMALL_MESSAGE,
     });
+    expect(getDownloadUiSnapshot(memberId, '187')?.status).not.toBe('downloaded');
   });
 
   it('does not let a tiny progress total overwrite a larger probe Content-Length', async () => {
@@ -605,6 +651,8 @@ describe('download manager', () => {
       status: 'failed',
       error: DOWNLOAD_PART_MISSING_MESSAGE,
     });
+    expect(getDownloadUiSnapshot(memberId, '187')?.error).not.toBe(DOWNLOAD_FAILED_MESSAGE);
+    expect(await getCompletedDownload(memberId, '187')).toBeNull();
   });
 
   it('keeps rate-limit copy on a 5-minute window', async () => {
@@ -630,6 +678,7 @@ describe('download manager', () => {
         return { uri: destUri };
       },
     });
+    const promote = jest.spyOn(host, 'promote');
     setDownloadFileHostForTests(host);
     setDownloadProbeForTests(async () => ({
       status: 206,
@@ -640,10 +689,14 @@ describe('download manager', () => {
     enqueueDownload(track, memberId, async () => 'member-token');
     await new Promise((resolve) => setTimeout(resolve, 0));
 
+    expect(promote).not.toHaveBeenCalled();
+    expect(await getCompletedDownload(memberId, '187')).toBeNull();
+    expect(host.exists('file:///documents/fan-performances/187')).toBe(false);
     expect(getDownloadUiSnapshot(memberId, '187')).toMatchObject({
       status: 'failed',
-      error: 'The download did not finish. Try again.',
+      error: DOWNLOAD_INCOMPLETE_MESSAGE,
     });
+    expect(getDownloadUiSnapshot(memberId, '187')?.status).not.toBe('downloaded');
   });
 
   it('native host prefers the downloadAsync File URI and refuses a missing .part move', async () => {
