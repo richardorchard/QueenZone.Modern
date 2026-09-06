@@ -71,7 +71,13 @@ check_path() {
     rm -f "$body_file"
     return 1
   fi
-  if [ "$path" = "/health" ] || [ "$path" = "/health/ready" ] || [ "$path" = "$WARMUP_PATH" ]; then
+  if [ "$path" = "/health/ready" ]; then
+    if ! grep -q '"status":"Healthy"' "$body_file"; then
+      echo "  ✗ $path → 200 but body missing \"status\":\"Healthy\""
+      rm -f "$body_file"
+      return 1
+    fi
+  elif [ "$path" = "/health" ] || [ "$path" = "$WARMUP_PATH" ]; then
     if ! grep -q '"status":"ok"' "$body_file"; then
       echo "  ✗ $path → 200 but body missing \"status\":\"ok\""
       rm -f "$body_file"
