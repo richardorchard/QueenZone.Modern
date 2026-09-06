@@ -1,14 +1,20 @@
+using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Mvc;
 using QueenZone.Data;
 using QueenZone.Web.Search;
 
 namespace QueenZone.Web.Pages.Admin.Articles;
 
+// See DetailModel for why antiforgery validation is done manually here: the automatic
+// Razor Pages filter returns a bare 400 on failure with no way for the admin to retry
+// gracefully, whereas a manual check can redirect back to the review page with a message.
+[IgnoreAntiforgeryToken]
 public sealed class ActionModel(
     IArticleSubmissionRepository articleSubmissionRepository,
     IArticleRepository articleRepository,
     PublicQueryCacheService publicQueryCache,
     ISearchIndexService searchIndexService,
+    IAntiforgery antiforgery,
     ILogger<ActionModel> logger) : AdminArticlesPageModel
 {
     [BindProperty]
@@ -28,6 +34,18 @@ public sealed class ActionModel(
 
     public async Task<IActionResult> OnPostAsync(Guid id, string submitAction, CancellationToken cancellationToken)
     {
+        try
+        {
+            await antiforgery.ValidateRequestAsync(HttpContext);
+        }
+        catch (AntiforgeryValidationException ex)
+        {
+            logger.LogWarning(ex, "Articles action POST rejected: {Reason}", ex.Message);
+            TempData["ArticleMessage"] = "This action could not be verified. Reload the page and try again.";
+            TempData["ArticleMessageKind"] = "error";
+            return Redirect($"/admin/articles/{id}");
+        }
+
         return submitAction switch
         {
             "approve" => await ApplyAsync(id, ArticleSubmissionStatus.ApprovedForPublishing,

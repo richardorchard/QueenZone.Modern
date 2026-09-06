@@ -2,12 +2,18 @@ using System.Diagnostics;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using QueenZone.Web;
 
 namespace QueenZone.Web.Tests;
 
 public sealed class RequestLogScopeMiddlewareTests
 {
+    private static IOptions<AdminOptions> AdminOptionsAllowing(params string[] emails) =>
+        Options.Create(new AdminOptions { AllowedEmails = emails });
+
+    private static readonly IOptions<AdminOptions> NoAdmins = AdminOptionsAllowing();
+
     [Fact]
     public async Task Member_principal_scope_has_trace_id_and_member_id_without_pii()
     {
@@ -32,7 +38,8 @@ public sealed class RequestLogScopeMiddlewareTests
                 invoked = true;
                 return Task.CompletedTask;
             },
-            logger);
+            logger,
+            NoAdmins);
 
         await middleware.InvokeAsync(context);
 
@@ -43,6 +50,7 @@ public sealed class RequestLogScopeMiddlewareTests
         Assert.False(scope.ContainsKey("Email"));
         Assert.False(scope.ContainsKey("Name"));
         Assert.False(scope.ContainsKey("DisplayName"));
+        Assert.False(scope.ContainsKey("AdminEmail"));
         Assert.DoesNotContain(scope.Values, value => value is string text
             && (text.Contains("member@example.com", StringComparison.Ordinal)
                 || text.Contains("Display Name", StringComparison.Ordinal)));
@@ -57,7 +65,7 @@ public sealed class RequestLogScopeMiddlewareTests
             TraceIdentifier = "anon-trace",
         };
         context.Request.Path = "/";
-        var middleware = new RequestLogScopeMiddleware(_ => Task.CompletedTask, logger);
+        var middleware = new RequestLogScopeMiddleware(_ => Task.CompletedTask, logger, NoAdmins);
 
         await middleware.InvokeAsync(context);
 
@@ -68,7 +76,39 @@ public sealed class RequestLogScopeMiddlewareTests
     }
 
     [Fact]
-    public async Task Entra_admin_without_member_guid_has_trace_id_only()
+    public async Task Entra_user_not_in_admin_allowlist_has_trace_id_only()
+    {
+        var logger = new RecordingScopeLogger();
+        var context = new DefaultHttpContext
+        {
+            TraceIdentifier = "admin-trace",
+            User = new ClaimsPrincipal(new ClaimsIdentity(
+                [
+                    new Claim(ClaimTypes.Email, "not-an-admin@example.com"),
+                    new Claim(ClaimTypes.Name, "Admin User"),
+                    new Claim(ClaimTypes.NameIdentifier, "not-an-admin@example.com"),
+                ],
+                authenticationType: "OpenIdConnect")),
+        };
+        context.Request.Path = "/admin/news";
+        var middleware = new RequestLogScopeMiddleware(
+            _ => Task.CompletedTask,
+            logger,
+            AdminOptionsAllowing("someone-else@example.com"));
+
+        await middleware.InvokeAsync(context);
+
+        var scope = Assert.Single(logger.Scopes);
+        Assert.Equal(Activity.Current?.TraceId.ToString() ?? "admin-trace", scope["TraceId"]);
+        Assert.False(scope.ContainsKey("MemberId"));
+        Assert.False(scope.ContainsKey("AdminEmail"));
+        Assert.DoesNotContain(scope.Keys, key => key.Contains("Name", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(scope.Values, value => value is string text
+            && text.Contains("not-an-admin@example.com", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Allowlisted_admin_principal_scope_includes_admin_email()
     {
         var logger = new RecordingScopeLogger();
         var context = new DefaultHttpContext
@@ -83,17 +123,17 @@ public sealed class RequestLogScopeMiddlewareTests
                 authenticationType: "OpenIdConnect")),
         };
         context.Request.Path = "/admin/news";
-        var middleware = new RequestLogScopeMiddleware(_ => Task.CompletedTask, logger);
+        var middleware = new RequestLogScopeMiddleware(
+            _ => Task.CompletedTask,
+            logger,
+            AdminOptionsAllowing("admin@example.com"));
 
         await middleware.InvokeAsync(context);
 
         var scope = Assert.Single(logger.Scopes);
         Assert.Equal(Activity.Current?.TraceId.ToString() ?? "admin-trace", scope["TraceId"]);
         Assert.False(scope.ContainsKey("MemberId"));
-        Assert.DoesNotContain(scope.Keys, key => key.Contains("Email", StringComparison.OrdinalIgnoreCase)
-            || key.Contains("Name", StringComparison.OrdinalIgnoreCase));
-        Assert.DoesNotContain(scope.Values, value => value is string text
-            && text.Contains("admin@example.com", StringComparison.Ordinal));
+        Assert.Equal("admin@example.com", scope["AdminEmail"]);
     }
 
     [Theory]
@@ -118,7 +158,8 @@ public sealed class RequestLogScopeMiddlewareTests
                 invoked = true;
                 return Task.CompletedTask;
             },
-            logger);
+            logger,
+            NoAdmins);
 
         await middleware.InvokeAsync(context);
 

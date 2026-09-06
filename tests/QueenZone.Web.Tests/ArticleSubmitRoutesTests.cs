@@ -523,6 +523,40 @@ public sealed partial class ArticleSubmitRoutesTests : IClassFixture<WebApplicat
     }
 
     [Fact]
+    public async Task Admin_prepare_with_stale_antiforgery_token_redisplays_review_instead_of_400()
+    {
+        using var isolated = factory.WithWebHostBuilder(_ => { });
+        var member = await CreateSignedInMemberClientAsync(
+            email: "article-prepare-stale@example.com",
+            displayName: "Stale Prepare Author",
+            subject: "google-article-prepare-stale",
+            options: new WebApplicationFactoryClientOptions
+            {
+                HandleCookies = true,
+                AllowAutoRedirect = false,
+            },
+            sourceFactory: isolated);
+        var submissionId = await SubmitArticleAsync(member, "Stale prepare feature", "stale-prepare-feature", isolated);
+
+        var admin = AdminHttpTestHelpers.CreateClient(isolated, AdminEmail);
+        var review = await admin.GetStringAsync($"/admin/articles/{submissionId:D}");
+        Assert.Contains("Edit and prepare article", review);
+
+        var prepare = await admin.PostAsync(
+            $"/admin/articles/{submissionId:D}?handler=Prepare",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = "not-a-real-token",
+            }));
+
+        Assert.Equal(HttpStatusCode.Redirect, prepare.StatusCode);
+        Assert.Equal($"/admin/articles/{submissionId:D}", prepare.Headers.Location!.OriginalString);
+
+        var redisplay = await admin.GetStringAsync($"/admin/articles/{submissionId:D}");
+        Assert.Contains("could not be verified", redisplay);
+    }
+
+    [Fact]
     public async Task PostAutosave_Returns403_WithoutAntiforgery()
     {
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions
