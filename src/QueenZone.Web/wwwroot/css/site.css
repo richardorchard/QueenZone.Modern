@@ -413,6 +413,17 @@
   color: var(--qz-burgundy);
 }
 
+.qz-account-providers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-5);
+}
+
+.qz-account-fallback {
+  margin-top: var(--space-5);
+}
+
 .visually-hidden {
   position: absolute;
   width: 1px;
@@ -4539,7 +4550,7 @@ select.qz-input {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-6);
-  align-items: center;
+  align-items: flex-start;
 }
 
 .qz-album-hero__cover {
@@ -6016,23 +6027,18 @@ select.qz-input {
   color: var(--qz-muted, #666);
 }
 
-.qz-message-report {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  align-items: center;
+.qz-message-report__link {
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  font: var(--type-meta);
+  letter-spacing: var(--ls-caps);
+  color: var(--qz-muted, #666);
 }
 
-.qz-message-report__reason {
-  min-width: 12rem;
-  flex: 1 1 12rem;
-  max-width: 24rem;
-  padding: 0.4rem 0.7rem;
-  border: 1px solid var(--border-strong, #c8c8c8);
-  border-radius: var(--radius-sm);
-  background: var(--qz-white);
-  color: var(--qz-charcoal);
-  font: var(--fw-regular, 400) 0.875rem/1.4 var(--font-body);
+.qz-message-report__link:hover {
+  color: var(--link-hover);
 }
 
 .qz-account-form__field textarea {
