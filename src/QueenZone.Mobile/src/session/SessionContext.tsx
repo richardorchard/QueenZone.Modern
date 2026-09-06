@@ -13,7 +13,7 @@ import { Alert, AppState, Linking } from 'react-native';
 import { addNetworkStateListener } from 'expo-network';
 import * as Notifications from 'expo-notifications';
 import { getAppConfig } from '../config/appConfig';
-import { ApiError, fetchJson } from '../api/client';
+import { ApiError, configureAuthenticatedGetRecovery, fetchJson } from '../api/client';
 import { fallbackProfileLimits, parseMemberProfile, type MemberProfile } from '../api/me';
 import type { AuthTokens } from '../api/auth';
 import { clearPushRegistration, refreshPushRegistration, syncPushRegistration } from '../notifications';
@@ -279,6 +279,25 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
     return refreshWithStoredGrant();
   }, [refreshWithStoredGrant]);
+
+  const recoverRejectedAccessToken = useCallback(
+    async (rejectedAccessToken: string): Promise<string | null> => {
+      const current = sessionRef.current.accessToken;
+      if (current && current !== rejectedAccessToken) {
+        return current;
+      }
+      if (!refreshTokenRef.current) {
+        return null;
+      }
+      return refreshWithStoredGrant();
+    },
+    [refreshWithStoredGrant],
+  );
+
+  useEffect(() => {
+    configureAuthenticatedGetRecovery(recoverRejectedAccessToken);
+    return () => configureAuthenticatedGetRecovery(null);
+  }, [recoverRejectedAccessToken]);
 
   useEffect(() => {
     let cancelled = false;

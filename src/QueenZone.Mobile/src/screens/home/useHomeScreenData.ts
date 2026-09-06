@@ -15,6 +15,7 @@ import { useHomeSection } from '../../hooks/useHomeSection';
 import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import { syncHomeWidget } from '../../widgets/widgetSync';
 import { onThisDayIsVisible, queenQuotesIsVisible } from './homeMeta';
+import { inboxPageSize } from '../messages/inboxMeta';
 
 /**
  * Owns every `useHomeSection` call for the home screen. This is the single place
@@ -36,7 +37,12 @@ export function useHomeScreenData(isSignedIn: boolean, accessToken: string | nul
   const messages = useHomeSection(
     useCallback(
       (signal) =>
-        isSignedIn && accessToken ? fetchInbox(accessToken, { pageSize: 2, signal }) : Promise.resolve(null),
+        isSignedIn && accessToken
+          ? fetchInbox(accessToken, { page: 1, pageSize: inboxPageSize, signal }).then((page) => ({
+              ...page,
+              items: page.items.slice(0, 2),
+            }))
+          : Promise.resolve(null),
       [isSignedIn, accessToken],
     ),
   );

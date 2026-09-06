@@ -9,7 +9,7 @@ import {
   searchRecipients,
 } from './messages';
 import { jsonResponse } from '../test/fixtures';
-import { ContentCache, conversationCacheKey, createMemoryStorage } from '../cache';
+import { ContentCache, conversationCacheKey, createMemoryStorage, inboxCacheKey } from '../cache';
 
 function accessJwt(payload: object): string {
   const encode = (value: object) => Buffer.from(JSON.stringify(value)).toString('base64url');
@@ -42,6 +42,32 @@ describe('fetchInbox', () => {
     const { url, init } = lastCall();
     expect(url).toBe('http://qz.test/api/v1/me/messages?page=2&pageSize=20');
     expect(init.headers).toMatchObject({ Authorization: 'Bearer tok' });
+  });
+
+  it('shares a standard first-page request and persists the complete response', async () => {
+    const cache = new ContentCache({ storage: createMemoryStorage() });
+    const token = accessJwt({ sub: 'member-a' });
+    const response = { items: [], page: 1, pageSize: 50, totalCount: 0, totalPages: 1 };
+    let resolveFetch: (response: Response) => void = () => {};
+    fetchMock.mockReturnValueOnce(new Promise((resolve) => { resolveFetch = resolve; }));
+
+    const first = fetchInbox(token, { page: 1, pageSize: 50, cache });
+    const second = fetchInbox(token, { page: 1, pageSize: 50, cache });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    resolveFetch(jsonResponse(response));
+    await expect(Promise.all([first, second])).resolves.toEqual([response, response]);
+    expect(await cache.get(inboxCacheKey('member-a'))).toEqual(response);
+  });
+
+  it('retains the cached inbox after a transient network failure', async () => {
+    const cache = new ContentCache({ storage: createMemoryStorage() });
+    const token = accessJwt({ sub: 'member-a' });
+    const cached = { items: [], page: 1, pageSize: 50, totalCount: 0, totalPages: 1 };
+    await cache.put(inboxCacheKey('member-a'), cached);
+    fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
+
+    await expect(fetchInbox(token, { page: 1, pageSize: 50, cache })).resolves.toEqual(cached);
   });
 });
 
