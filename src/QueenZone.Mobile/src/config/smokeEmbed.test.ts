@@ -12,6 +12,7 @@ const smokeEmbed = require('../../plugins/smokeEmbed.cjs') as {
   smokeEmbedAutolinking: () => { exclude: string[] };
   applyAndroidBundleInDebug: (contents: string) => string;
   applyAndroidReleaseDebugSigning: (contents: string) => string;
+  applyAndroidManifestCleartextTraffic: (manifest: unknown) => unknown;
   DEV_CLIENT_PACKAGES: string[];
   EMBED_FLAG: string;
 };
@@ -73,6 +74,22 @@ describe('applyAndroidReleaseDebugSigning', () => {
   it('leaves an existing debug signingConfig alone', () => {
     const source = 'release {\n        signingConfig signingConfigs.debug\n        minifyEnabled false\n}\n';
     assert.equal(smokeEmbed.applyAndroidReleaseDebugSigning(source), source);
+  });
+});
+
+describe('applyAndroidManifestCleartextTraffic', () => {
+  it('allows cleartext HTTP so smoke/journeys can reach the Testing host over 10.0.2.2 (#1372)', () => {
+    const manifest = { manifest: { application: [{ $: { 'android:label': '@string/app_name' } }] } };
+    const patched = smokeEmbed.applyAndroidManifestCleartextTraffic(manifest) as typeof manifest;
+    assert.equal(
+      (patched.manifest.application[0].$ as Record<string, string>)['android:usesCleartextTraffic'],
+      'true',
+    );
+  });
+
+  it('is a no-op when the manifest has no application element', () => {
+    const manifest = { manifest: {} };
+    assert.deepEqual(smokeEmbed.applyAndroidManifestCleartextTraffic(manifest), manifest);
   });
 });
 

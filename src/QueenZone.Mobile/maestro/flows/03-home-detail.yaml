@@ -7,8 +7,10 @@ appId: org.queenzone.mobile
       id: news-story-screen
     timeout: 20000
 - assertVisible: QueenZone modernisation begins
+# Story hides the tab bar (navigation/visibility.ts) — leave via its own
+# back control, same pattern as 08-profile-signed-out.yaml's profile-back.
 - tapOn:
-    id: tab-home
+    id: news-story-back
 - extendedWaitUntil:
     visible:
       id: home-screen

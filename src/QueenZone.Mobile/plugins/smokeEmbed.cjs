@@ -9,7 +9,12 @@
  * alone still opened the launcher. Local `expo start --dev-client` is
  * unchanged unless QUEENZONE_MOBILE_SMOKE_EMBED=1 is set at prebuild.
  */
-const { createRunOncePlugin, withAppBuildGradle, withXcodeProject } = require('expo/config-plugins');
+const {
+  createRunOncePlugin,
+  withAppBuildGradle,
+  withXcodeProject,
+  withAndroidManifest,
+} = require('expo/config-plugins');
 
 const TAG = 'queenzone-smoke-embed';
 const EMBED_FLAG = 'QUEENZONE_MOBILE_SMOKE_EMBED';
@@ -81,6 +86,30 @@ function applyAndroidReleaseDebugSigning(contents) {
   );
 }
 
+/**
+ * Release blocks cleartext HTTP by default (no `debug/AndroidManifest.xml`
+ * override), but smoke/journeys bake EXPO_PUBLIC_API_BASE_URL as
+ * http://10.0.2.2:<port> to reach the Testing web host — every request was
+ * failing with "Unable to reach QueenZone" once #1324 switched to Release
+ * APKs (#1372). Scoped to smokeEmbed builds only; store Release stays HTTPS-only.
+ */
+function applyAndroidManifestCleartextTraffic(androidManifest) {
+  const application = androidManifest?.manifest?.application?.[0];
+  if (!application) {
+    return androidManifest;
+  }
+  application.$ = application.$ ?? {};
+  application.$['android:usesCleartextTraffic'] = 'true';
+  return androidManifest;
+}
+
+function withAndroidSmokeEmbedManifest(config) {
+  return withAndroidManifest(config, (mod) => {
+    mod.modResults = applyAndroidManifestCleartextTraffic(mod.modResults);
+    return mod;
+  });
+}
+
 function withAndroidSmokeEmbed(config) {
   return withAppBuildGradle(config, (mod) => {
     if (mod.modResults.language !== 'groovy') {
@@ -108,6 +137,7 @@ function withSmokeEmbeddedBundle(config) {
     return config;
   }
   config = withAndroidSmokeEmbed(config);
+  config = withAndroidSmokeEmbedManifest(config);
   config = withIosSmokeEmbed(config);
   return config;
 }
@@ -118,6 +148,7 @@ plugin.filterExpoPluginsForSmokeEmbed = filterExpoPluginsForSmokeEmbed;
 plugin.smokeEmbedAutolinking = smokeEmbedAutolinking;
 plugin.applyAndroidBundleInDebug = applyAndroidBundleInDebug;
 plugin.applyAndroidReleaseDebugSigning = applyAndroidReleaseDebugSigning;
+plugin.applyAndroidManifestCleartextTraffic = applyAndroidManifestCleartextTraffic;
 plugin.DEV_CLIENT_PACKAGES = DEV_CLIENT_PACKAGES;
 plugin.EMBED_FLAG = EMBED_FLAG;
 module.exports = plugin;
