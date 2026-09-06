@@ -2,6 +2,16 @@ import type { FanPerformance } from '../api';
 import { apiV1Url } from '../config';
 import { fanPerformanceAudioPath } from '../audio/formatDuration';
 import { fileLooksLikeHttpError } from './audioBytes';
+import {
+  adoptProgressTotal,
+  canPromotePart,
+  classifyPromoteError,
+  downloadHopSignals,
+  downloadHopTarget,
+  isTinyCompleteDownload,
+  messageForFinalizeFailure,
+  resolveDownloadPartUri,
+} from './finalize';
 import { getDownloadFileHost } from './files';
 import {
   clearDownloadManifest,
@@ -11,13 +21,17 @@ import {
   upsertCompletedDownload,
 } from './manifest';
 import {
+  DOWNLOAD_EMPTY_PART_MESSAGE,
   DOWNLOAD_FAILED_MESSAGE,
   DOWNLOAD_INCOMPLETE_MESSAGE,
+  DOWNLOAD_PART_MISSING_MESSAGE,
   DOWNLOAD_RATE_LIMITED_MESSAGE,
   DOWNLOAD_TIMEOUT_MESSAGE,
+  DOWNLOAD_TOO_SMALL_MESSAGE,
   DOWNLOAD_UNAUTHORIZED_MESSAGE,
   LOW_STORAGE_MESSAGE,
 } from './messages';
+import { reportDownloadBreadcrumb } from './telemetry';
 import { stopActivePlayback, stopPlaybackIf } from './playbackStop';
 import {
   clearDownloadUiForMember,
@@ -76,10 +90,17 @@ async function cancelResponseBody(response: Response): Promise<void> {
  * track — cancel the body immediately and abort if headers take too long.
  * A 200 (Range ignored by a proxy) is OK only after the body is cancelled.
  */
-async function defaultProbeAudio(
-  url: string,
-  token: string,
-): Promise<{ sourceRevision: string | null; byteSize: number | null; status: number }> {
+type AudioDownloadProbe = {
+  sourceRevision: string | null;
+  byteSize: number | null;
+  status: number;
+  contentType?: string | null;
+  contentLength?: number | null;
+  redirected?: boolean;
+  finalTarget?: string | null;
+};
+
+async function defaultProbeAudio(url: string, token: string): Promise<AudioDownloadProbe> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
   try {
@@ -94,10 +115,20 @@ async function defaultProbeAudio(
     const etag = response.headers.get('etag');
     const ranged = parseContentRangeTotal(response.headers.get('content-range'));
     const length = Number(response.headers.get('content-length'));
+    const contentLength = Number.isFinite(length) && length > 0 ? length : null;
+    const finalTarget = downloadHopTarget(response.url);
+    const requestTarget = downloadHopTarget(url);
     return {
       status: response.status,
       sourceRevision: etag && etag.trim() ? etag.trim() : null,
-      byteSize: ranged ?? (Number.isFinite(length) && length > 0 ? length : null),
+      byteSize: ranged ?? contentLength,
+      contentType: response.headers.get('content-type'),
+      contentLength,
+      redirected: Boolean(
+        (response as Response & { redirected?: boolean }).redirected ||
+          (requestTarget && finalTarget && requestTarget !== finalTarget),
+      ),
+      finalTarget,
     };
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
@@ -176,17 +207,25 @@ async function pumpQueue(): Promise<void> {
   await work;
 }
 
+const KNOWN_DOWNLOAD_MESSAGES = new Set([
+  DOWNLOAD_UNAUTHORIZED_MESSAGE,
+  LOW_STORAGE_MESSAGE,
+  DOWNLOAD_RATE_LIMITED_MESSAGE,
+  DOWNLOAD_TIMEOUT_MESSAGE,
+  DOWNLOAD_INCOMPLETE_MESSAGE,
+  DOWNLOAD_FAILED_MESSAGE,
+  DOWNLOAD_PART_MISSING_MESSAGE,
+  DOWNLOAD_EMPTY_PART_MESSAGE,
+  DOWNLOAD_TOO_SMALL_MESSAGE,
+]);
+
 function messageForDownloadError(error: unknown): string {
   if (error instanceof Error && error.message) {
-    if (
-      error.message === DOWNLOAD_UNAUTHORIZED_MESSAGE ||
-      error.message === LOW_STORAGE_MESSAGE ||
-      error.message === DOWNLOAD_RATE_LIMITED_MESSAGE ||
-      error.message === DOWNLOAD_TIMEOUT_MESSAGE ||
-      error.message === DOWNLOAD_INCOMPLETE_MESSAGE ||
-      error.message === DOWNLOAD_FAILED_MESSAGE
-    ) {
+    if (KNOWN_DOWNLOAD_MESSAGES.has(error.message)) {
       return error.message;
+    }
+    if (classifyPromoteError(error) === 'no-such-file') {
+      return DOWNLOAD_PART_MISSING_MESSAGE;
     }
     if (error.name === 'AbortError' || /aborted|timeout/i.test(error.message)) {
       return DOWNLOAD_TIMEOUT_MESSAGE;
@@ -216,6 +255,7 @@ async function runDownload(
   const downloadAbort = new AbortController();
   const downloadTimer = setTimeout(() => downloadAbort.abort(), DOWNLOAD_TIMEOUT_MS);
   let abortReason: 'timeout' | 'storage' | null = null;
+  let materializedPartUri = partUri;
 
   try {
     const token = await ensureAccessToken();
@@ -226,8 +266,18 @@ async function runDownload(
     const url = apiV1Url(fanPerformanceAudioPath(track.id));
     let sourceRevision: string | null = null;
     let expectedBytes: number | null = null;
+    let probeStatus: number | null = null;
+    let probeContentType: string | null = null;
+    let probeContentLength: number | null = null;
+    let probeRedirected = false;
+    let probeFinalTarget: string | null = null;
     try {
       const probe = await probeAudio(url, token);
+      probeStatus = probe.status;
+      probeContentType = probe.contentType ?? null;
+      probeContentLength = probe.contentLength ?? null;
+      probeRedirected = Boolean(probe.redirected);
+      probeFinalTarget = probe.finalTarget ?? null;
       if (probe.status === 401 || probe.status === 403 || probe.status === 404) {
         throw new Error(DOWNLOAD_UNAUTHORIZED_MESSAGE);
       }
@@ -236,8 +286,10 @@ async function runDownload(
       }
       // Non-200/206 (including a timed-out probe status 0) is not fatal.
       // Streaming already proved the file is there; File.createDownloadTask
-      // is the real transfer. A Range probe that ignores Range and buffers
-      // the whole MP3 used to fail longer tracks and leak the connection.
+      // is the real transfer (full GET — a Cloudflare Worker hop, if any,
+      // can disagree on Content-Length / error body / redirect vs Range).
+      // A Range probe that ignores Range and buffers the whole MP3 used to
+      // fail longer tracks and leak the connection.
       sourceRevision = probe.sourceRevision;
       expectedBytes = probe.byteSize;
     } catch (error) {
@@ -249,6 +301,17 @@ async function runDownload(
       }
       // Probe network errors: still attempt the download.
     }
+
+    reportDownloadBreadcrumb('probe', {
+      performanceId,
+      status: probeStatus,
+      expectedBytes,
+      contentType: probeContentType,
+      contentLength: probeContentLength,
+      redirected: probeRedirected,
+      finalTarget: probeFinalTarget,
+      requestTarget: downloadHopTarget(url),
+    });
 
     if (expectedBytes && host.availableBytes() < expectedBytes + DISK_SAFETY_MARGIN_BYTES) {
       throw new Error(LOW_STORAGE_MESSAGE);
@@ -265,13 +328,17 @@ async function runDownload(
 
     host.deleteIfExists(partUri);
     let lastProgressAt = 0;
-    await host.download({
+    let progressTotal: number | null = null;
+    const taskResult = await host.download({
       url,
       destUri: partUri,
       headers: { Authorization: `Bearer ${token}` },
       signal: downloadAbort.signal,
       onProgress: (written, total) => {
-        const knownTotal = total > 0 ? total : expectedBytes;
+        if (total > 0) {
+          progressTotal = total;
+        }
+        const knownTotal = adoptProgressTotal(expectedBytes, total);
         if (knownTotal && host.availableBytes() < knownTotal + DISK_SAFETY_MARGIN_BYTES) {
           abortReason = 'storage';
           downloadAbort.abort();
@@ -301,21 +368,76 @@ async function runDownload(
       throw new Error(abortReason === 'storage' ? LOW_STORAGE_MESSAGE : DOWNLOAD_TIMEOUT_MESSAGE);
     }
 
-    const size = host.size(partUri);
-    if (!host.exists(partUri) || size <= 0) {
-      host.deleteIfExists(partUri);
-      throw new Error(DOWNLOAD_FAILED_MESSAGE);
+    const partToPromote = resolveDownloadPartUri(partUri, taskResult?.uri);
+    materializedPartUri = partToPromote;
+    const size = host.size(partToPromote);
+    const partExists = host.exists(partToPromote);
+    const hop = downloadHopSignals({
+      requestUrl: url,
+      requestTarget: downloadHopTarget(url),
+      finalTarget: probeFinalTarget,
+      redirected: probeRedirected,
+      probeExpected: expectedBytes,
+      progressTotal,
+      finalSize: size,
+      destUri: partUri,
+      returnedUri: taskResult?.uri,
+    });
+    reportDownloadBreadcrumb('task-complete', {
+      performanceId,
+      destUri: partUri,
+      returnedUri: taskResult?.uri ?? null,
+      partUri: partToPromote,
+      exists: partExists,
+      size,
+      progressTotal,
+      expectedBytes,
+      contentType: probeContentType,
+      contentLength: probeContentLength,
+      redirected: hop.redirected,
+      destMismatch: hop.destMismatch,
+      progressVsProbe: hop.progressVsProbe,
+      sizeVsProgress: hop.sizeVsProgress,
+      tinyComplete: hop.tinyComplete,
+      requestTarget: downloadHopTarget(url),
+      finalTarget: probeFinalTarget,
+    });
+
+    if (!partExists) {
+      throw new Error(messageForFinalizeFailure('missing-part'));
+    }
+    if (size <= 0) {
+      host.deleteIfExists(partToPromote);
+      throw new Error(messageForFinalizeFailure('empty-part'));
     }
     if (expectedBytes && expectedBytes > 64 && size < expectedBytes * 0.95) {
-      host.deleteIfExists(partUri);
-      throw new Error(DOWNLOAD_INCOMPLETE_MESSAGE);
+      host.deleteIfExists(partToPromote);
+      throw new Error(messageForFinalizeFailure('incomplete'));
     }
-    if (await fileLooksLikeHttpError((uri, max) => host.readPrefix(uri, max), partUri, size)) {
-      host.deleteIfExists(partUri);
+    if (isTinyCompleteDownload({ size, probeExpected: expectedBytes, progressTotal })) {
+      host.deleteIfExists(partToPromote);
+      throw new Error(messageForFinalizeFailure('tiny-complete'));
+    }
+    if (await fileLooksLikeHttpError((uri, max) => host.readPrefix(uri, max), partToPromote, size)) {
+      host.deleteIfExists(partToPromote);
       throw new Error(DOWNLOAD_FAILED_MESSAGE);
     }
+    if (!canPromotePart(partExists, size)) {
+      host.deleteIfExists(partToPromote);
+      throw new Error(messageForFinalizeFailure('missing-part'));
+    }
 
-    host.promote(partUri, completedUri);
+    try {
+      host.promote(partToPromote, completedUri);
+    } catch (error) {
+      reportDownloadBreadcrumb('promote-error', {
+        performanceId,
+        partUri: partToPromote,
+        completedUri,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw new Error(messageForFinalizeFailure(classifyPromoteError(error)));
+    }
     const byteSize = host.size(completedUri);
     if (
       !host.exists(completedUri) ||
@@ -340,6 +462,7 @@ async function runDownload(
     setDownloadUiSnapshot(memberId, snapshotFromEntry(entry));
   } catch (error) {
     host.deleteIfExists(partUri);
+    host.deleteIfExists(materializedPartUri);
     host.deleteIfExists(completedUri);
     const message = messageForDownloadError(error);
     setDownloadUiSnapshot(

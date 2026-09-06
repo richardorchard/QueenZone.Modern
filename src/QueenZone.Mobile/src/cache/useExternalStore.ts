@@ -1,16 +1,15 @@
-import { useEffect, useRef, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useRef, useSyncExternalStore } from 'react';
 import { getPrefixVersion, getStoreVersion, subscribe, subscribePrefix } from './externalStore';
 
 /**
  * Version for one `keys.ts` entry. Re-renders when that key is invalidated
- * directly or via a matching prefix.
+ * directly or via a matching prefix. Subscribe/getSnapshot are keyed so a
+ * recycled list row does not keep listening to the first item's key.
  */
 export function useStoreVersion(key: string): number {
-  return useSyncExternalStore(
-    (onStoreChange) => subscribe(key, onStoreChange),
-    () => getStoreVersion(key),
-    () => getStoreVersion(key),
-  );
+  const subscribeToKey = useCallback((onStoreChange: () => void) => subscribe(key, onStoreChange), [key]);
+  const getSnapshot = useCallback(() => getStoreVersion(key), [key]);
+  return useSyncExternalStore(subscribeToKey, getSnapshot, getSnapshot);
 }
 
 /**
@@ -18,11 +17,12 @@ export function useStoreVersion(key: string): number {
  * matching key is invalidated.
  */
 export function usePrefixVersion(prefix: string): number {
-  return useSyncExternalStore(
-    (onStoreChange) => subscribePrefix(prefix, onStoreChange),
-    () => getPrefixVersion(prefix),
-    () => getPrefixVersion(prefix),
+  const subscribeToPrefix = useCallback(
+    (onStoreChange: () => void) => subscribePrefix(prefix, onStoreChange),
+    [prefix],
   );
+  const getSnapshot = useCallback(() => getPrefixVersion(prefix), [prefix]);
+  return useSyncExternalStore(subscribeToPrefix, getSnapshot, getSnapshot);
 }
 
 /**

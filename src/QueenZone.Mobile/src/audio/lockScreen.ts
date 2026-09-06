@@ -21,9 +21,10 @@ export type LockScreenMetadata = {
 };
 
 /**
- * Accept only a local file/asset URI for now-playing art. Remote and blob
- * URLs must never reach lock-screen metadata (tokens and songfiles stay off
- * the system player).
+ * Accept only an absolute `file:` URI for now-playing art. Scheme-less names
+ * (`assets_icon`) and `asset:` paths throw on Android lock-screen
+ * (QUEENZONE-MOBILE-9). Remote and blob URLs stay off metadata so tokens and
+ * songfiles never reach the system player.
  */
 export function lockScreenArtworkUrlOrOmit(url: string | undefined): string | undefined {
   if (!url) {
@@ -36,11 +37,11 @@ export function lockScreenArtworkUrlOrOmit(url: string | undefined): string | un
   }
 
   const lower = trimmed.toLowerCase();
-  if (lower.startsWith('https://') || lower.startsWith('http://') || lower.startsWith('blob:')) {
-    return undefined;
+  if (lower.startsWith('file:')) {
+    return trimmed;
   }
 
-  return trimmed;
+  return undefined;
 }
 
 export function lockScreenMetadata(
