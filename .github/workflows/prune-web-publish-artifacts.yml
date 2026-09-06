@@ -1,0 +1,119 @@
+name: Prune stale web-publish artifacts
+
+# GitHub upload-artifact retention-days is whole days only (minimum 1), so
+# ci.yml keeps web-publish-${{ github.run_id }} at retention-days: 1 as a
+# backstop. Richard wants ~8 hour lifetime for Actions storage hygiene.
+# This scheduled job deletes artifacts named web-publish-* whose created_at
+# is older than 8 hours via the Artifacts API. Max overshoot is one cron
+# interval (~2h), so practical life is ~8–10h.
+#
+# Deploy reuse-first (deploy.yml / deploy-dev.yml) may still need a fresh
+# zip; artifacts younger than 8 hours are left alone. If a zip is already
+# gone, Deploy falls back to build-from-checkout (#1370 / #1372).
+#
+# Scope is web-publish-* only. Coverage, mobile, and other CI artifacts
+# keep their existing retention. Superseded-PR cleanup stays in
+# prune-stale-pr-artifacts.yml — do not merge the two jobs.
+on:
+  schedule:
+    # Every 2 hours UTC. Combined with the 8h age floor, leftover zips
+    # last about 8–10 hours before API delete.
+    - cron: "0 */2 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "List matching artifacts without deleting"
+        type: boolean
+        default: false
+  # Cheap self-test on PRs that touch this file: list only, never delete.
+  pull_request:
+    paths:
+      - ".github/workflows/prune-web-publish-artifacts.yml"
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: prune-web-publish-artifacts
+  cancel-in-progress: false
+
+jobs:
+  prune:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete web-publish artifacts older than 8 hours
+        uses: actions/github-script@v9
+        env:
+          DRY_RUN: ${{ github.event_name == 'pull_request' || inputs.dry_run == true }}
+        with:
+          script: |
+            const PREFIX = "web-publish-";
+            const MAX_AGE_MS = 8 * 60 * 60 * 1000;
+            const cutoff = new Date(Date.now() - MAX_AGE_MS);
+            const dryRun = process.env.DRY_RUN === "true";
+
+            core.info(
+              `${dryRun ? "Dry-run" : "Prune"}: ${PREFIX}* older than ${cutoff.toISOString()} (8h).`,
+            );
+
+            const artifacts = await github.paginate(
+              github.rest.actions.listArtifactsForRepo,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                per_page: 100,
+              },
+            );
+
+            const matches = artifacts.filter((artifact) =>
+              artifact.name.startsWith(PREFIX),
+            );
+            const stale = matches.filter(
+              (artifact) => new Date(artifact.created_at) < cutoff,
+            );
+            const fresh = matches.filter(
+              (artifact) => new Date(artifact.created_at) >= cutoff,
+            );
+
+            core.info(
+              `Found ${matches.length} ${PREFIX}* artifact(s): ${stale.length} older than 8h, ${fresh.length} still fresh.`,
+            );
+
+            for (const artifact of fresh) {
+              core.info(
+                `Keeping ${artifact.name} (id ${artifact.id}, created ${artifact.created_at}, ${artifact.size_in_bytes} bytes).`,
+              );
+            }
+
+            if (stale.length === 0) {
+              core.info("No web-publish artifacts older than 8 hours.");
+              return;
+            }
+
+            for (const artifact of stale) {
+              const summary = `${artifact.name} (id ${artifact.id}, created ${artifact.created_at}, ${artifact.size_in_bytes} bytes)`;
+              if (dryRun) {
+                core.info(`Would delete ${summary}.`);
+                continue;
+              }
+
+              try {
+                await github.rest.actions.deleteArtifact({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  artifact_id: artifact.id,
+                });
+                core.info(`Deleted ${summary}.`);
+              } catch (err) {
+                // Already expired, already deleted, or raced with GitHub's
+                // 1-day retention sweep. Treat 404 as success so the job
+                // stays idempotent.
+                const status = err.status ?? err.response?.status;
+                if (status === 404) {
+                  core.info(`Already gone: ${summary}.`);
+                } else {
+                  core.warning(`Could not delete ${summary}: ${err.message}`);
+                }
+              }
+            }
