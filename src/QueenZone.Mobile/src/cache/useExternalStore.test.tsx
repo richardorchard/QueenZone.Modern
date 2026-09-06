@@ -19,6 +19,31 @@ describe('useExternalStore', () => {
     expect(result.current).toBe(1);
   });
 
+  it('follows the current key instead of staying on the first subscribed key', () => {
+    const { result, rerender } = renderHook(({ key }: { key: string }) => useStoreVersion(key), {
+      initialProps: { key: 'downloads:member:1:performance:191' },
+    });
+    expect(result.current).toBe(0);
+
+    act(() => {
+      invalidate('downloads:member:1:performance:193');
+    });
+    expect(result.current).toBe(0);
+
+    rerender({ key: 'downloads:member:1:performance:193' });
+    expect(result.current).toBe(1);
+
+    act(() => {
+      invalidate('downloads:member:1:performance:191');
+    });
+    expect(result.current).toBe(1);
+
+    act(() => {
+      invalidate('downloads:member:1:performance:193');
+    });
+    expect(result.current).toBe(2);
+  });
+
   it('re-renders usePrefixVersion for matching key and prefix invalidation only', () => {
     const { result } = renderHook(() => usePrefixVersion(NEWS_CACHE_KEY_PREFIX));
     expect(result.current).toBe(0);

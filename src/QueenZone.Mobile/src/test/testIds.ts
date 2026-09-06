@@ -100,6 +100,8 @@ export const testIds = {
   fanPerformanceDownloadPrefix: 'fan-performance-download-',
   fanPerformanceDownloadPlayPrefix: 'fan-performance-download-play-',
   fanPerformanceDownloadRemovePrefix: 'fan-performance-download-remove-',
+  fanPerformanceDownloadErrorPrefix: 'fan-performance-download-error-',
+  fanPerformanceDownloadProgressPrefix: 'fan-performance-download-progress-',
   fanPerformanceSubmit: 'fan-performance-submit',
   fanPerformanceSubmitPick: 'fan-performance-submit-pick',
   fanPerformanceSubmitSend: 'fan-performance-submit-send',

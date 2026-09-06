@@ -8,6 +8,7 @@ import { testIds } from '../test/testIds';
 import { createMemoryDownloadHost, setDownloadFileHostForTests } from './files';
 import { setDownloadManifestStorageForTests } from './manifest';
 import { resetDownloadManagerForTests, setDownloadProbeForTests } from './manager';
+import { DOWNLOAD_RATE_LIMITED_MESSAGE } from './messages';
 import { resetDownloadUiForTests, setDownloadUiSnapshot, transientSnapshot } from './uiState';
 import { DownloadAction } from './DownloadAction';
 
@@ -81,6 +82,21 @@ describe('DownloadAction', () => {
       ),
     ).toBeOnTheScreen();
     expect(screen.getByText('Could not download this recording. Try again.')).toBeOnTheScreen();
+  });
+
+  it('shows the full rate-limit error in compact controls', () => {
+    setDownloadUiSnapshot(
+      'member-1',
+      transientSnapshot(String(track.id), 'failed', {
+        title: track.title,
+        performedBy: track.performedBy,
+        error: DOWNLOAD_RATE_LIMITED_MESSAGE,
+      }),
+    );
+    renderWithProviders(<DownloadAction track={track} compact />, { navigation: false });
+    expect(screen.getByText(DOWNLOAD_RATE_LIMITED_MESSAGE)).toBeOnTheScreen();
+    expect(DOWNLOAD_RATE_LIMITED_MESSAGE).toContain('5 minutes');
+    expect(DOWNLOAD_RATE_LIMITED_MESSAGE.toLowerCase()).not.toContain('wait a minute');
   });
 
   it('shows in-situ percent while downloading', () => {

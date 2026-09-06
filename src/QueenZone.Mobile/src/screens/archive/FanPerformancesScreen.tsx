@@ -265,6 +265,7 @@ export function FanPerformancesScreen({ navigation }: Props) {
                 </Pressable>
                 {canPlay || isRestoring ? (
                   <DownloadAction
+                    key={String(item.id)}
                     track={item}
                     compact
                     onNeedSignIn={() =>

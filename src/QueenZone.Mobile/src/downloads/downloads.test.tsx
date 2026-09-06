@@ -1,7 +1,8 @@
+import * as Sentry from '@sentry/react-native';
 import { createMemoryStorage } from '../cache/storage';
 import { resetExternalStoreForTests } from '../cache/externalStore';
 import { fanPerformanceFixture } from '../test/fixtures';
-import { createMemoryDownloadHost, setDownloadFileHostForTests } from './files';
+import { createMemoryDownloadHost, getDownloadFileHost, setDownloadFileHostForTests } from './files';
 import {
   getCompletedDownload,
   reconcileDownloadManifest,
@@ -17,7 +18,12 @@ import {
   setDownloadProbeForTests,
 } from './manager';
 import {
+  DOWNLOAD_EMPTY_PART_MESSAGE,
+  DOWNLOAD_FAILED_MESSAGE,
+  DOWNLOAD_INCOMPLETE_MESSAGE,
+  DOWNLOAD_PART_MISSING_MESSAGE,
   DOWNLOAD_RATE_LIMITED_MESSAGE,
+  DOWNLOAD_TOO_SMALL_MESSAGE,
   OFFLINE_PLAYBACK_MESSAGE,
   SIGN_IN_PLAYBACK_MESSAGE,
 } from './messages';
@@ -182,6 +188,7 @@ describe('resolveAudioSource', () => {
 describe('download manager', () => {
   beforeEach(resetDownloads);
   afterEach(() => {
+    jest.restoreAllMocks();
     setDownloadFileHostForTests(null);
     setDownloadManifestStorageForTests(null);
     setDownloadProbeForTests(null);
@@ -213,8 +220,10 @@ describe('download manager', () => {
     const host = createMemoryDownloadHost({
       downloadImpl: async ({ destUri }) => {
         host.files.set(destUri, new TextEncoder().encode('{"title":"Unauthorized"}'));
+        return { uri: destUri };
       },
     });
+    const promote = jest.spyOn(host, 'promote');
     setDownloadFileHostForTests(host);
     setDownloadProbeForTests(async () => ({
       status: 206,
@@ -224,9 +233,40 @@ describe('download manager', () => {
 
     enqueueDownload(track, memberId, async () => 'member-token');
     await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(promote).not.toHaveBeenCalled();
     expect(await getCompletedDownload(memberId, '187')).toBeNull();
     expect(host.exists('file:///documents/fan-performances/187')).toBe(false);
     expect(getDownloadUiSnapshot(memberId, '187')?.status).toBe('failed');
+    expect(getDownloadUiSnapshot(memberId, '187')?.status).not.toBe('downloaded');
+  });
+
+  it('rejects an HTML error page saved as a tiny complete download', async () => {
+    const host = createMemoryDownloadHost({
+      downloadImpl: async ({ destUri, onProgress }) => {
+        const body = new TextEncoder().encode('<html><title>Too Many Requests</title></html>');
+        onProgress?.(body.byteLength, body.byteLength);
+        host.files.set(destUri, body);
+        return { uri: destUri };
+      },
+    });
+    const promote = jest.spyOn(host, 'promote');
+    setDownloadFileHostForTests(host);
+    setDownloadProbeForTests(async () => ({
+      status: 0,
+      sourceRevision: null,
+      byteSize: null,
+    }));
+
+    enqueueDownload(track, memberId, async () => 'member-token');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(promote).not.toHaveBeenCalled();
+    expect(await getCompletedDownload(memberId, '187')).toBeNull();
+    expect(host.exists('file:///documents/fan-performances/187')).toBe(false);
+    expect(getDownloadUiSnapshot(memberId, '187')).toMatchObject({
+      status: 'failed',
+      error: DOWNLOAD_TOO_SMALL_MESSAGE,
+    });
+    expect(getDownloadUiSnapshot(memberId, '187')?.status).not.toBe('downloaded');
   });
 
   it('deletes the partial and does not complete after a failed download', async () => {
@@ -308,6 +348,72 @@ describe('download manager', () => {
     expect(getDownloadUiSnapshot(memberId, '187')?.status).toBe('downloaded');
   });
 
+  it('writes progress onto the active performance id, not the first queued id', async () => {
+    const first = fanPerformanceFixture({
+      id: 191,
+      title: 'Aaa First',
+      detailPath: '/fan-performances/191',
+      audioPath: '/api/v1/content/fan-performances/191/audio',
+    });
+    const third = fanPerformanceFixture({
+      id: 193,
+      title: 'Zzz Last',
+      detailPath: '/fan-performances/193',
+      audioPath: '/api/v1/content/fan-performances/193/audio',
+    });
+    setDownloadUiSnapshot(
+      memberId,
+      transientSnapshot('191', 'failed', {
+        title: first.title,
+        performedBy: first.performedBy,
+        error: 'Could not download this recording. Try again.',
+      }),
+    );
+    setDownloadUiSnapshot(
+      memberId,
+      transientSnapshot('192', 'failed', {
+        title: 'Mmm Middle',
+        performedBy: 'Mel',
+        error: 'Could not download this recording. Try again.',
+      }),
+    );
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const host = createMemoryDownloadHost({
+      downloadImpl: async ({ destUri, onProgress }) => {
+        onProgress?.(400, 1000);
+        await held;
+        host.files.set(destUri, new Uint8Array(1000));
+        return { uri: destUri };
+      },
+    });
+    setDownloadFileHostForTests(host);
+    setDownloadProbeForTests(async () => ({
+      status: 206,
+      sourceRevision: '"etag-9"',
+      byteSize: 1000,
+    }));
+
+    enqueueDownload(third, memberId, async () => 'member-token');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(getDownloadUiSnapshot(memberId, '193')).toMatchObject({
+      status: 'downloading',
+      byteSize: 400,
+      expectedBytes: 1000,
+    });
+    expect(getDownloadUiSnapshot(memberId, '191')?.status).toBe('failed');
+    expect(getDownloadUiSnapshot(memberId, '191')?.byteSize).toBeNull();
+    expect(getDownloadUiSnapshot(memberId, '192')?.status).toBe('failed');
+
+    release();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(getDownloadUiSnapshot(memberId, '193')?.status).toBe('downloaded');
+    expect(getDownloadUiSnapshot(memberId, '191')?.status).toBe('failed');
+  });
+
   it('still downloads when the Range probe times out or returns a non-206', async () => {
     const host = createMemoryDownloadHost();
     setDownloadFileHostForTests(host);
@@ -369,6 +475,321 @@ describe('download manager', () => {
     enqueueDownload(track, memberId, async () => 'member-token');
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(getDownloadUiSnapshot(memberId, '187')?.status).toBe('downloaded');
+  });
+
+  it('treats a missing .part as a finalize failure and never promotes', async () => {
+    const host = createMemoryDownloadHost({
+      downloadImpl: async () => ({ uri: 'file:///documents/fan-performances/187.part' }),
+    });
+    const promote = jest.spyOn(host, 'promote');
+    setDownloadFileHostForTests(host);
+    setDownloadProbeForTests(async () => ({
+      status: 206,
+      sourceRevision: '"etag-9"',
+      byteSize: 4,
+    }));
+
+    enqueueDownload(track, memberId, async () => 'member-token');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(promote).not.toHaveBeenCalled();
+    expect(await getCompletedDownload(memberId, '187')).toBeNull();
+    expect(host.exists('file:///documents/fan-performances/187')).toBe(false);
+    expect(getDownloadUiSnapshot(memberId, '187')).toMatchObject({
+      status: 'failed',
+      error: DOWNLOAD_PART_MISSING_MESSAGE,
+    });
+    expect(getDownloadUiSnapshot(memberId, '187')?.error).not.toBe(DOWNLOAD_FAILED_MESSAGE);
+    expect(Sentry.addBreadcrumb).toHaveBeenCalledWith(
+      expect.objectContaining({
+        category: 'download',
+        message: 'task-complete',
+        data: expect.objectContaining({
+          exists: false,
+          size: 0,
+          destMismatch: false,
+          progressVsProbe: 'probe-only',
+          tinyComplete: false,
+        }),
+      }),
+    );
+  });
+
+  it('treats an empty .part as a finalize failure before promote', async () => {
+    const host = createMemoryDownloadHost({
+      downloadImpl: async ({ destUri }) => {
+        host.files.set(destUri, new Uint8Array());
+        return { uri: destUri };
+      },
+    });
+    const promote = jest.spyOn(host, 'promote');
+    setDownloadFileHostForTests(host);
+    setDownloadProbeForTests(async () => ({
+      status: 206,
+      sourceRevision: '"etag-9"',
+      byteSize: 4,
+    }));
+
+    enqueueDownload(track, memberId, async () => 'member-token');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(promote).not.toHaveBeenCalled();
+    expect(await getCompletedDownload(memberId, '187')).toBeNull();
+    expect(host.exists('file:///documents/fan-performances/187.part')).toBe(false);
+    expect(getDownloadUiSnapshot(memberId, '187')).toMatchObject({
+      status: 'failed',
+      error: DOWNLOAD_EMPTY_PART_MESSAGE,
+    });
+    expect(getDownloadUiSnapshot(memberId, '187')?.error).not.toBe(DOWNLOAD_FAILED_MESSAGE);
+    expect(getDownloadUiSnapshot(memberId, '187')?.status).not.toBe('downloaded');
+  });
+
+  it('prefers the returned task File URI when dest .part was not written', async () => {
+    const returnedUri = 'file:///cache/task-187';
+    const host = createMemoryDownloadHost({
+      downloadImpl: async () => {
+        host.files.set(returnedUri, new Uint8Array([1, 2, 3, 4]));
+        return { uri: returnedUri };
+      },
+    });
+    setDownloadFileHostForTests(host);
+    setDownloadProbeForTests(async () => ({
+      status: 206,
+      sourceRevision: '"etag-9"',
+      byteSize: 4,
+    }));
+
+    enqueueDownload(track, memberId, async () => 'member-token');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(host.exists('file:///documents/fan-performances/187')).toBe(true);
+    expect(host.exists(returnedUri)).toBe(false);
+    expect(getDownloadUiSnapshot(memberId, '187')?.status).toBe('downloaded');
+    expect(Sentry.addBreadcrumb).toHaveBeenCalledWith(
+      expect.objectContaining({
+        category: 'download',
+        message: 'task-complete',
+        data: expect.objectContaining({
+          destMismatch: true,
+          destUri: 'file:///documents/fan-performances/187.part',
+          returnedUri,
+        }),
+      }),
+    );
+  });
+
+  it('breadcrumbs a Cloudflare hop host+path without query tokens', async () => {
+    jest.mocked(Sentry.addBreadcrumb).mockClear();
+    const returnedUri = 'file:///cache/task-187';
+    const host = createMemoryDownloadHost({
+      downloadImpl: async () => {
+        host.files.set(returnedUri, new Uint8Array([1, 2, 3, 4]));
+        return { uri: returnedUri };
+      },
+    });
+    setDownloadFileHostForTests(host);
+    setDownloadProbeForTests(async () => ({
+      status: 206,
+      sourceRevision: '"etag-9"',
+      byteSize: 4,
+      redirected: true,
+      finalTarget: 'cdn2.queenzone.org/songfiles/clip.mp3',
+      contentType: 'audio/mpeg',
+      contentLength: 4,
+    }));
+
+    enqueueDownload(track, memberId, async () => 'member-token');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(getDownloadUiSnapshot(memberId, '187')?.status).toBe('downloaded');
+    expect(Sentry.addBreadcrumb).toHaveBeenCalledWith(
+      expect.objectContaining({
+        category: 'download',
+        message: 'probe',
+        data: expect.objectContaining({
+          redirected: true,
+          finalTarget: 'cdn2.queenzone.org/songfiles/clip.mp3',
+          requestTarget: expect.stringMatching(/\/api\/v1\/content\/fan-performances\/187\/audio$/),
+        }),
+      }),
+    );
+    expect(Sentry.addBreadcrumb).toHaveBeenCalledWith(
+      expect.objectContaining({
+        category: 'download',
+        message: 'task-complete',
+        data: expect.objectContaining({
+          destMismatch: true,
+          redirected: true,
+          finalTarget: 'cdn2.queenzone.org/songfiles/clip.mp3',
+        }),
+      }),
+    );
+    const payload = JSON.stringify(jest.mocked(Sentry.addBreadcrumb).mock.calls);
+    expect(payload).not.toMatch(/[?&](sig|token|access_token)=/i);
+    expect(payload).not.toContain('member-token');
+    expect(payload).not.toContain('Bearer');
+  });
+
+  it('rejects a tiny 100% progress total that does not match a real recording', async () => {
+    const host = createMemoryDownloadHost({
+      downloadImpl: async ({ destUri, onProgress }) => {
+        onProgress?.(200, 200);
+        host.files.set(destUri, new Uint8Array(200));
+        return { uri: destUri };
+      },
+    });
+    const promote = jest.spyOn(host, 'promote');
+    setDownloadFileHostForTests(host);
+    setDownloadProbeForTests(async () => ({
+      status: 0,
+      sourceRevision: null,
+      byteSize: null,
+    }));
+
+    enqueueDownload(track, memberId, async () => 'member-token');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(promote).not.toHaveBeenCalled();
+    expect(await getCompletedDownload(memberId, '187')).toBeNull();
+    expect(host.exists('file:///documents/fan-performances/187')).toBe(false);
+    expect(getDownloadUiSnapshot(memberId, '187')).toMatchObject({
+      status: 'failed',
+      error: DOWNLOAD_TOO_SMALL_MESSAGE,
+    });
+    expect(getDownloadUiSnapshot(memberId, '187')?.status).not.toBe('downloaded');
+    expect(Sentry.addBreadcrumb).toHaveBeenCalledWith(
+      expect.objectContaining({
+        category: 'download',
+        message: 'task-complete',
+        data: expect.objectContaining({
+          progressTotal: 200,
+          size: 200,
+          progressVsProbe: 'progress-only',
+          tinyComplete: true,
+          destMismatch: false,
+        }),
+      }),
+    );
+  });
+
+  it('does not let a tiny progress total overwrite a larger probe Content-Length', async () => {
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const host = createMemoryDownloadHost({
+      downloadImpl: async ({ destUri, onProgress }) => {
+        onProgress?.(200, 200);
+        await held;
+        host.files.set(destUri, new Uint8Array(5_000_000));
+        return { uri: destUri };
+      },
+    });
+    setDownloadFileHostForTests(host);
+    setDownloadProbeForTests(async () => ({
+      status: 206,
+      sourceRevision: '"etag-9"',
+      byteSize: 5_000_000,
+    }));
+
+    enqueueDownload(track, memberId, async () => 'member-token');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const snapshot = getDownloadUiSnapshot(memberId, '187');
+    expect(snapshot?.status).toBe('downloading');
+    expect(snapshot?.byteSize).toBe(200);
+    expect(snapshot?.expectedBytes).toBe(5_000_000);
+
+    release();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(getDownloadUiSnapshot(memberId, '187')?.status).toBe('downloaded');
+  });
+
+  it('maps a NoSuchFile promote error to the missing-part message', async () => {
+    const host = createMemoryDownloadHost({
+      downloadImpl: async ({ destUri }) => {
+        host.files.set(destUri, new Uint8Array([1, 2, 3, 4]));
+        return { uri: destUri };
+      },
+    });
+    host.promote = () => {
+      const error = new Error('NoSuchFileException: fan-performances/187.part');
+      error.name = 'NoSuchFileException';
+      throw error;
+    };
+    setDownloadFileHostForTests(host);
+    setDownloadProbeForTests(async () => ({
+      status: 206,
+      sourceRevision: '"etag-9"',
+      byteSize: 4,
+    }));
+
+    enqueueDownload(track, memberId, async () => 'member-token');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(getDownloadUiSnapshot(memberId, '187')).toMatchObject({
+      status: 'failed',
+      error: DOWNLOAD_PART_MISSING_MESSAGE,
+    });
+    expect(getDownloadUiSnapshot(memberId, '187')?.error).not.toBe(DOWNLOAD_FAILED_MESSAGE);
+    expect(await getCompletedDownload(memberId, '187')).toBeNull();
+  });
+
+  it('keeps rate-limit copy on a 5-minute window', async () => {
+    expect(DOWNLOAD_RATE_LIMITED_MESSAGE).toContain('5 minutes');
+    expect(DOWNLOAD_RATE_LIMITED_MESSAGE.toLowerCase()).not.toContain('wait a minute');
+  });
+
+  it('memory host promote refuses a missing or empty .part', () => {
+    const host = createMemoryDownloadHost();
+    expect(() => host.promote('file:///documents/fan-performances/187.part', 'file:///done')).toThrow(
+      DOWNLOAD_PART_MISSING_MESSAGE,
+    );
+    host.files.set('file:///documents/fan-performances/187.part', new Uint8Array());
+    expect(() =>
+      host.promote('file:///documents/fan-performances/187.part', 'file:///done'),
+    ).toThrow(DOWNLOAD_EMPTY_PART_MESSAGE);
+  });
+
+  it('rejects a short file against a larger probe Content-Length as incomplete', async () => {
+    const host = createMemoryDownloadHost({
+      downloadImpl: async ({ destUri }) => {
+        host.files.set(destUri, new Uint8Array(1000));
+        return { uri: destUri };
+      },
+    });
+    const promote = jest.spyOn(host, 'promote');
+    setDownloadFileHostForTests(host);
+    setDownloadProbeForTests(async () => ({
+      status: 206,
+      sourceRevision: '"etag-9"',
+      byteSize: 10_000,
+    }));
+
+    enqueueDownload(track, memberId, async () => 'member-token');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(promote).not.toHaveBeenCalled();
+    expect(await getCompletedDownload(memberId, '187')).toBeNull();
+    expect(host.exists('file:///documents/fan-performances/187')).toBe(false);
+    expect(getDownloadUiSnapshot(memberId, '187')).toMatchObject({
+      status: 'failed',
+      error: DOWNLOAD_INCOMPLETE_MESSAGE,
+    });
+    expect(getDownloadUiSnapshot(memberId, '187')?.status).not.toBe('downloaded');
+  });
+
+  it('native host prefers the downloadAsync File URI and refuses a missing .part move', async () => {
+    setDownloadFileHostForTests(null);
+    const host = getDownloadFileHost();
+    const result = await host.download({
+      url: 'https://example.test/audio',
+      destUri: 'file:///documents/fan-performances/178.part',
+      headers: { Authorization: 'Bearer token' },
+    });
+    expect(result?.uri).toBe('file:///documents/x');
+    expect(() => host.promote('file:///missing.part', 'file:///done')).toThrow(
+      DOWNLOAD_PART_MISSING_MESSAGE,
+    );
   });
 
   it('sign-out deletes files, partials, and the manifest', async () => {
