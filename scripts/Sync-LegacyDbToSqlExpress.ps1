@@ -114,6 +114,25 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "sqlpackage extract failed with exit code $LASTEXITCODE" }
 
     Write-Host "Recreating staging database $stagingDatabase..."
+
+    # A hard-killed prior run (workflow cancellation, runner crash) can leave this
+    # staging database's .mdf/.ldf files on disk without a matching sys.databases
+    # entry, if it died between CREATE DATABASE and this script's own DROP DATABASE
+    # cleanup. sys.databases won't show it, so the IF EXISTS/DROP below is skipped,
+    # and CREATE DATABASE then fails with "file already exists". Sweep any such
+    # orphaned files first so this run can self-heal instead of failing again.
+    $stagingDbId = (sqlcmd -S "localhost\$InstanceName" -h -1 -W -Q "SET NOCOUNT ON; SELECT ISNULL(CONVERT(varchar(10), DB_ID(N'$stagingDatabase')), '')") -join ''
+    if ([string]::IsNullOrWhiteSpace($stagingDbId.Trim())) {
+        $dataPath = ((sqlcmd -S "localhost\$InstanceName" -h -1 -W -Q "SET NOCOUNT ON; SELECT CONVERT(nvarchar(260), SERVERPROPERTY('InstanceDefaultDataPath'))") -join '').Trim()
+        if (-not [string]::IsNullOrWhiteSpace($dataPath) -and (Test-Path $dataPath)) {
+            Get-ChildItem -Path $dataPath -Filter "$stagingDatabase.*" -ErrorAction SilentlyContinue |
+                ForEach-Object {
+                    Write-Host "Removing orphaned staging database file from an interrupted run: $($_.Name)"
+                    Remove-Item $_.FullName -Force -ErrorAction SilentlyContinue
+                }
+        }
+    }
+
     $dropSql = @"
 IF EXISTS (SELECT 1 FROM sys.databases WHERE name = '$stagingDatabase')
 BEGIN
