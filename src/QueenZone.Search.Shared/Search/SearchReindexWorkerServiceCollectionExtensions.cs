@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace QueenZone.Search.Shared;
 
@@ -26,6 +27,7 @@ public static class SearchReindexWorkerServiceCollectionExtensions
             services.AddOptions<SearchReindexSchedulerOptions>();
         }
 
+        services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<SearchReindexBuilder>();
         services.AddScoped<SearchReindexScheduledWorker>();
         return services;
