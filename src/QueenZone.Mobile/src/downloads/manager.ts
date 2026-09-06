@@ -285,7 +285,7 @@ async function runDownload(
         throw new Error(DOWNLOAD_RATE_LIMITED_MESSAGE);
       }
       // Non-200/206 (including a timed-out probe status 0) is not fatal.
-      // Streaming already proved the file is there; File.createDownloadTask
+      // Streaming already proved the file is there; File.downloadFileAsync
       // is the real transfer (full GET — a Cloudflare Worker hop, if any,
       // can disagree on Content-Length / error body / redirect vs Range).
       // A Range probe that ignores Range and buffers the whole MP3 used to

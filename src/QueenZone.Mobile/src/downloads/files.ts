@@ -149,8 +149,13 @@ function createNativeHost(): DownloadFileHost {
       if (dest.exists) {
         dest.delete();
       }
-      const task = File.createDownloadTask(url, dest, {
+      // The task API reported successful full GETs without leaving a usable
+      // file on both platforms. The one-shot API owns transfer + destination
+      // materialisation as one native operation and still supports progress
+      // and cancellation.
+      const file = await File.downloadFileAsync(url, dest, {
         headers,
+        idempotent: true,
         signal,
         onProgress: onProgress
           ? ({ bytesWritten, totalBytes }) => {
@@ -158,7 +163,6 @@ function createNativeHost(): DownloadFileHost {
             }
           : undefined,
       });
-      const file = await task.downloadAsync();
       if (!file) {
         throw new Error('Download did not complete.');
       }
