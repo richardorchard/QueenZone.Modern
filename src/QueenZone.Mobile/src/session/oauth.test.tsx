@@ -8,6 +8,7 @@ import {
   refreshAccessToken,
   remoteAuthTimeoutMs,
   revokeRefreshToken,
+  signInWithPassword,
   signInWithProvider,
 } from './oauth';
 import { jsonResponse } from '../test/fixtures';
@@ -113,6 +114,42 @@ describe('signInWithProvider', () => {
 
     await expect(pending).resolves.toEqual({ accessToken: 'a', refreshToken: 'r', expiresIn: 900 });
     expect(WebBrowser.dismissAuthSession).toHaveBeenCalled();
+  });
+});
+
+describe('signInWithPassword', () => {
+  it('exchanges email and password for the same token shape as authorization_code', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ access_token: 'a', refresh_token: 'r', expires_in: 900 }),
+    );
+
+    await expect(signInWithPassword('http://qz.test', 'reviewer@example.com', 'secret')).resolves.toEqual({
+      accessToken: 'a',
+      refreshToken: 'r',
+      expiresIn: 900,
+    });
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/api/v1/auth/token');
+    expect(fetchMock.mock.calls[0]?.[1]?.body).toBe(
+      'grant_type=password&client_id=queenzone-mobile&username=reviewer%40example.com&password=secret',
+    );
+  });
+
+  it('maps invalid_grant to a generic credential error', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ error: 'invalid_grant', error_description: 'The password grant is invalid.' }, 400),
+    );
+    await expect(signInWithPassword('http://qz.test', 'reviewer@example.com', 'nope')).rejects.toThrow(
+      'Incorrect email or password.',
+    );
+  });
+
+  it('surfaces a suspended account without treating it as a generic credential error', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ error: 'invalid_grant', error_description: 'This account has been suspended.' }, 400),
+    );
+    await expect(signInWithPassword('http://qz.test', 'reviewer@example.com', 'secret')).rejects.toThrow(
+      'This account has been suspended.',
+    );
   });
 });
 

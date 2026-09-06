@@ -17,7 +17,13 @@ import { ApiError, fetchJson } from '../api/client';
 import { fallbackProfileLimits, parseMemberProfile, type MemberProfile } from '../api/me';
 import type { AuthTokens } from '../api/auth';
 import { clearPushRegistration, refreshPushRegistration, syncPushRegistration } from '../notifications';
-import { logoutRemote, refreshAccessToken, revokeRefreshToken, signInWithProvider } from './oauth';
+import {
+  logoutRemote,
+  refreshAccessToken,
+  revokeRefreshToken,
+  signInWithPassword as requestPasswordTokens,
+  signInWithProvider,
+} from './oauth';
 import {
   isSmokeAuthEnabled,
   parseSmokeAuthAccessToken,
@@ -54,6 +60,7 @@ export type Session = {
 
 export type SessionActions = {
   signIn: (provider: string) => Promise<void>;
+  signInWithPassword: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<MemberProfile | null>;
   ensureAccessToken: () => Promise<string | null>;
@@ -562,6 +569,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [applyTokens],
   );
 
+  const signInWithPassword = useCallback(
+    async (email: string, password: string) => {
+      const tokens = await requestPasswordTokens(getAppConfig().apiBaseUrl, email, password);
+      await applyTokens(tokens);
+    },
+    [applyTokens],
+  );
+
   const signOut = useCallback(async () => {
     // Current tokens/profile are read via sessionRef / refreshTokenRef so this
     // callback identity stays stable across token refresh and /me.
@@ -614,13 +629,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const actions = useMemo<SessionActions>(
     () => ({
       signIn,
+      signInWithPassword,
       applySmokeSession,
       signOut,
       refreshProfile,
       ensureAccessToken,
       setAccessToken,
     }),
-    [applySmokeSession, ensureAccessToken, refreshProfile, setAccessToken, signIn, signOut],
+    [applySmokeSession, ensureAccessToken, refreshProfile, setAccessToken, signIn, signInWithPassword, signOut],
   );
 
   return (

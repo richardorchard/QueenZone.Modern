@@ -19,7 +19,7 @@ QueenZone is an independent, fan-run Queen archive and community and is not affi
 Most archive, news and photography features are available without signing in. To review member-only functionality, use the supplied review account:
 
 1. Open QueenZone and select the profile avatar from Home.
-2. Sign in with the supplied review account.
+2. On Sign in, expand **Other ways to sign in** and enter the supplied review email and password. Do not use a social provider for this reviewer account.
 3. Forum posting is available from the Forum tab. Please create clearly identified test content and remove it when finished if the UI offers that option.
 4. Private messages are available from the member profile. `[ADD A SECOND SAFE TEST RECIPIENT OR EXPLAIN THE REVIEW FIXTURE]`.
 5. Photo submission is available from Photography. Submissions enter moderation and do not publish immediately.

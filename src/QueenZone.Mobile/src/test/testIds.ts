@@ -107,6 +107,10 @@ export const testIds = {
   fanPerformanceReportSend: 'fan-performance-report-send',
 
   signInClose: 'sign-in-close',
+  signInOtherWays: 'sign-in-other-ways',
+  signInEmail: 'sign-in-email',
+  signInPassword: 'sign-in-password',
+  signInPasswordSubmit: 'sign-in-password-submit',
 
   memberGate: 'member-gate',
   inboxScreen: 'inbox-screen',
