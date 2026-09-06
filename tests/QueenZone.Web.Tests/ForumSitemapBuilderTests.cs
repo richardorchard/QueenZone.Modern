@@ -124,6 +124,10 @@ public sealed class ForumSitemapBuilderTests
             CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<ForumRecentThreadItem>>([]);
 
+        public Task<IReadOnlyList<ForumRecentThreadItem>> GetLegacyDiscographyThreadsAsync(
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<ForumRecentThreadItem>>([]);
+
         public Task<ForumArchiveStats> GetArchiveStatsAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult(new ForumArchiveStats(0, 0, 0));
 

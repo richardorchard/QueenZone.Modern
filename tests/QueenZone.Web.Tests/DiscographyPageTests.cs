@@ -26,6 +26,30 @@ public sealed class DiscographyPageTests : IClassFixture<WebApplicationFactory<P
     }
 
     [Fact]
+    public async Task DiscographyIndexLinksToRareDiscography()
+    {
+        var client = factory.CreateClient();
+
+        var body = await client.GetStringAsync("/discography");
+
+        Assert.Contains("/discography/rare-discography", body);
+        Assert.Contains("John S Stuart", body);
+    }
+
+    [Fact]
+    public async Task RareDiscographyPage_RendersLegacyDiscographyThreads()
+    {
+        var client = factory.CreateClient();
+
+        var body = await client.GetStringAsync("/discography/rare-discography");
+
+        Assert.Contains("Rare Discography", body);
+        Assert.Contains("John S Stuart", body);
+        Assert.Contains("Complete guide to Queen promo-only pressings", body);
+        Assert.Contains(TestSiteConfiguration.CanonicalLink("/discography/rare-discography"), body);
+    }
+
+    [Fact]
     public async Task DiscographyAlbumDetail_RendersTracklist()
     {
         var client = factory.CreateClient();
