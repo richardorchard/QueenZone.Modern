@@ -121,7 +121,14 @@ else
             }
             @if (isAdmin)
             {
-              <a class="qz-button qz-button--danger" href="/forum/post/@post.Id/hide-author">Hide all by this author</a>
+              <a class="qz-forum-post__hide-author-link" href="/forum/post/@post.Id/hide-author" aria-label="Hide all posts by @post.AuthorUsername" title="Hide all posts by @post.AuthorUsername">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="m17 11 4 4m0-4-4 4" />
+                </svg>
+                <span class="visually-hidden">Hide all posts by @post.AuthorUsername</span>
+              </a>
             }
           </div>
         }

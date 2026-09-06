@@ -6176,7 +6176,8 @@ select.qz-input {
 
 .qz-forum-post__quote-link,
 .qz-forum-post__edit-link,
-.qz-forum-post__message-link {
+.qz-forum-post__message-link,
+.qz-forum-post__hide-author-link {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -6194,9 +6195,19 @@ select.qz-input {
   color: var(--qz-blue);
 }
 
+.qz-forum-post__hide-author-link {
+  margin-left: auto;
+}
+
+.qz-forum-post__hide-author-link:hover,
+.qz-forum-post__hide-author-link:focus-visible {
+  color: var(--qz-burgundy);
+}
+
 .qz-forum-post__quote-link svg,
 .qz-forum-post__edit-link svg,
-.qz-forum-post__message-link svg {
+.qz-forum-post__message-link svg,
+.qz-forum-post__hide-author-link svg {
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
