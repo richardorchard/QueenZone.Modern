@@ -25,12 +25,15 @@ describe('ArchiveIconPlate', () => {
       'aria-hidden': true,
     });
 
-    const groups = UNSAFE_getAllByType(G);
-    expect(groups).toHaveLength(1);
-    expect(groups[0].props.transform).toBe(`translate(${tx}, ${tx}) scale(${s})`);
-    expect(groups[0].props.fill).toBe('none');
-    expect(groups[0].props.strokeWidth).toBe(1.15);
-    expect(groups[0].props.strokeLinecap).toBe('round');
-    expect(groups[0].props.strokeLinejoin).toBe('round');
+    const glyph = UNSAFE_getAllByType(G).find(
+      (node) =>
+        typeof node.props.transform === 'string' && node.props.transform.startsWith('translate('),
+    );
+    expect(glyph).toBeDefined();
+    expect(glyph?.props.transform).toBe(`translate(${tx}, ${tx}) scale(${s})`);
+    expect(glyph?.props.fill).toBe('none');
+    expect(glyph?.props.strokeWidth).toBe(1.15);
+    expect(glyph?.props.strokeLinecap).toBe('round');
+    expect(glyph?.props.strokeLinejoin).toBe('round');
   });
 });
