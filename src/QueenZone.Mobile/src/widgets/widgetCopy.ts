@@ -121,7 +121,13 @@ export function widgetSecondaryPt(family: WidgetFamily): number {
 }
 
 export function widgetGraphemeCount(copy: string): number {
-  return [...new Intl.Segmenter('en', { granularity: 'grapheme' }).segment(copy)].length;
+  const Segmenter = Intl.Segmenter;
+  if (typeof Segmenter !== 'function') {
+    // Hermes does not currently expose Intl.Segmenter. Counting code points is
+    // sufficient for the font-size estimate and avoids aborting widget render.
+    return Array.from(copy).length;
+  }
+  return [...new Segmenter('en', { granularity: 'grapheme' }).segment(copy)].length;
 }
 
 /**
