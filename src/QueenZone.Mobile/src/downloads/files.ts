@@ -126,20 +126,12 @@ function createNativeHost(): DownloadFileHost {
     },
     async readPrefix(uri, maxBytes) {
       try {
-        const file = fileFor(uri);
-        if (!file.exists) {
+        const file = fileFor(uri) as { exists: boolean; bytes?: () => Uint8Array | Promise<Uint8Array> };
+        if (!file.exists || typeof file.bytes !== 'function') {
           return null;
         }
-        const reader = file as { bytes?: () => Uint8Array | Promise<Uint8Array> };
-        if (typeof reader.bytes !== 'function') {
-          return null;
-        }
-        const result = reader.bytes();
-        const bytes = result instanceof Promise ? await result : result;
-        if (!bytes) {
-          return null;
-        }
-        return bytes.subarray(0, Math.min(maxBytes, bytes.length));
+        const bytes = await Promise.resolve(file.bytes());
+        return bytes ? bytes.subarray(0, Math.min(maxBytes, bytes.length)) : null;
       } catch {
         return null;
       }

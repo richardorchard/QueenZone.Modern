@@ -32,10 +32,8 @@ function statusRank(status: DownloadUiSnapshot['status']): number {
       return 1;
     case 'failed':
       return 2;
-    case 'removing':
-      return 3;
     default:
-      return 4;
+      return 3;
   }
 }
 
@@ -49,9 +47,6 @@ function statusLine(item: DownloadUiSnapshot): string {
   }
   if (item.status === 'failed') {
     return item.error ?? 'Download failed';
-  }
-  if (item.status === 'removing') {
-    return 'Removing';
   }
   const sizeLabel = formatByteSize(item.byteSize);
   return sizeLabel ? `Downloaded · ${sizeLabel}` : 'Downloaded';

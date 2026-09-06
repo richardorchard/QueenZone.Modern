@@ -72,6 +72,13 @@ describe('FanPerformanceDownloadsList', () => {
   it('lists in-progress and failed downloads with their status', () => {
     setDownloadUiSnapshot(
       'member-1',
+      transientSnapshot('190', 'queued', {
+        title: 'Now I\'m Here',
+        performedBy: 'Sam',
+      }),
+    );
+    setDownloadUiSnapshot(
+      'member-1',
       transientSnapshot('188', 'downloading', {
         title: 'Liar',
         performedBy: 'Sam',
@@ -89,6 +96,8 @@ describe('FanPerformanceDownloadsList', () => {
     );
 
     renderWithProviders(<FanPerformanceDownloadsList />, { navigation: false });
+    expect(screen.getByText('Now I\'m Here')).toBeOnTheScreen();
+    expect(screen.getByText(/Queued/)).toBeOnTheScreen();
     expect(screen.getByText('Liar')).toBeOnTheScreen();
     expect(screen.getByText(/Downloading · 25%/)).toBeOnTheScreen();
     expect(screen.getByText('Father To Son')).toBeOnTheScreen();
