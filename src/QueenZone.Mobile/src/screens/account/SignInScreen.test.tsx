@@ -2,6 +2,7 @@ import { screen, userEvent, waitFor } from '@testing-library/react-native';
 import { fallbackAuthProviders } from '../../api/auth';
 import { jsonResponse } from '../../test/fixtures';
 import { createMockSession } from '../../test/mockSession';
+import { testIds } from '../../test/testIds';
 import { fakeNavigation, renderWithProviders } from '../../test/render';
 import { SignInScreen } from './SignInScreen';
 
@@ -16,6 +17,7 @@ const fetchMock = jest.fn<Promise<Response>, [RequestInfo | URL, RequestInit?]>(
 beforeEach(() => {
   mockSession.isSignedIn = false;
   mockSession.signIn.mockReset();
+  mockSession.signInWithPassword.mockReset();
   fetchMock.mockReset();
   global.fetch = fetchMock as unknown as typeof fetch;
   fetchMock.mockResolvedValue(jsonResponse({ providers: fallbackAuthProviders }));
@@ -61,5 +63,53 @@ describe('SignInScreen', () => {
         params: { screen: 'Composer', params: { threadId: 9 } },
       }),
     );
+  });
+
+  it('expands other ways and completes password sign-in on the same session path', async () => {
+    const user = userEvent.setup();
+    mockSession.signInWithPassword.mockResolvedValue(undefined);
+    const navigation = renderSignIn({ tab: 'ForumTab', screen: 'Composer', params: { threadId: 9 } });
+    await waitFor(() => expect(screen.getByTestId(testIds.signInOtherWays)).toBeOnTheScreen());
+    expect(screen.queryByTestId(testIds.signInEmail)).toBeNull();
+
+    await user.press(screen.getByTestId(testIds.signInOtherWays));
+    await waitFor(() => expect(screen.getByTestId(testIds.signInEmail)).toBeOnTheScreen());
+    await user.type(screen.getByTestId(testIds.signInEmail), 'reviewer@example.com');
+    await user.type(screen.getByTestId(testIds.signInPassword), 'correct horse battery staple');
+    await user.press(screen.getByTestId(testIds.signInPasswordSubmit));
+
+    await waitFor(() =>
+      expect(mockSession.signInWithPassword).toHaveBeenCalledWith(
+        'reviewer@example.com',
+        'correct horse battery staple',
+      ),
+    );
+    await waitFor(() =>
+      expect(navigation.navigate).toHaveBeenCalledWith('Tabs', {
+        screen: 'ForumTab',
+        params: { screen: 'Composer', params: { threadId: 9 } },
+      }),
+    );
+  });
+
+  it('surfaces a password sign-in failure without leaving', async () => {
+    const user = userEvent.setup();
+    mockSession.signInWithPassword.mockRejectedValue(new Error('Incorrect email or password.'));
+    const navigation = renderSignIn();
+    await waitFor(() => expect(screen.getByTestId(testIds.signInOtherWays)).toBeOnTheScreen());
+    await user.press(screen.getByTestId(testIds.signInOtherWays));
+    await user.type(screen.getByLabelText('Email'), 'reviewer@example.com');
+    await user.type(screen.getByLabelText('Password'), 'wrong');
+    await user.press(screen.getByTestId(testIds.signInPasswordSubmit));
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Incorrect email or password.'));
+    expect(navigation.navigate).not.toHaveBeenCalled();
+  });
+
+  it('describes OAuth secrets separately from the password fallback', async () => {
+    renderSignIn();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Continue with Google' })).toBeOnTheScreen());
+    expect(screen.getByText(/OAuth never sends a provider secret/)).toBeOnTheScreen();
+    expect(screen.getByText(/operator-created accounts/)).toBeOnTheScreen();
+    expect(screen.queryByText(/The app never sees a password/)).toBeNull();
   });
 });

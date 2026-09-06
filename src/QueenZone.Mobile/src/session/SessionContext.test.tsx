@@ -43,6 +43,7 @@ jest.mock('../api/client', () => {
 
 jest.mock('./oauth', () => ({
   signInWithProvider: jest.fn(),
+  signInWithPassword: jest.fn(),
   refreshAccessToken: jest.fn(),
   revokeRefreshToken: jest.fn(),
   logoutRemote: jest.fn(),
@@ -76,6 +77,7 @@ const writeIdentity = tokenStore.writeStoredIdentityShell as jest.MockedFunction
 >;
 const clearStored = tokenStore.clearStoredSession as jest.MockedFunction<typeof tokenStore.clearStoredSession>;
 const signInWithProvider = oauth.signInWithProvider as jest.MockedFunction<typeof oauth.signInWithProvider>;
+const signInWithPassword = oauth.signInWithPassword as jest.MockedFunction<typeof oauth.signInWithPassword>;
 const refreshAccessToken = oauth.refreshAccessToken as jest.MockedFunction<typeof oauth.refreshAccessToken>;
 const logoutRemote = oauth.logoutRemote as jest.MockedFunction<typeof oauth.logoutRemote>;
 const revokeRefreshToken = oauth.revokeRefreshToken as jest.MockedFunction<typeof oauth.revokeRefreshToken>;
@@ -102,6 +104,13 @@ function Probe() {
         }}
       >
         do-sign-in
+      </Text>
+      <Text
+        onPress={() => {
+          void session.signInWithPassword('reviewer@example.com', 'review-pass').catch(() => {});
+        }}
+      >
+        do-password-sign-in
       </Text>
       <Text onPress={() => void session.signOut()}>do-sign-out</Text>
       <Text
@@ -158,6 +167,7 @@ beforeEach(() => {
   writeIdentity.mockResolvedValue(undefined);
   clearStored.mockReset();
   signInWithProvider.mockReset();
+  signInWithPassword.mockReset();
   refreshAccessToken.mockReset();
   logoutRemote.mockReset();
   revokeRefreshToken.mockReset();
@@ -400,6 +410,25 @@ describe('SessionProvider', () => {
       memberId: 'member-1',
       avatarPath: null,
     });
+  });
+
+  it('signs in with email and password through the same token store as OAuth', async () => {
+    const user = userEvent.setup();
+    readStored.mockResolvedValue(null);
+    signInWithPassword.mockResolvedValue(authTokensFixture({ accessToken: 'password-access' }));
+    renderSession();
+    await waitFor(() => expect(screen.getByText('signed-out')).toBeOnTheScreen());
+
+    await user.press(screen.getByText('do-password-sign-in'));
+    await waitFor(() => expect(screen.getByText('signed-in')).toBeOnTheScreen());
+    expect(signInWithPassword).toHaveBeenCalledWith('http://qz.test', 'reviewer@example.com', 'review-pass');
+    expect(signInWithProvider).not.toHaveBeenCalled();
+    expect(writeStored).toHaveBeenCalledWith({
+      accessToken: 'password-access',
+      refreshToken: 'refresh-token',
+      expiresIn: 900,
+    });
+    await waitFor(() => expect(syncPushRegistration).toHaveBeenCalledWith('password-access', 'member-1'));
   });
 
   it('signs out locally even when remote logout never completes', async () => {

@@ -49,6 +49,35 @@ public sealed class MobileAuthRateLimitRouteTests
         Assert.DoesNotContain(issued.AccessToken, body, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task PasswordGrant_ReturnsRfc6749TooManyRequests_AfterIpLimit()
+    {
+        using var factory = CreateFactory(ipPermitLimit: 1);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var members = scope.ServiceProvider.GetRequiredService<MemberAccountService>();
+            var seeded = await members.RegisterAsync(
+                "auth-password-rate@example.com",
+                "correct horse battery staple",
+                "Auth Rate Fan");
+            Assert.True(seeded.Succeeded, seeded.Error);
+        }
+
+        using var client = factory.CreateAnonymousClient();
+        using var firstRequest = PasswordForm();
+        var first = await client.PostAsync(MobileAuthEndpoints.TokenPath, firstRequest);
+        using var secondRequest = PasswordForm();
+        var second = await client.PostAsync(MobileAuthEndpoints.TokenPath, secondRequest);
+
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        Assert.Equal(HttpStatusCode.TooManyRequests, second.StatusCode);
+        Assert.Equal("application/json", second.Content.Headers.ContentType?.MediaType);
+        var payload = await second.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("temporarily_unavailable", payload.GetProperty("error").GetString());
+        Assert.DoesNotContain("auth-password-rate@example.com", await second.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+        Assert.DoesNotContain("correct horse battery staple", await second.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+    }
+
     private static QueenZoneWebApplicationFactory CreateFactory(
         int ipPermitLimit = 30,
         int accountPermitLimit = 10) =>
@@ -106,6 +135,15 @@ public sealed class MobileAuthRateLimitRouteTests
             payload.GetProperty("access_token").GetString()!,
             payload.GetProperty("refresh_token").GetString()!);
     }
+
+    private static FormUrlEncodedContent PasswordForm() =>
+        new(new Dictionary<string, string>
+        {
+            ["grant_type"] = "password",
+            ["client_id"] = MobileAuthOptions.DefaultClientId,
+            ["username"] = "auth-password-rate@example.com",
+            ["password"] = "correct horse battery staple",
+        });
 
     private static string AuthorizeUrl(string challenge, string state = "st") =>
         $"{MobileAuthEndpoints.AuthorizePath}?response_type=code" +

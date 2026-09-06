@@ -261,6 +261,45 @@ public sealed class MobileAuthService(
         return await IssueTokenPairAsync(account, now, cancellationToken);
     }
 
+    public async Task<MobileAuthTokenResult> ExchangePasswordGrantAsync(
+        string? clientId,
+        string? username,
+        string? password,
+        CancellationToken cancellationToken)
+    {
+        var mobile = options.Value;
+        if (!string.Equals(clientId, mobile.ClientId, StringComparison.Ordinal)
+            || string.IsNullOrWhiteSpace(username)
+            || string.IsNullOrWhiteSpace(password))
+        {
+            return MobileAuthTokenResult.Failed("invalid_grant", PasswordGrantInvalidDescription);
+        }
+
+        if (!tokens.CanIssueTokens)
+        {
+            return MobileAuthTokenResult.Failed("temporarily_unavailable", "Mobile auth is not configured.");
+        }
+
+        var signIn = await memberAccountService.SignInAsync(username, password, cancellationToken);
+        if (!signIn.Succeeded || signIn.Account is null)
+        {
+            return MobileAuthTokenResult.Failed(
+                "invalid_grant",
+                string.Equals(signIn.Error, MemberAccountService.SuspendedSignInError, StringComparison.Ordinal)
+                    ? MemberAccountService.SuspendedSignInError
+                    : PasswordGrantInvalidDescription);
+        }
+
+        if (!accountRateLimiter.IsAllowed(signIn.Account.Id))
+        {
+            return MobileAuthTokenResult.RateLimited();
+        }
+
+        return await IssueTokenPairAsync(signIn.Account, timeProvider.GetUtcNow().UtcDateTime, cancellationToken);
+    }
+
+    public const string PasswordGrantInvalidDescription = "The password grant is invalid.";
+
     public async Task RevokeRefreshTokenAsync(string? refreshToken, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(refreshToken))
