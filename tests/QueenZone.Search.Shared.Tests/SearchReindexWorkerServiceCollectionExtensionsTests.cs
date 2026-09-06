@@ -51,4 +51,15 @@ public sealed class SearchReindexWorkerServiceCollectionExtensionsTests
         Assert.Equal("search-reindex", options.LeaseName);
         Assert.True(options.UseRunLease);
     }
+
+    [Fact]
+    public void AddQueenZoneSearchReindexWorker_registers_system_time_provider()
+    {
+        var services = new ServiceCollection();
+        services.AddQueenZoneSearchReindexWorker();
+
+        using var provider = services.BuildServiceProvider();
+
+        Assert.Same(TimeProvider.System, provider.GetRequiredService<TimeProvider>());
+    }
 }
