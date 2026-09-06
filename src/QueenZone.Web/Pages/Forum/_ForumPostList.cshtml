@@ -18,10 +18,17 @@ else
         <div class="qz-forum-post__content">
           <header class="qz-forum-post__header">
             @* Legacy archive posts have no AuthorMemberId; modern posts link to /members/{id}. *@
-            @if (post.AuthorMemberId is Guid authorProfileId)
+            @{
+              var authorHref = post.AuthorMemberId is Guid authorProfileId
+                ? $"/members/{authorProfileId}"
+                : post.AuthorLegacyUserId is int authorLegacyUserId
+                  ? $"/forum/archive-authors/{authorLegacyUserId}"
+                  : null;
+            }
+            @if (authorHref is not null)
             {
-              <a class="qz-forum-post__author-link" href="/members/@authorProfileId" title="View @post.AuthorUsername's profile">
-                <partial name="_MemberAvatar" model="@(new MemberAvatarViewModel { DisplayName = post.AuthorUsername, MemberId = authorProfileId, Size = "sm" })" />
+              <a class="qz-forum-post__author-link" href="@authorHref" title="View @post.AuthorUsername's profile">
+                <partial name="_MemberAvatar" model="@(new MemberAvatarViewModel { DisplayName = post.AuthorUsername, MemberId = post.AuthorMemberId, Size = "sm" })" />
               </a>
             }
             else
@@ -29,9 +36,9 @@ else
               <partial name="_MemberAvatar" model="@(new MemberAvatarViewModel { DisplayName = post.AuthorUsername, Size = "sm" })" />
             }
             <div class="qz-forum-post__author-meta">
-              @if (post.AuthorMemberId is Guid profileMemberId)
+              @if (authorHref is not null)
               {
-                <strong class="qz-forum-post__author"><a class="qz-forum-post__author-link" href="/members/@profileMemberId">@post.AuthorUsername</a></strong>
+                <strong class="qz-forum-post__author"><a class="qz-forum-post__author-link" href="@authorHref">@post.AuthorUsername</a></strong>
               }
               else
               {
