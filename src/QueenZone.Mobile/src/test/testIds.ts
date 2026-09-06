@@ -47,6 +47,7 @@ export const testIds = {
   photosScreen: 'photos-screen',
   photoCategoryScreen: 'photo-category-screen',
   photoViewerScreen: 'photo-viewer-screen',
+  photoViewerClose: 'photo-viewer-close',
   photoViewerSave: 'photo-viewer-save',
 
   archiveHubScreen: 'archive-hub-screen',
@@ -65,6 +66,7 @@ export const testIds = {
   forumScreen: 'forum-screen',
   forumCategoryScreen: 'forum-category-screen',
   forumThreadScreen: 'forum-thread-screen',
+  forumThreadBack: 'forum-thread-back',
   forumThreadWatch: 'forum-thread-watch',
   forumThreadReply: 'forum-thread-reply',
   forumThreadAttachment: 'forum-thread-attachment',
