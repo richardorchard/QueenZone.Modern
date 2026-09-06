@@ -290,11 +290,34 @@ describe('classifyFetchFailure', () => {
     });
   });
 
-  it('maps lost-connection to abort when the deadline aborted the fetch', () => {
+  it('maps a native AbortError to timeout when the deadline fired', () => {
+    const abort = Object.assign(new Error('Aborted'), { name: 'AbortError' });
+    expect(classifyFetchFailure(abort, timedOutDeadline)).toMatchObject({ kind: 'timeout' });
+    expect(classifyFetchFailure(abort, timedOutDeadline)).toBeInstanceOf(ApiError);
+    expect(classifyFetchFailure(abort, liveDeadline)).toMatchObject({ name: 'AbortError' });
+    expect(classifyFetchFailure(abort, liveDeadline)).not.toBeInstanceOf(ApiError);
+  });
+
+  it('maps timed-out Expo cancel to timeout, not AbortError', () => {
+    const canceled = Object.assign(new Error('FetchRequestCanceledException'), {
+      name: 'FetchRequestCanceledException',
+    });
+    expect(classifyFetchFailure(canceled, timedOutDeadline)).toMatchObject({
+      kind: 'timeout',
+      name: 'ApiError',
+    });
+    expect(classifyFetchFailure(canceled, timedOutDeadline)).toBeInstanceOf(ApiError);
+    expect(classifyFetchFailure('FetchRequestCanceledException', timedOutDeadline)).toMatchObject({
+      kind: 'timeout',
+    });
+  });
+
+  it('maps lost-connection to timeout when the deadline aborted the fetch', () => {
     const lost = Object.assign(new Error('The network connection was lost'), {
       name: 'UnexpectedException',
     });
-    expect(classifyFetchFailure(lost, timedOutDeadline)).toMatchObject({ name: 'AbortError' });
+    expect(classifyFetchFailure(lost, timedOutDeadline)).toMatchObject({ kind: 'timeout' });
+    expect(classifyFetchFailure(lost, timedOutDeadline)).toBeInstanceOf(ApiError);
     expect(classifyFetchFailure(lost, liveDeadline)).toMatchObject({ kind: 'offline' });
   });
 
@@ -305,6 +328,10 @@ describe('classifyFetchFailure', () => {
     expect(classifyFetchFailure(lost, liveDeadline, AbortSignal.abort())).toMatchObject({
       name: 'AbortError',
     });
+    expect(classifyFetchFailure(lost, timedOutDeadline, AbortSignal.abort())).toMatchObject({
+      name: 'AbortError',
+    });
+    expect(classifyFetchFailure(lost, timedOutDeadline, AbortSignal.abort())).not.toBeInstanceOf(ApiError);
   });
 
   it('keeps a genuine write TypeError as offline', () => {

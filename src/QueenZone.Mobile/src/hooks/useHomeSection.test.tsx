@@ -1,5 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react-native';
 import { ApiError } from '../api/client';
+import { OFFLINE_MESSAGE, TIMEOUT_MESSAGE } from '../api/errors';
 import { deferred } from '../test/fixtures';
 import { sectionViewOf, useHomeSection, type SectionSnapshot } from './useHomeSection';
 
@@ -157,6 +158,101 @@ describe('useHomeSection', () => {
     rerender({ fn: second });
     await waitFor(() => expect(result.current.view).toEqual({ kind: 'content', data: 'two' }));
     expect(second).toHaveBeenCalled();
+  });
+
+  it('shows a retryable error when the section times out', async () => {
+    const fetcher = jest.fn();
+    fetcher.mockRejectedValueOnce(ApiError.timeout());
+    fetcher.mockResolvedValueOnce('ok');
+    const { result } = renderHook(() => useHomeSection(fetcher));
+
+    await waitFor(() =>
+      expect(result.current.view).toEqual({
+        kind: 'error',
+        message: TIMEOUT_MESSAGE,
+      }),
+    );
+
+    await act(async () => {
+      result.current.reload();
+    });
+    await waitFor(() => expect(result.current.view).toEqual({ kind: 'content', data: 'ok' }));
+  });
+
+  it('shows a retryable error when the section is offline', async () => {
+    const fetcher = jest.fn();
+    fetcher.mockRejectedValueOnce(ApiError.offline());
+    fetcher.mockResolvedValueOnce('ok');
+    const { result } = renderHook(() => useHomeSection(fetcher));
+
+    await waitFor(() =>
+      expect(result.current.view).toEqual({
+        kind: 'error',
+        message: OFFLINE_MESSAGE,
+      }),
+    );
+
+    await act(async () => {
+      result.current.reload();
+    });
+    await waitFor(() => expect(result.current.view).toEqual({ kind: 'content', data: 'ok' }));
+  });
+
+  it('treats a stray AbortError on the initial generation as a timeout failure', async () => {
+    const fetcher = jest.fn().mockRejectedValueOnce(Object.assign(new Error('Aborted'), { name: 'AbortError' }));
+    const { result } = renderHook(() => useHomeSection(fetcher));
+
+    await waitFor(() =>
+      expect(result.current.view).toEqual({
+        kind: 'error',
+        message: TIMEOUT_MESSAGE,
+      }),
+    );
+  });
+
+  it('recovers via refresh after an initial-generation stray AbortError', async () => {
+    const fetcher = jest.fn();
+    fetcher.mockRejectedValueOnce(Object.assign(new Error('Aborted'), { name: 'AbortError' }));
+    fetcher.mockResolvedValueOnce('ok');
+    const { result } = renderHook(() => useHomeSection(fetcher));
+
+    await waitFor(() =>
+      expect(result.current.view).toEqual({
+        kind: 'error',
+        message: TIMEOUT_MESSAGE,
+      }),
+    );
+
+    await act(async () => {
+      await result.current.refresh();
+    });
+    expect(result.current.view).toEqual({ kind: 'content', data: 'ok' });
+  });
+
+  // Field path (Richard/Pat): first load can stay pending; PTR starts a new
+  // generation and recovers. The superseded initial abort must not flash failed.
+  it('lets refresh recover a first generation that stayed pending', async () => {
+    const first = deferred<string>();
+    const second = deferred<string>();
+    const fetcher = jest.fn();
+    fetcher.mockReturnValueOnce(first.promise);
+    fetcher.mockReturnValueOnce(second.promise);
+    const { result } = renderHook(() => useHomeSection(fetcher));
+    expect(result.current.view).toEqual({ kind: 'skeleton' });
+
+    await act(async () => {
+      void result.current.refresh();
+    });
+    const firstSignal = fetcher.mock.calls[0][0] as AbortSignal;
+    expect(firstSignal.aborted).toBe(true);
+    expect(result.current.view).toEqual({ kind: 'skeleton' });
+
+    first.reject(Object.assign(new Error('Aborted'), { name: 'AbortError' }));
+    await flush();
+    expect(result.current.view).toEqual({ kind: 'skeleton' });
+
+    second.resolve('ok');
+    await waitFor(() => expect(result.current.view).toEqual({ kind: 'content', data: 'ok' }));
   });
 
   it('reloads from error without data through skeleton then content', async () => {
