@@ -210,6 +210,48 @@ describe('HomeScreen', () => {
     await flushVirtualizedList();
   });
 
+  it('recovers via pull-to-refresh after an initial-generation forum abort', async () => {
+    fetchForum.mockRejectedValueOnce(Object.assign(new Error('Aborted'), { name: 'AbortError' }));
+    renderHome();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Live Aid remembered' })).toBeOnTheScreen());
+    await waitFor(() => expect(screen.getByText(TIMEOUT_MESSAGE)).toBeOnTheScreen());
+    expect(screen.queryByRole('button', { name: 'Ranking every studio album' })).toBeNull();
+
+    fetchForum.mockResolvedValueOnce([forumRecentThreadFixture()]);
+    await act(async () => {
+      fireEvent(screen.UNSAFE_getByType(RefreshControl), 'refresh');
+    });
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Ranking every studio album' })).toBeOnTheScreen(),
+    );
+    expect(screen.queryByText(TIMEOUT_MESSAGE)).toBeNull();
+    await flushVirtualizedList();
+  });
+
+  // Field path (Richard/Pat): first Home forum load stays on the skeleton;
+  // pull-to-refresh starts a new generation and recovers. The aborted first
+  // generation must not flash a failed section.
+  it('recovers a first-load forum skeleton on pull-to-refresh', async () => {
+    const pendingForum = deferred<ReturnType<typeof forumRecentThreadFixture>[]>();
+    fetchForum.mockReturnValueOnce(pendingForum.promise);
+    renderHome();
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Live Aid remembered' })).toBeOnTheScreen());
+    expect(screen.getByText('In the forum')).toBeOnTheScreen();
+    expect(screen.queryByRole('button', { name: 'Ranking every studio album' })).toBeNull();
+    expect(screen.queryByText(TIMEOUT_MESSAGE)).toBeNull();
+
+    await act(async () => {
+      fireEvent(screen.UNSAFE_getByType(RefreshControl), 'refresh');
+    });
+    pendingForum.reject(Object.assign(new Error('Aborted'), { name: 'AbortError' }));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Ranking every studio album' })).toBeOnTheScreen(),
+    );
+    expect(screen.queryByText(TIMEOUT_MESSAGE)).toBeNull();
+    await flushVirtualizedList();
+  });
+
   it('opens live news and forum rows with numeric ids, not placeholders', async () => {
     const { navigation } = renderHome();
     await waitFor(() => expect(screen.getByRole('button', { name: 'Live Aid remembered' })).toBeOnTheScreen());

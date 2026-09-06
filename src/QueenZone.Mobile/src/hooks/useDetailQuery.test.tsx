@@ -125,7 +125,7 @@ describe('useDetailQuery', () => {
     );
   });
 
-  it('treats a stray AbortError on the current generation as a timeout failure', async () => {
+  it('treats a stray AbortError on the initial generation as a timeout failure', async () => {
     const fetcher = jest.fn().mockRejectedValueOnce(Object.assign(new Error('Aborted'), { name: 'AbortError' }));
     const { result } = renderHook(() => useDetailQuery(fetcher));
 
