@@ -1,12 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import {
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getAppConfig } from '../../config/appConfig';
 import {
@@ -29,6 +22,7 @@ import { MemberGate } from '../../session/MemberGate';
 import { useSession } from '../../session/SessionContext';
 import { radius, space, type, useTheme, type ColorScheme } from '../../theme';
 import { ArchiveImage } from '../../ui/ArchiveImage';
+import { ThemedRefreshControl } from '../../ui/ThemedRefreshControl';
 
 const kinds: { value: SubmissionKind; label: string }[] = [
   { value: 'photos', label: 'Photos' },
@@ -151,7 +145,7 @@ function MySubmissionsList() {
       style={[styles.flex, { backgroundColor: c.surfacePage }]}
       contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + space.xxl }]}
       refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={c.accentPrimary} />
+        <ThemedRefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} />
       }
     >
       <Text style={[type.eyebrow, { color: c.accentPrimary }]}>Members</Text>

@@ -4,7 +4,6 @@ import {
   FlatList,
   KeyboardAvoidingView,
   Platform,
-  RefreshControl,
   StyleSheet,
   Text,
   View,
@@ -21,6 +20,7 @@ import { useSession } from '../../session/SessionContext';
 import { fonts, palette, space, type, useTheme } from '../../theme';
 import { IconButton } from '../../ui/IconButton';
 import { ErrorBlock, LoadingBlock, OfflineBanner } from '../../ui/ScreenStates';
+import { ThemedRefreshControl } from '../../ui/ThemedRefreshControl';
 import { testIds } from '../../test/testIds';
 import {
   buildThreadItems,
@@ -181,11 +181,7 @@ function ConversationThread({ navigation, route }: Props) {
         data={threadItems}
         keyExtractor={threadKeyExtractor}
         refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={conversation.refresh}
-            tintColor={c.accentPrimary}
-          />
+          <ThemedRefreshControl refreshing={refreshing} onRefresh={conversation.refresh} />
         }
         ListHeaderComponent={
           offlineSnapshot ? (
