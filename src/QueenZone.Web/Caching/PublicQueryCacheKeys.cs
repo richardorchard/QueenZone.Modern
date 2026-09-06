@@ -24,6 +24,8 @@ public static class PublicQueryCacheKeys
 
     public const string ForumRecentThreadsSegment = Prefix + ":forum:recent-threads";
 
+    public const string ForumLegacyDiscographyThreads = Prefix + ":forum:legacy-discography-threads";
+
     public const string PhotoVersion = Prefix + ":photo:version";
 
     public const string FanPerformanceVersion = Prefix + ":fan-performance:version";

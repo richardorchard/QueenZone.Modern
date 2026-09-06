@@ -1,0 +1,43 @@
+@page "/discography/rare-discography"
+@model RareDiscographyModel
+
+<partial name="_PageHero" model='@(("The Queenzone.com Archive", "Rare Discography", "The John S Stuart collection — rare recordings and analysis documented, post by post, on the QueenZone.com notice board.", $"{Model.Threads.Count} posts"))' />
+
+<section class="qz-section">
+  <div class="qz-container">
+    <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
+    <p>
+      John S Stuart has previously taken the time to share his knowledge on the QueenZone.com
+      notice board and post some thorough analysis of Queen recordings.
+    </p>
+    <p>
+      Listed here are John's Queen rare / discography posts, that make up the most staggering,
+      amazing Queen discography ever made publicly available.
+    </p>
+    @if (Model.Threads.Count == 0)
+    {
+      <p>No rare discography posts are available yet.</p>
+    }
+    else
+    {
+      <div class="qz-table-wrap">
+        <table class="qz-table">
+          <thead><tr><th>Thread</th><th>Board</th><th>Replies</th><th>Latest</th></tr></thead>
+          <tbody>
+            @foreach (var thread in Model.Threads)
+            {
+              <tr>
+                <td><a href="@thread.DetailPath">@thread.Title</a></td>
+                <td><a href="@thread.CategoryPath">@thread.CategoryName</a></td>
+                <td>@thread.ReplyCount.ToString("N0")</td>
+                <td>
+                  <time datetime="@thread.LastActivityAt.ToString("yyyy-MM-dd")">@thread.LastActivityAt.ToString("dd MMMM yyyy")</time>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+</section>
