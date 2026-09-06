@@ -18,6 +18,7 @@ export type DownloadFileHost = {
   listAllUris(): string[];
   promote(partUri: string, completedUri: string): void;
   writeBytes(uri: string, bytes: Uint8Array): void;
+  readPrefix(uri: string, maxBytes: number): Promise<Uint8Array | null>;
   download(input: {
     url: string;
     destUri: string;
@@ -123,6 +124,26 @@ function createNativeHost(): DownloadFileHost {
       }
       file.write(bytes);
     },
+    async readPrefix(uri, maxBytes) {
+      try {
+        const file = fileFor(uri);
+        if (!file.exists) {
+          return null;
+        }
+        const reader = file as { bytes?: () => Uint8Array | Promise<Uint8Array> };
+        if (typeof reader.bytes !== 'function') {
+          return null;
+        }
+        const result = reader.bytes();
+        const bytes = result instanceof Promise ? await result : result;
+        if (!bytes) {
+          return null;
+        }
+        return bytes.subarray(0, Math.min(maxBytes, bytes.length));
+      } catch {
+        return null;
+      }
+    },
     async download({ url, destUri, headers, onProgress, signal }) {
       audioDir();
       const dest = fileFor(destUri);
@@ -192,6 +213,13 @@ export function createMemoryDownloadHost(
     },
     writeBytes: (uri, bytes) => {
       files.set(uri, bytes);
+    },
+    readPrefix: async (uri, maxBytes) => {
+      const bytes = files.get(uri);
+      if (!bytes) {
+        return null;
+      }
+      return bytes.subarray(0, Math.min(maxBytes, bytes.length));
     },
     download: downloadImpl,
   };

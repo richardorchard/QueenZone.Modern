@@ -5,7 +5,8 @@ import type { FanPerformance } from '../api';
 import { testIds } from '../test/testIds';
 import { EmptyBlock } from '../ui/ScreenStates';
 import { space, type, useTheme } from '../theme';
-import { formatByteSize } from './formatBytes';
+import { DownloadAction } from './DownloadAction';
+import { formatByteSize, formatDownloadProgress } from './formatBytes';
 import { removeDownload } from './manager';
 import { useDownloadMemberId, useDownloadUiList } from './useDownloadUi';
 import type { DownloadUiSnapshot } from './types';
@@ -23,11 +24,47 @@ function toTrack(item: DownloadUiSnapshot): FanPerformance {
   };
 }
 
+function statusRank(status: DownloadUiSnapshot['status']): number {
+  switch (status) {
+    case 'downloading':
+      return 0;
+    case 'queued':
+      return 1;
+    case 'failed':
+      return 2;
+    case 'removing':
+      return 3;
+    default:
+      return 4;
+  }
+}
+
+function statusLine(item: DownloadUiSnapshot): string {
+  if (item.status === 'downloading') {
+    const progress = formatDownloadProgress(item.byteSize, item.expectedBytes);
+    return progress ? `Downloading · ${progress}` : 'Downloading';
+  }
+  if (item.status === 'queued') {
+    return 'Queued';
+  }
+  if (item.status === 'failed') {
+    return item.error ?? 'Download failed';
+  }
+  if (item.status === 'removing') {
+    return 'Removing';
+  }
+  const sizeLabel = formatByteSize(item.byteSize);
+  return sizeLabel ? `Downloaded · ${sizeLabel}` : 'Downloaded';
+}
+
 export function FanPerformanceDownloadsList() {
   const { c } = useTheme();
   const memberId = useDownloadMemberId();
-  const items = useDownloadUiList().filter((item) => item.status === 'downloaded');
+  const items = useDownloadUiList()
+    .filter((item) => item.status !== 'removing')
+    .sort((a, b) => statusRank(a.status) - statusRank(b.status) || a.title.localeCompare(b.title));
   const player = useFanPerformancePlayer();
+  const playQueue = items.filter((item) => item.status === 'downloaded').map(toTrack);
 
   return (
     <FlatList
@@ -39,19 +76,20 @@ export function FanPerformanceDownloadsList() {
       renderItem={({ item }) => {
         const track = toTrack(item);
         const playingThis = player.current?.id === track.id && player.playing;
-        const sizeLabel = formatByteSize(item.byteSize);
         return (
           <View style={[styles.row, { borderTopColor: c.hairline }]}>
             <Pressable
               testID={`${testIds.fanPerformanceDownloadPlayPrefix}${item.performanceId}`}
               accessibilityRole="button"
-              accessibilityLabel={playingThis ? `Pause ${item.title}` : `Play ${item.title} offline`}
+              accessibilityLabel={playingThis ? `Pause ${item.title}` : `Play ${item.title}`}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 6 }}
+              unstable_pressDelay={0}
               onPress={() => {
                 if (player.current?.id === track.id) {
                   player.toggle();
                   return;
                 }
-                player.play(track, items.map(toTrack));
+                player.play(track, playQueue.length > 0 ? playQueue : [track]);
               }}
               style={[
                 styles.play,
@@ -69,25 +107,37 @@ export function FanPerformanceDownloadsList() {
             </Pressable>
             <View style={styles.copy}>
               <Text style={[type.listTitle, { color: c.textPrimary }]}>{item.title}</Text>
-              <Text style={[type.caption, { color: c.textSecondary, marginTop: space.xs }]}>
+              <Text
+                style={[
+                  type.caption,
+                  { color: item.status === 'failed' ? c.danger : c.textSecondary, marginTop: space.xs },
+                ]}
+                numberOfLines={2}
+              >
                 Performed by {item.performedBy}
-                {sizeLabel ? ` · ${sizeLabel}` : ''}
+                {` · ${statusLine(item)}`}
               </Text>
             </View>
-            <Pressable
-              testID={`${testIds.fanPerformanceDownloadRemovePrefix}${item.performanceId}`}
-              accessibilityRole="button"
-              accessibilityLabel={`Remove download of ${item.title}`}
-              onPress={() => {
-                if (!memberId) {
-                  return;
-                }
-                void removeDownload(memberId, item.performanceId);
-              }}
-              style={styles.remove}
-            >
-              <Trash2 size={18} color={c.danger} />
-            </Pressable>
+            {item.status === 'downloaded' ? (
+              <Pressable
+                testID={`${testIds.fanPerformanceDownloadRemovePrefix}${item.performanceId}`}
+                accessibilityRole="button"
+                accessibilityLabel={`Remove download of ${item.title}`}
+                hitSlop={8}
+                unstable_pressDelay={0}
+                onPress={() => {
+                  if (!memberId) {
+                    return;
+                  }
+                  void removeDownload(memberId, item.performanceId);
+                }}
+                style={styles.remove}
+              >
+                <Trash2 size={18} color={c.danger} />
+              </Pressable>
+            ) : (
+              <DownloadAction track={track} compact onNeedSignIn={() => undefined} />
+            )}
           </View>
         );
       }}
