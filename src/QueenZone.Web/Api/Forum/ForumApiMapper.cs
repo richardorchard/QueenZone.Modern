@@ -8,44 +8,54 @@ namespace QueenZone.Web;
 /// </summary>
 public static class ForumApiMapper
 {
-    public static ForumCategoryListItemDto ToCategoryListItem(ForumCategoryItem category) =>
-        new(
+    public static ForumCategoryListItemDto ToCategoryListItem(ForumCategoryItem category)
+    {
+        var name = ForumTextCleaning.CleanForumText(category.Name);
+        return new(
             category.Id,
-            category.Name,
-            category.Description,
+            name,
+            ForumTextCleaning.CleanForumTextOrNull(category.Description),
             category.PostCount,
             category.LastActivityAt,
-            category.LatestThreadTitle,
-            ForumRoutes.GetCategoryCanonicalPath(category.Id, category.Name));
+            ForumTextCleaning.CleanForumTextOrNull(category.LatestThreadTitle),
+            ForumRoutes.GetCategoryCanonicalPath(category.Id, name));
+    }
 
     public static IReadOnlyList<ForumCategoryListItemDto> ToCategoryListItems(
         IEnumerable<ForumCategoryItem> categories) =>
         categories.Select(ToCategoryListItem).ToList();
 
-    public static ForumTopicListItemDto ToTopicListItem(ForumTopicItem topic) =>
-        new(
+    public static ForumTopicListItemDto ToTopicListItem(ForumTopicItem topic)
+    {
+        var title = ForumTextCleaning.CleanForumText(topic.Title);
+        return new(
             topic.Id,
-            topic.Title,
+            title,
             topic.LastActivityAt,
             topic.AuthorUsername,
             topic.ReplyCount,
             topic.LastPostUsername,
             topic.IsSticky,
-            ForumRoutes.GetTopicCanonicalPath(topic.Id, topic.Title));
+            ForumRoutes.GetTopicCanonicalPath(topic.Id, title));
+    }
 
     public static IReadOnlyList<ForumTopicListItemDto> ToTopicListItems(
         IEnumerable<ForumTopicItem> topics) =>
         topics.Select(ToTopicListItem).ToList();
 
-    public static ForumRecentThreadDto ToRecentThread(ForumRecentThreadItem item) =>
-        new(
+    public static ForumRecentThreadDto ToRecentThread(ForumRecentThreadItem item)
+    {
+        var title = ForumTextCleaning.CleanForumText(item.Title);
+        var categoryName = ForumTextCleaning.CleanForumText(item.CategoryName);
+        return new(
             item.TopicId,
-            item.Title,
+            title,
             item.CategoryId,
-            item.CategoryName,
+            categoryName,
             item.ReplyCount,
             item.LastActivityAt,
-            ForumRoutes.GetTopicCanonicalPath(item.TopicId, item.Title));
+            ForumRoutes.GetTopicCanonicalPath(item.TopicId, title));
+    }
 
     public static IReadOnlyList<ForumRecentThreadDto> ToRecentThreads(
         IEnumerable<ForumRecentThreadItem> items) =>

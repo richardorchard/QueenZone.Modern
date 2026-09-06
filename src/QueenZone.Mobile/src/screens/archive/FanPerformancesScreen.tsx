@@ -233,7 +233,7 @@ export function FanPerformancesScreen({ navigation }: Props) {
             meta={metaLine(item)}
             hint={!canPlay && !isRestoring ? 'Sign in to play' : undefined}
             leading={
-              <View style={styles.leading}>
+              <View style={styles.leading} pointerEvents="box-none">
                 <Pressable
                   testID={`${testIds.fanPerformancePlayPrefix}${item.id}`}
                   accessibilityRole="button"
@@ -245,6 +245,8 @@ export function FanPerformancesScreen({ navigation }: Props) {
                         : `Play ${item.title}`
                       : `Sign in to play ${item.title}`
                   }
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 6 }}
+                  unstable_pressDelay={0}
                   onPress={() => onPlay(item)}
                   style={[
                     styles.play,
