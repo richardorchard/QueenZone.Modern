@@ -1,0 +1,82 @@
+@page "/admin/reviewer-accounts"
+@model QueenZone.Web.Pages.Admin.ReviewerAccounts.IndexModel
+
+<div class="admin-shell">
+  <h1>Reviewer accounts</h1>
+  <p><a href="/admin">Back to admin</a></p>
+
+  @if (Model.StatusMessage is not null)
+  {
+    <div class="admin-status admin-status--success">@Model.StatusMessage</div>
+  }
+
+  <section class="admin-form">
+    <h2>Add reviewer account</h2>
+    <p>Passwords are stored as one-way hashes. They cannot be viewed later. Use Edit to set a replacement password.</p>
+    <form method="post">
+      <div asp-validation-summary="ModelOnly" class="validation-summary-errors"></div>
+      <label asp-for="Input.Email"></label>
+      <input asp-for="Input.Email" type="email" autocomplete="off" />
+      <span asp-validation-for="Input.Email"></span>
+
+      <label asp-for="Input.DisplayName"></label>
+      <input asp-for="Input.DisplayName" autocomplete="off" />
+      <span asp-validation-for="Input.DisplayName"></span>
+
+      <label asp-for="Input.Password"></label>
+      <input id="Input_Password" name="Input.Password" type="password" autocomplete="new-password" />
+      <span asp-validation-for="Input.Password"></span>
+
+      <label asp-for="Input.ConfirmPassword"></label>
+      <input id="Input_ConfirmPassword" name="Input.ConfirmPassword" type="password" autocomplete="new-password" />
+      <span asp-validation-for="Input.ConfirmPassword"></span>
+
+      <label>
+        <input type="checkbox" data-password-visibility="Input_Password,Input_ConfirmPassword" />
+        Show password while entering it
+      </label>
+
+      <button type="submit" class="qz-button">Add account</button>
+    </form>
+  </section>
+
+  <section class="admin-form">
+    <h2>Accounts with password sign-in</h2>
+    @if (Model.Accounts.Count == 0)
+    {
+      <p>No local-password accounts exist.</p>
+    }
+    else
+    {
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Email</th>
+            <th>Display name</th>
+            <th>Password</th>
+            <th>Last login</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          @foreach (var account in Model.Accounts)
+          {
+            <tr>
+              <td>@account.Email</td>
+              <td>@account.DisplayName</td>
+              <td>Set — hidden</td>
+              <td>@(account.LastLoginAt?.ToString("u") ?? "Never")</td>
+              <td>@(account.IsSuspended ? "Suspended" : "Active")</td>
+              <td><a href="/admin/reviewer-accounts/@account.Id">Edit</a></td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
+  </section>
+</div>
+
+@section Scripts {
+  <script src="~/js/admin-reviewer-accounts.js" asp-append-version="true"></script>
+}

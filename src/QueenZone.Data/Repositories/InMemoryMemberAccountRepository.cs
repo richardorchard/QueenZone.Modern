@@ -95,6 +95,70 @@ public sealed class InMemoryMemberAccountRepository : IMemberAccountRepository
         }
     }
 
+    public Task<IReadOnlyList<LocalPasswordAccountSummary>> ListLocalPasswordAccountsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        lock (gate)
+        {
+            IReadOnlyList<LocalPasswordAccountSummary> result = accounts
+                .Where(account => account.PasswordHash is not null)
+                .OrderBy(account => account.Email, StringComparer.OrdinalIgnoreCase)
+                .Select(account => new LocalPasswordAccountSummary(
+                    account.Id,
+                    account.Email,
+                    account.DisplayName,
+                    account.CreatedAt,
+                    account.LastLoginAt,
+                    account.IsSuspended))
+                .ToList();
+            return Task.FromResult(result);
+        }
+    }
+
+    public Task<MemberAccount?> UpdateLocalPasswordAccountAsync(
+        Guid memberId,
+        string email,
+        string displayName,
+        string? passwordHash,
+        CancellationToken cancellationToken = default)
+    {
+        lock (gate)
+        {
+            var account = accounts.FirstOrDefault(candidate => candidate.Id == memberId);
+            if (account?.PasswordHash is null)
+            {
+                return Task.FromResult<MemberAccount?>(null);
+            }
+
+            account.Email = email;
+            account.NormalizedEmail = Normalize(email);
+            account.DisplayName = displayName;
+            if (passwordHash is not null)
+            {
+                account.PasswordHash = passwordHash;
+            }
+
+            return Task.FromResult<MemberAccount?>(account);
+        }
+    }
+
+    public Task<bool> RemoveLocalPasswordAsync(
+        Guid memberId,
+        CancellationToken cancellationToken = default)
+    {
+        lock (gate)
+        {
+            var account = accounts.FirstOrDefault(candidate => candidate.Id == memberId);
+            if (account?.PasswordHash is null)
+            {
+                return Task.FromResult(false);
+            }
+
+            account.PasswordHash = null;
+            return Task.FromResult(true);
+        }
+    }
+
     public Task<MemberAccount?> UpdateAvatarUrlAsync(Guid memberId, string? avatarBlobPath, CancellationToken cancellationToken = default)
     {
         lock (gate)
