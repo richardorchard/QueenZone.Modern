@@ -1,3 +1,5 @@
+using Azure.Storage.Blobs;
+
 namespace QueenZone.Tools.Tests;
 
 public sealed class BlobSnapshotServiceTests
@@ -79,4 +81,47 @@ public sealed class BlobSnapshotServiceTests
     public void ParseMissingEditorialBlobReference_RejectsUnknownSources() =>
         Assert.Throws<InvalidOperationException>(
             () => BlobSnapshotService.ParseMissingEditorialBlobReference("ModernForumPost:43558"));
+
+    [Fact]
+    public void IsCurrent_RequiresMatchingBytesSourceVersionAndFormat()
+    {
+        var blob = new SnapshotBlob("gallery", "photo.jpg", "gallery", 123, "PIC_FILES_T:1", "etag-1");
+        var metadata = new Dictionary<string, string>
+        {
+            ["qzsourceversion"] = BlobSnapshotService.SourceVersion(blob.SourceETag),
+            ["qzsnapshotformat"] = "1",
+        };
+
+        Assert.True(BlobSnapshotService.IsCurrent(blob, 123, metadata));
+        Assert.False(BlobSnapshotService.IsCurrent(blob, 124, metadata));
+        Assert.False(BlobSnapshotService.IsCurrent(blob with { SourceETag = "etag-2" }, 123, metadata));
+        Assert.False(BlobSnapshotService.IsCurrent(blob, 123, new Dictionary<string, string>()));
+    }
+
+    [Fact]
+    public void CreateSourceReadUri_GeneratesReadOnlyBlobSasFromSharedKey()
+    {
+        var accountKey = Convert.ToBase64String(new byte[32]);
+        var service = new BlobServiceClient(
+            $"DefaultEndpointsProtocol=https;AccountName=sourceaccount;AccountKey={accountKey};EndpointSuffix=core.windows.net");
+        var blob = service.GetBlobContainerClient("gallery").GetBlobClient("photo.jpg");
+
+        var result = BlobSnapshotService.CreateSourceReadUri(blob, new DateTimeOffset(2026, 9, 6, 12, 0, 0, TimeSpan.Zero));
+
+        Assert.Equal("sourceaccount.blob.core.windows.net", result.Host);
+        Assert.Contains("sp=r", result.Query, StringComparison.Ordinal);
+        Assert.Contains("sr=b", result.Query, StringComparison.Ordinal);
+        Assert.Contains("sig=", result.Query, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CreateSourceReadUri_PreservesExistingSas()
+    {
+        var blob = new BlobClient(new Uri(
+            "https://sourceaccount.blob.core.windows.net/gallery/photo.jpg?sv=2026-01-01&sp=r&sig=existing"));
+
+        var result = BlobSnapshotService.CreateSourceReadUri(blob, DateTimeOffset.UtcNow);
+
+        Assert.Equal(blob.Uri, result);
+    }
 }

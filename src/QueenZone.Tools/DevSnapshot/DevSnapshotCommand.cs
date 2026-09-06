@@ -68,8 +68,8 @@ internal static class DevSnapshotCommand
                 await session.RemoveMissingEditorialBlobReferencesAsync(referencedSelection.MissingEditorialBlobs);
             }
 
-            Console.WriteLine("Resetting and copying curated blobs.");
-            await blobs.ResetTargetAndCopyAsync(manifest);
+            Console.WriteLine("Reconciling curated blobs with server-side copies.");
+            await blobs.ReconcileTargetAsync(manifest);
             Console.WriteLine("Seeding synthetic dev accounts.");
             await session.SeedSyntheticAccountsAsync(
                 RequiredEnvironment("DEV_SNAPSHOT_ADMIN_PASSWORD"),

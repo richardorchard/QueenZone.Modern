@@ -10,7 +10,13 @@ internal sealed record SnapshotBlob(
     string Name,
     string Budget,
     long Bytes,
-    string Source);
+    string Source,
+    string SourceETag = "",
+    string? ContentType = null,
+    string? CacheControl = null,
+    string? ContentDisposition = null,
+    string? ContentEncoding = null,
+    string? ContentLanguage = null);
 
 [ExcludeFromCodeCoverage]
 internal sealed record SnapshotSummary(
