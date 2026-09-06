@@ -302,7 +302,8 @@ public sealed class ModernForumRepository(QueenZoneDbContext dbContext) : IForum
             row.EditedAt.HasValue
                 ? new DateTimeOffset(DateTime.SpecifyKind(row.EditedAt.Value, DateTimeKind.Utc))
                 : null,
-            row.EditCount);
+            row.EditCount,
+            row.USER_ID);
 
     [ExcludeFromCodeCoverage]
     private static ForumTopicItem MapTopic(ForumTopicRow row) =>

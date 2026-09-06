@@ -184,7 +184,8 @@ public static class PublicContentMapper
             ToForumAttachments(post.Attachments),
             post.AuthorMemberId,
             post.EditedAt,
-            post.EditCount);
+            post.EditCount,
+            AuthorLegacyUserId: post.AuthorLegacyUserId);
 
     public static ForumPostViewModel WithEditState(
         ForumPostViewModel post,

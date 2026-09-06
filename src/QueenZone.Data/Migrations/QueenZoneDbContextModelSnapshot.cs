@@ -1309,6 +1309,9 @@ namespace QueenZone.Data.Migrations
 
                     b.HasIndex("ThreadId");
 
+                    b.HasIndex("AuthorLegacyUserId", "PostedAt")
+                        .HasDatabaseName("IX_ModernForumPost_AuthorLegacyUserId_PostedAt");
+
                     b.ToTable("ModernForumPost", null, t =>
                         {
                             t.ExcludeFromMigrations();

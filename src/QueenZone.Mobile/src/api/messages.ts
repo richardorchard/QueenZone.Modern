@@ -1,6 +1,7 @@
 import { getContentCache } from '../cache/defaultCache';
 import type { ContentCache } from '../cache/contentCache';
-import { conversationCacheKey } from '../cache/keys';
+import { fetchJsonWithOfflineCacheResult } from '../cache/fetchCached';
+import { conversationCacheKey, inboxCacheKey } from '../cache/keys';
 import { withOfflineCacheResult, type CachedResult } from '../cache/withOfflineCache';
 import { resolvePushMemberId } from '../notifications/pushMemberId';
 import { fetchJson, sendJson } from './client';
@@ -73,19 +74,48 @@ export type MessageRecipient = {
   displayName: string;
 };
 
+export type InboxReadQuery = PageQuery & {
+  cache?: ContentCache;
+  /** Pull-to-refresh: write-through on success, never serve a cached snapshot. */
+  networkOnly?: boolean;
+};
+
+const cachedInboxPageSize = 50;
+
 function pageParams({ page, pageSize }: PageQuery) {
   return { page, pageSize };
 }
 
-export function fetchInbox(
+export async function fetchInbox(
   accessToken: string,
-  query: PageQuery = {},
+  query: InboxReadQuery = {},
 ): Promise<ApiPagedResponse<InboxConversation>> {
-  return fetchJson(messagesApiPath, {
+  const fetchOptions = {
     query: pageParams(query),
     signal: query.signal,
     accessToken,
-  });
+  };
+  const memberId = resolvePushMemberId(accessToken, null);
+  const page = query.page ?? 1;
+  const pageSize = query.pageSize ?? cachedInboxPageSize;
+
+  // Only the standard first page is shared and persisted. Later pages have
+  // independent pagination state and must never overwrite the inbox snapshot.
+  if (!memberId || page !== 1 || pageSize !== cachedInboxPageSize) {
+    return fetchJson(messagesApiPath, fetchOptions);
+  }
+
+  const result = await fetchJsonWithOfflineCacheResult<ApiPagedResponse<InboxConversation>>(
+    messagesApiPath,
+    {
+      ...fetchOptions,
+      cacheKey: inboxCacheKey(memberId),
+      cache: query.cache,
+      fallback: query.networkOnly !== true,
+      invalidateOn: [401, 403],
+    },
+  );
+  return result.data;
 }
 
 export function fetchArchivedInbox(
