@@ -1,4 +1,4 @@
-import { screen, userEvent, waitFor } from '@testing-library/react-native';
+import { act, screen, userEvent, waitFor } from '@testing-library/react-native';
 import { createMemoryStorage } from '../cache/storage';
 import { resetExternalStoreForTests } from '../cache/externalStore';
 import { fanPerformanceFixture, memberProfileFixture } from '../test/fixtures';
@@ -134,11 +134,71 @@ describe('FanPerformanceDownloadsList', () => {
     );
 
     renderWithProviders(<FanPerformanceDownloadsList />, { navigation: false });
-    expect(screen.getByText(/Performed by Ann · Downloaded/)).toBeOnTheScreen();
-    expect(screen.getByText(/Performed by Mel · Downloading · 50%/)).toBeOnTheScreen();
+    expect(screen.getByTestId(`${testIds.fanPerformanceDownloadProgressPrefix}191`)).toHaveTextContent(
+      /Downloaded/,
+    );
+    expect(screen.getByTestId(`${testIds.fanPerformanceDownloadProgressPrefix}192`)).toHaveTextContent(
+      'Performed by Mel · Downloading · 50%',
+    );
     expect(screen.getByTestId(`${testIds.fanPerformanceDownloadErrorPrefix}193`)).toHaveTextContent(
       'Too many audio requests. Wait 5 minutes and try again.',
     );
-    expect(screen.queryByText(/Performed by Ann · Downloading/)).toBeNull();
+    expect(screen.getByTestId(`${testIds.fanPerformanceDownloadProgressPrefix}191`)).not.toHaveTextContent(
+      /Downloading/,
+    );
+  });
+
+  it('binds live progress to the retried performance id, not the first row', async () => {
+    setDownloadUiSnapshot(
+      'member-1',
+      transientSnapshot('191', 'failed', {
+        title: 'Aaa First',
+        performedBy: 'Ann',
+        error: 'Could not download this recording. Try again.',
+      }),
+    );
+    setDownloadUiSnapshot(
+      'member-1',
+      transientSnapshot('192', 'failed', {
+        title: 'Mmm Middle',
+        performedBy: 'Mel',
+        error: 'Could not download this recording. Try again.',
+      }),
+    );
+    setDownloadUiSnapshot(
+      'member-1',
+      transientSnapshot('193', 'failed', {
+        title: 'Zzz Last',
+        performedBy: 'Zoe',
+        error: 'Could not download this recording. Try again.',
+      }),
+    );
+
+    const view = renderWithProviders(<FanPerformanceDownloadsList />, { navigation: false });
+
+    act(() => {
+      setDownloadUiSnapshot(
+        'member-1',
+        transientSnapshot('193', 'downloading', {
+          title: 'Zzz Last',
+          performedBy: 'Zoe',
+          byteSize: 400,
+          expectedBytes: 1000,
+        }),
+      );
+    });
+    view.rerender(<FanPerformanceDownloadsList />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId(`${testIds.fanPerformanceDownloadProgressPrefix}193`)).toHaveTextContent(
+        'Performed by Zoe · Downloading · 40%',
+      ),
+    );
+    expect(screen.getByTestId(`${testIds.fanPerformanceDownloadProgressPrefix}191`)).not.toHaveTextContent(
+      /Downloading|40%/,
+    );
+    expect(screen.getByTestId(`${testIds.fanPerformanceDownloadProgressPrefix}192`)).not.toHaveTextContent(
+      /Downloading|40%/,
+    );
   });
 });

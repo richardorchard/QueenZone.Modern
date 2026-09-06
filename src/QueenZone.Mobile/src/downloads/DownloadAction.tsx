@@ -42,7 +42,8 @@ export function DownloadAction({ track, compact = false, onNeedSignIn }: Props) 
   const { c } = useTheme();
   const { accessToken, isRestoring, ensureAccessToken } = useSession();
   const memberId = useDownloadMemberId();
-  const snapshot = useDownloadUi(track.id);
+  const performanceId = String(track.id);
+  const snapshot = useDownloadUi(performanceId);
   const status = snapshot?.status;
   const progressLabel = formatDownloadProgress(snapshot?.byteSize, snapshot?.expectedBytes);
   const sizeLabel =
@@ -59,7 +60,7 @@ export function DownloadAction({ track, compact = false, onNeedSignIn }: Props) 
       return;
     }
     if (status === 'downloaded') {
-      void removeDownload(memberId, String(track.id));
+      void removeDownload(memberId, performanceId);
       return;
     }
     if (status === 'queued' || status === 'downloading' || status === 'removing') {
@@ -100,7 +101,7 @@ export function DownloadAction({ track, compact = false, onNeedSignIn }: Props) 
 
   return (
     <Pressable
-      testID={`${testIds.fanPerformanceDownloadPrefix}${track.id}`}
+      testID={`${testIds.fanPerformanceDownloadPrefix}${performanceId}`}
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityHint={

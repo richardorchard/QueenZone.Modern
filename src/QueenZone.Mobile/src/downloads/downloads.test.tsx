@@ -312,6 +312,72 @@ describe('download manager', () => {
     expect(getDownloadUiSnapshot(memberId, '187')?.status).toBe('downloaded');
   });
 
+  it('writes progress onto the active performance id, not the first queued id', async () => {
+    const first = fanPerformanceFixture({
+      id: 191,
+      title: 'Aaa First',
+      detailPath: '/fan-performances/191',
+      audioPath: '/api/v1/content/fan-performances/191/audio',
+    });
+    const third = fanPerformanceFixture({
+      id: 193,
+      title: 'Zzz Last',
+      detailPath: '/fan-performances/193',
+      audioPath: '/api/v1/content/fan-performances/193/audio',
+    });
+    setDownloadUiSnapshot(
+      memberId,
+      transientSnapshot('191', 'failed', {
+        title: first.title,
+        performedBy: first.performedBy,
+        error: 'Could not download this recording. Try again.',
+      }),
+    );
+    setDownloadUiSnapshot(
+      memberId,
+      transientSnapshot('192', 'failed', {
+        title: 'Mmm Middle',
+        performedBy: 'Mel',
+        error: 'Could not download this recording. Try again.',
+      }),
+    );
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const host = createMemoryDownloadHost({
+      downloadImpl: async ({ destUri, onProgress }) => {
+        onProgress?.(400, 1000);
+        await held;
+        host.files.set(destUri, new Uint8Array(1000));
+        return { uri: destUri };
+      },
+    });
+    setDownloadFileHostForTests(host);
+    setDownloadProbeForTests(async () => ({
+      status: 206,
+      sourceRevision: '"etag-9"',
+      byteSize: 1000,
+    }));
+
+    enqueueDownload(third, memberId, async () => 'member-token');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(getDownloadUiSnapshot(memberId, '193')).toMatchObject({
+      status: 'downloading',
+      byteSize: 400,
+      expectedBytes: 1000,
+    });
+    expect(getDownloadUiSnapshot(memberId, '191')?.status).toBe('failed');
+    expect(getDownloadUiSnapshot(memberId, '191')?.byteSize).toBeNull();
+    expect(getDownloadUiSnapshot(memberId, '192')?.status).toBe('failed');
+
+    release();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(getDownloadUiSnapshot(memberId, '193')?.status).toBe('downloaded');
+    expect(getDownloadUiSnapshot(memberId, '191')?.status).toBe('failed');
+  });
+
   it('still downloads when the Range probe times out or returns a non-206', async () => {
     const host = createMemoryDownloadHost();
     setDownloadFileHostForTests(host);
