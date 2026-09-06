@@ -1,5 +1,3 @@
-using System.Net;
-using System.Text.RegularExpressions;
 using QueenZone.Data;
 
 namespace QueenZone.Web;
@@ -8,7 +6,7 @@ namespace QueenZone.Web;
 /// Centralized mapping from repository DTOs to stable public view models.
 /// Call once at the Web edge; page models and Razor views should consume view models only.
 /// </summary>
-public static partial class PublicContentMapper
+public static class PublicContentMapper
 {
     public static NewsArchiveItem ToNewsArchiveItem(
         NewsItem item,
@@ -109,14 +107,14 @@ public static partial class PublicContentMapper
 
     public static ForumCategorySummary ToForumCategorySummary(ForumCategoryItem category)
     {
-        var name = CleanForumText(category.Name);
+        var name = ForumTextCleaning.CleanForumText(category.Name);
         return new(
             category.Id,
             name,
-            CleanForumTextOrNull(category.Description),
+            ForumTextCleaning.CleanForumTextOrNull(category.Description),
             category.PostCount,
             category.LastActivityAt,
-            CleanForumTextOrNull(category.LatestThreadTitle),
+            ForumTextCleaning.CleanForumTextOrNull(category.LatestThreadTitle),
             ForumRoutes.GetCategoryCanonicalPath(category.Id, name));
     }
 
@@ -126,7 +124,7 @@ public static partial class PublicContentMapper
 
     public static ForumThreadSummary ToForumThreadSummary(ForumTopicItem topic)
     {
-        var title = CleanForumText(topic.Title);
+        var title = ForumTextCleaning.CleanForumText(topic.Title);
         return new(
             topic.Id,
             title,
@@ -144,8 +142,8 @@ public static partial class PublicContentMapper
 
     public static ForumRecentThreadSummary ToForumRecentThreadSummary(ForumRecentThreadItem item)
     {
-        var title = CleanForumText(item.Title);
-        var categoryName = CleanForumText(item.CategoryName);
+        var title = ForumTextCleaning.CleanForumText(item.Title);
+        var categoryName = ForumTextCleaning.CleanForumText(item.CategoryName);
         return new(
             item.TopicId,
             title,
@@ -163,8 +161,8 @@ public static partial class PublicContentMapper
 
     public static ForumThreadHeader ToForumThreadHeader(ForumTopicHeader header)
     {
-        var title = CleanForumText(header.Title);
-        var forumName = CleanForumText(header.ForumName);
+        var title = ForumTextCleaning.CleanForumText(header.Title);
+        var forumName = ForumTextCleaning.CleanForumText(header.ForumName);
         return new(
             header.TopicId,
             title,
@@ -249,30 +247,4 @@ public static partial class PublicContentMapper
                 attachment.ThumbnailUrl))
             .ToList();
     }
-
-    /// <summary>
-    /// Legacy forum titles/names occasionally contain raw HTML (e.g. <c>&lt;b&gt;</c>) that was
-    /// meant for display in the old vBulletin-style templates. These fields are rendered as plain
-    /// text here, so strip tags rather than showing the literal markup.
-    /// </summary>
-    private static string CleanForumText(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return string.Empty;
-        }
-
-        var plain = ForumHtmlTagRegex().Replace(value, string.Empty);
-        plain = WebUtility.HtmlDecode(plain);
-        return ForumWhitespaceRegex().Replace(plain, " ").Trim();
-    }
-
-    private static string? CleanForumTextOrNull(string? value) =>
-        string.IsNullOrWhiteSpace(value) ? null : CleanForumText(value);
-
-    [GeneratedRegex("<[^>]+>", RegexOptions.IgnoreCase)]
-    private static partial Regex ForumHtmlTagRegex();
-
-    [GeneratedRegex("\\s+")]
-    private static partial Regex ForumWhitespaceRegex();
 }
