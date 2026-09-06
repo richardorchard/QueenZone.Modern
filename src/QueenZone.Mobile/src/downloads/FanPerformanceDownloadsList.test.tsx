@@ -101,6 +101,44 @@ describe('FanPerformanceDownloadsList', () => {
     expect(screen.getByText('Liar')).toBeOnTheScreen();
     expect(screen.getByText(/Downloading · 25%/)).toBeOnTheScreen();
     expect(screen.getByText('Father To Son')).toBeOnTheScreen();
-    expect(screen.getAllByText(/The download timed out/).length).toBeGreaterThan(0);
+    expect(screen.getByTestId(`${testIds.fanPerformanceDownloadErrorPrefix}189`)).toHaveTextContent(
+      'The download timed out. Try again.',
+    );
+  });
+
+  it('keeps progress on the retried row and shows the full rate-limit error', () => {
+    setDownloadUiSnapshot(
+      'member-1',
+      transientSnapshot('191', 'downloaded', {
+        title: 'Aaa First',
+        performedBy: 'Ann',
+        byteSize: 4096,
+      }),
+    );
+    setDownloadUiSnapshot(
+      'member-1',
+      transientSnapshot('192', 'downloading', {
+        title: 'Mmm Middle',
+        performedBy: 'Mel',
+        byteSize: 512,
+        expectedBytes: 1024,
+      }),
+    );
+    setDownloadUiSnapshot(
+      'member-1',
+      transientSnapshot('193', 'failed', {
+        title: 'Zzz Last',
+        performedBy: 'Zoe',
+        error: 'Too many audio requests. Wait 5 minutes and try again.',
+      }),
+    );
+
+    renderWithProviders(<FanPerformanceDownloadsList />, { navigation: false });
+    expect(screen.getByText(/Performed by Ann · Downloaded/)).toBeOnTheScreen();
+    expect(screen.getByText(/Performed by Mel · Downloading · 50%/)).toBeOnTheScreen();
+    expect(screen.getByTestId(`${testIds.fanPerformanceDownloadErrorPrefix}193`)).toHaveTextContent(
+      'Too many audio requests. Wait 5 minutes and try again.',
+    );
+    expect(screen.queryByText(/Performed by Ann · Downloading/)).toBeNull();
   });
 });

@@ -116,7 +116,7 @@ export function DownloadAction({ track, compact = false, onNeedSignIn }: Props) 
       style={[
         styles.button,
         compact ? styles.compact : null,
-        compact && showCaption ? styles.compactWide : null,
+        compact && showCaption ? (status === 'failed' ? styles.compactFailed : styles.compactWide) : null,
         { borderColor: c.borderStrong, backgroundColor: c.surfaceRaised },
       ]}
     >
@@ -127,10 +127,10 @@ export function DownloadAction({ track, compact = false, onNeedSignIn }: Props) 
       {showCaption ? (
         <Text
           style={[
-            compact ? type.meta : type.caption,
+            compact && status !== 'failed' ? type.meta : type.caption,
             { color: status === 'failed' ? c.danger : c.textPrimary, flexShrink: 1 },
           ]}
-          numberOfLines={compact ? 2 : 3}
+          numberOfLines={status === 'failed' ? undefined : compact ? 2 : 3}
         >
           {compact && status === 'downloading' ? sizeLabel || '…' : caption}
         </Text>
@@ -161,5 +161,13 @@ const styles = StyleSheet.create({
     maxWidth: 96,
     minHeight: 40,
     paddingHorizontal: space.sm,
+  },
+  compactFailed: {
+    width: undefined,
+    maxWidth: 220,
+    minHeight: 40,
+    paddingHorizontal: space.sm,
+    paddingVertical: space.xs,
+    alignItems: 'flex-start',
   },
 });

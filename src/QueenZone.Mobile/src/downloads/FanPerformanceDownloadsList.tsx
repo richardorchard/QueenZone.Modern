@@ -24,19 +24,6 @@ function toTrack(item: DownloadUiSnapshot): FanPerformance {
   };
 }
 
-function statusRank(status: DownloadUiSnapshot['status']): number {
-  switch (status) {
-    case 'downloading':
-      return 0;
-    case 'queued':
-      return 1;
-    case 'failed':
-      return 2;
-    default:
-      return 3;
-  }
-}
-
 function statusLine(item: DownloadUiSnapshot): string {
   if (item.status === 'downloading') {
     const progress = formatDownloadProgress(item.byteSize, item.expectedBytes);
@@ -57,7 +44,7 @@ export function FanPerformanceDownloadsList() {
   const memberId = useDownloadMemberId();
   const items = useDownloadUiList()
     .filter((item) => item.status !== 'removing')
-    .sort((a, b) => statusRank(a.status) - statusRank(b.status) || a.title.localeCompare(b.title));
+    .sort((a, b) => a.title.localeCompare(b.title) || a.performanceId.localeCompare(b.performanceId));
   const player = useFanPerformancePlayer();
   const playQueue = items.filter((item) => item.status === 'downloaded').map(toTrack);
 
@@ -103,15 +90,20 @@ export function FanPerformanceDownloadsList() {
             <View style={styles.copy}>
               <Text style={[type.listTitle, { color: c.textPrimary }]}>{item.title}</Text>
               <Text
-                style={[
-                  type.caption,
-                  { color: item.status === 'failed' ? c.danger : c.textSecondary, marginTop: space.xs },
-                ]}
+                style={[type.caption, { color: c.textSecondary, marginTop: space.xs }]}
                 numberOfLines={2}
               >
                 Performed by {item.performedBy}
-                {` · ${statusLine(item)}`}
+                {item.status === 'failed' ? '' : ` · ${statusLine(item)}`}
               </Text>
+              {item.status === 'failed' ? (
+                <Text
+                  testID={`${testIds.fanPerformanceDownloadErrorPrefix}${item.performanceId}`}
+                  style={[type.caption, { color: c.danger, marginTop: space.xs }]}
+                >
+                  {statusLine(item)}
+                </Text>
+              ) : null}
             </View>
             {item.status === 'downloaded' ? (
               <Pressable
