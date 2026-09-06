@@ -778,7 +778,10 @@ describe('download manager', () => {
     expect(getDownloadUiSnapshot(memberId, '187')?.status).not.toBe('downloaded');
   });
 
-  it('native host prefers the downloadAsync File URI and refuses a missing .part move', async () => {
+  it('native host uses the completed one-shot File URI and refuses a missing .part move', async () => {
+    const { File } = jest.requireMock('expo-file-system') as typeof import('expo-file-system');
+    const oneShot = jest.spyOn(File, 'downloadFileAsync');
+    const task = jest.spyOn(File, 'createDownloadTask');
     setDownloadFileHostForTests(null);
     const host = getDownloadFileHost();
     const result = await host.download({
@@ -787,6 +790,15 @@ describe('download manager', () => {
       headers: { Authorization: 'Bearer token' },
     });
     expect(result?.uri).toBe('file:///documents/x');
+    expect(oneShot).toHaveBeenCalledWith(
+      'https://example.test/audio',
+      expect.objectContaining({ uri: 'file:///documents/fan-performances/178.part' }),
+      expect.objectContaining({
+        headers: { Authorization: 'Bearer token' },
+        idempotent: true,
+      }),
+    );
+    expect(task).not.toHaveBeenCalled();
     expect(() => host.promote('file:///missing.part', 'file:///done')).toThrow(
       DOWNLOAD_PART_MISSING_MESSAGE,
     );
