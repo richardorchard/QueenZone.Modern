@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ApiError } from '../api/client';
+import { ApiError, TIMEOUT_MESSAGE } from '../api/errors';
 import { PagedRequestCoordinator } from './usePagedContent';
 
 export type SectionSnapshot<T> =
@@ -30,7 +30,15 @@ function isAbortError(err: unknown): boolean {
 }
 
 function errorMessage(err: unknown): string {
-  return err instanceof ApiError ? err.message : 'Something went wrong.';
+  if (err instanceof ApiError) {
+    return err.message;
+  }
+  // Stray AbortError on a live generation is a misclassified timeout, not a
+  // supersede. Surface a retryable timeout rather than "Something went wrong."
+  if (isAbortError(err)) {
+    return TIMEOUT_MESSAGE;
+  }
+  return 'Something went wrong.';
 }
 
 export type HomeSection<T> = {
@@ -64,7 +72,10 @@ export function useHomeSection<T>(fetcher: (signal: AbortSignal) => Promise<T>):
         }
         setSnapshot({ status: 'ready', data: result });
       } catch (err: unknown) {
-        if (!coordinator.isCurrent(generation) || isAbortError(err)) {
+        // Ignore only superseded or caller-aborted requests. A timeout or
+        // offline classified as AbortError on the current generation must
+        // become a failed snapshot — never a permanent pending skeleton.
+        if (!coordinator.isCurrent(generation) || signal.aborted) {
           return;
         }
         setSnapshot((current) => ({

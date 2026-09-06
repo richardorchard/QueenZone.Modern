@@ -209,17 +209,21 @@ export function classifyFetchFailure(
   deadline: Pick<DeadlineHandle, 'timedOut'>,
   caller?: AbortSignal,
 ): unknown {
+  // True caller abort only — supersede, unmount, or explicit cancel.
   if (caller?.aborted) {
     return toAbortError(err);
   }
+  // Deadline abort is a timeout, including Expo cancel / lost-connection
+  // messages that iOS emits instead of AbortError when the timer fires.
+  if (deadline.timedOut()) {
+    return ApiError.timeout(err);
+  }
   if (isCallerAbort(err)) {
-    return deadline.timedOut() ? ApiError.timeout(err) : err;
+    return err;
   }
-  // Expo cancel is not AbortError. Treat it as abort, not ApiError.offline (#1201).
+  // Expo cancel is not AbortError. Treat a live (non-timeout) cancel as
+  // abort, not ApiError.offline (#1201).
   if (isExpoFetchCanceled(err)) {
-    return toAbortError(err);
-  }
-  if (isLostConnectionMessage(err) && deadline.timedOut()) {
     return toAbortError(err);
   }
   return ApiError.offline(err);

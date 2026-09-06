@@ -11,6 +11,8 @@ import {
   fetchRandomQuote,
   voteHomePoll,
 } from '../../api';
+import { ApiError } from '../../api/client';
+import { OFFLINE_MESSAGE, TIMEOUT_MESSAGE } from '../../api/errors';
 import { invalidate } from '../../cache/externalStore';
 import { NEWS_LIST_CACHE_KEY } from '../../cache/keys';
 import { deferred, forumRecentThreadFixture, newsItemFixture, pagedResponse } from '../../test/fixtures';
@@ -135,6 +137,77 @@ describe('HomeScreen', () => {
     renderHome();
     expect(screen.getByTestId(testIds.homeScreen)).toBeOnTheScreen();
     await waitFor(() => expect(screen.getByTestId(testIds.homeHero)).toBeOnTheScreen());
+  });
+
+  it('renders recent forum threads from fetchForumRecentThreads instead of a skeleton', async () => {
+    fetchForum.mockResolvedValue([
+      forumRecentThreadFixture(),
+      forumRecentThreadFixture({ topicId: 1003, title: 'True or not true?' }),
+    ]);
+    renderHome();
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Live Aid remembered' })).toBeOnTheScreen());
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Ranking every studio album' })).toBeOnTheScreen(),
+    );
+    expect(screen.getByRole('button', { name: 'True or not true?' })).toBeOnTheScreen();
+    expect(screen.getByText('In the forum')).toBeOnTheScreen();
+    expect(screen.queryByText(TIMEOUT_MESSAGE)).toBeNull();
+    expect(screen.queryByText(OFFLINE_MESSAGE)).toBeNull();
+    await flushVirtualizedList();
+  });
+
+  it('shows a retryable forum error when recent-threads times out', async () => {
+    fetchForum.mockRejectedValueOnce(ApiError.timeout());
+    fetchForum.mockResolvedValueOnce([forumRecentThreadFixture()]);
+    renderHome();
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Live Aid remembered' })).toBeOnTheScreen());
+    await waitFor(() => expect(screen.getByText(TIMEOUT_MESSAGE)).toBeOnTheScreen());
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeOnTheScreen();
+    expect(screen.queryByRole('button', { name: 'Ranking every studio album' })).toBeNull();
+
+    const user = userEvent.setup();
+    await user.press(screen.getByRole('button', { name: 'Try again' }));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Ranking every studio album' })).toBeOnTheScreen(),
+    );
+    expect(screen.queryByText(TIMEOUT_MESSAGE)).toBeNull();
+    await flushVirtualizedList();
+  });
+
+  it('shows a retryable forum error when recent-threads is offline', async () => {
+    fetchForum.mockRejectedValueOnce(ApiError.offline());
+    fetchForum.mockResolvedValueOnce([forumRecentThreadFixture()]);
+    renderHome();
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Live Aid remembered' })).toBeOnTheScreen());
+    await waitFor(() => expect(screen.getByText(OFFLINE_MESSAGE)).toBeOnTheScreen());
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeOnTheScreen();
+
+    const user = userEvent.setup();
+    await user.press(screen.getByRole('button', { name: 'Try again' }));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Ranking every studio album' })).toBeOnTheScreen(),
+    );
+    expect(screen.queryByText(OFFLINE_MESSAGE)).toBeNull();
+    await flushVirtualizedList();
+  });
+
+  it('recovers a failed forum section on pull-to-refresh', async () => {
+    fetchForum.mockRejectedValueOnce(ApiError.timeout());
+    renderHome();
+    await waitFor(() => expect(screen.getByText(TIMEOUT_MESSAGE)).toBeOnTheScreen());
+
+    fetchForum.mockResolvedValueOnce([forumRecentThreadFixture()]);
+    await act(async () => {
+      fireEvent(screen.UNSAFE_getByType(RefreshControl), 'refresh');
+    });
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Ranking every studio album' })).toBeOnTheScreen(),
+    );
+    expect(screen.queryByText(TIMEOUT_MESSAGE)).toBeNull();
+    await flushVirtualizedList();
   });
 
   it('opens live news and forum rows with numeric ids, not placeholders', async () => {
