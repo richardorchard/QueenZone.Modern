@@ -108,7 +108,9 @@ Run **Refresh dev curated snapshot** manually. It performs these stages:
 3. publish the production-compatible schema to `queenzone-dev-db`, excluding
    the known broken legacy views;
 4. select, sanitise, and stream curated rows to dev;
-5. clear dev Blob Storage and copy only the generated manifest;
+5. reconcile dev Blob Storage to the generated manifest, deleting obsolete
+   objects and using bounded-parallel Azure server-side copies for changed
+   objects;
 6. seed synthetic password accounts;
 7. apply current EF migrations;
 8. rebuild `SearchDocument`;
@@ -123,6 +125,14 @@ The workflow uploads only `summary.json` for 30 days. It does not upload the
 full manifest because forum filenames may contain user-supplied text. Logs and
 artifacts never contain connection strings, SAS tokens, passwords, email
 addresses, or account keys.
+
+Blob copies use per-object, read-only source SAS URLs that expire after four
+hours. The target storage service reads each changed object directly from the
+source account; blob content does not pass through the Actions runner. Target
+metadata records a hash of the source ETag, so later refreshes skip unchanged
+objects while the final inventory check still requires exact names, byte sizes,
+source versions, and object count. The first refresh after this mechanism is
+introduced copies every selected object once to establish those markers.
 
 On any failure, the final handler removes the database connection and leaves
 the public dev site on deterministic sample data. A partial database or Blob
