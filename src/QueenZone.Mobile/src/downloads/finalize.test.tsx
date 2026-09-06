@@ -2,6 +2,8 @@ import {
   adoptProgressTotal,
   canPromotePart,
   classifyPromoteError,
+  downloadHopSignals,
+  downloadHopTarget,
   isTinyCompleteDownload,
   messageForFinalizeFailure,
   MIN_PLAUSIBLE_AUDIO_BYTES,
@@ -77,6 +79,67 @@ describe('classifyPromoteError', () => {
     expect(classifyPromoteError(new Error('ENOENT: no such file'))).toBe('no-such-file');
     expect(classifyPromoteError(new Error('disk full'))).toBe('unknown');
     expect(classifyPromoteError('boom')).toBe('unknown');
+  });
+});
+
+describe('downloadHopTarget', () => {
+  it('keeps host plus path and drops query tokens', () => {
+    expect(
+      downloadHopTarget(
+        'https://www.queenzone.org/api/v1/content/fan-performances/178/audio?sig=secret',
+      ),
+    ).toBe('www.queenzone.org/api/v1/content/fan-performances/178/audio');
+    expect(downloadHopTarget('https://cdn2.queenzone.org/songfiles/x.mp3')).toBe(
+      'cdn2.queenzone.org/songfiles/x.mp3',
+    );
+    expect(downloadHopTarget('https://cdn2.queenzone.org/songfiles/clip.mp3?sig=abc#frag')).toBe(
+      'cdn2.queenzone.org/songfiles/clip.mp3',
+    );
+    expect(downloadHopTarget('not-a-url?token=secret')).toBe('not-a-url');
+    expect(downloadHopTarget(null)).toBeNull();
+    expect(downloadHopTarget('')).toBeNull();
+  });
+});
+
+describe('downloadHopSignals', () => {
+  it('flags a tiny progress total against a real probe Content-Length', () => {
+    expect(
+      downloadHopSignals({
+        requestUrl: 'https://www.queenzone.org/api/v1/content/fan-performances/178/audio',
+        finalTarget: 'cdn2.queenzone.org/songfiles/178.mp3',
+        probeExpected: 5_000_000,
+        progressTotal: 200,
+        finalSize: 200,
+        destUri: 'file:///documents/fan-performances/178.part',
+        returnedUri: 'file:///cache/178-task',
+      }),
+    ).toEqual({
+      redirected: true,
+      destMismatch: true,
+      progressVsProbe: 'tiny-vs-probe',
+      sizeVsProgress: 'match',
+      tinyComplete: true,
+    });
+  });
+
+  it('stays quiet when probe, progress, dest, and size agree', () => {
+    expect(
+      downloadHopSignals({
+        requestUrl: 'https://www.queenzone.org/api/v1/content/fan-performances/178/audio',
+        finalTarget: 'www.queenzone.org/api/v1/content/fan-performances/178/audio',
+        probeExpected: 1024,
+        progressTotal: 1024,
+        finalSize: 1024,
+        destUri: 'file:///documents/fan-performances/178.part',
+        returnedUri: 'file:///documents/fan-performances/178.part',
+      }),
+    ).toEqual({
+      redirected: false,
+      destMismatch: false,
+      progressVsProbe: 'match',
+      sizeVsProgress: 'match',
+      tinyComplete: false,
+    });
   });
 });
 

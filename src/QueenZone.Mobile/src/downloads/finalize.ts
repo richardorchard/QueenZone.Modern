@@ -81,6 +81,85 @@ export function classifyPromoteError(error: unknown): 'no-such-file' | 'unknown'
   return 'unknown';
 }
 
+/** Host + path only — never query/tokens. Used to see if a full GET hopped hosts. */
+export function downloadHopTarget(url: string | null | undefined): string | null {
+  if (!url) {
+    return null;
+  }
+  try {
+    const parsed = new URL(url);
+    return `${parsed.host}${parsed.pathname}`;
+  } catch {
+    const cut = url.split('?')[0]?.split('#')[0] ?? '';
+    return cut || null;
+  }
+}
+
+export type DownloadHopSignals = {
+  redirected: boolean;
+  destMismatch: boolean;
+  progressVsProbe: 'match' | 'tiny-vs-probe' | 'probe-only' | 'progress-only' | 'unknown';
+  sizeVsProgress: 'match' | 'short' | 'unknown';
+  tinyComplete: boolean;
+};
+
+/**
+ * Compare Range-probe size, native-task progress total, and final bytes.
+ * A Cloudflare Worker in front of the full GET can advertise a short
+ * Content-Length or error body while the Range stream still works.
+ */
+export function downloadHopSignals(input: {
+  requestUrl?: string | null;
+  finalUrl?: string | null;
+  requestTarget?: string | null;
+  finalTarget?: string | null;
+  redirected?: boolean;
+  probeExpected: number | null;
+  progressTotal: number | null;
+  finalSize: number;
+  destUri: string;
+  returnedUri?: string | null;
+}): DownloadHopSignals {
+  const requestTarget = input.requestTarget ?? downloadHopTarget(input.requestUrl);
+  const finalTarget = input.finalTarget ?? downloadHopTarget(input.finalUrl);
+  const redirected = Boolean(
+    input.redirected || (requestTarget && finalTarget && requestTarget !== finalTarget),
+  );
+  const returned = input.returnedUri?.trim() ?? '';
+  const destMismatch = Boolean(returned && returned !== input.destUri);
+  const probe = input.probeExpected;
+  const progress = input.progressTotal;
+  let progressVsProbe: DownloadHopSignals['progressVsProbe'] = 'unknown';
+  if (probe != null && probe > 0 && progress != null && progress > 0) {
+    if (progress < MIN_PLAUSIBLE_AUDIO_BYTES && probe > MIN_PLAUSIBLE_AUDIO_BYTES) {
+      progressVsProbe = 'tiny-vs-probe';
+    } else if (progress >= probe * 0.95 && progress <= probe * 1.05) {
+      progressVsProbe = 'match';
+    } else {
+      progressVsProbe = progress < probe * 0.5 ? 'tiny-vs-probe' : 'unknown';
+    }
+  } else if (probe != null && probe > 0) {
+    progressVsProbe = 'probe-only';
+  } else if (progress != null && progress > 0) {
+    progressVsProbe = 'progress-only';
+  }
+  let sizeVsProgress: DownloadHopSignals['sizeVsProgress'] = 'unknown';
+  if (progress != null && progress > 0 && input.finalSize > 0) {
+    sizeVsProgress = input.finalSize >= progress * 0.95 ? 'match' : 'short';
+  }
+  return {
+    redirected,
+    destMismatch,
+    progressVsProbe,
+    sizeVsProgress,
+    tinyComplete: isTinyCompleteDownload({
+      size: input.finalSize,
+      probeExpected: probe,
+      progressTotal: progress,
+    }),
+  };
+}
+
 export function messageForFinalizeFailure(
   kind: 'missing-part' | 'empty-part' | 'tiny-complete' | 'incomplete' | 'no-such-file' | 'unknown',
 ): string {

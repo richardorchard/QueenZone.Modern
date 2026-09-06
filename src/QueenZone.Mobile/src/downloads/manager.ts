@@ -6,6 +6,8 @@ import {
   adoptProgressTotal,
   canPromotePart,
   classifyPromoteError,
+  downloadHopSignals,
+  downloadHopTarget,
   isTinyCompleteDownload,
   messageForFinalizeFailure,
   resolveDownloadPartUri,
@@ -88,10 +90,17 @@ async function cancelResponseBody(response: Response): Promise<void> {
  * track — cancel the body immediately and abort if headers take too long.
  * A 200 (Range ignored by a proxy) is OK only after the body is cancelled.
  */
-async function defaultProbeAudio(
-  url: string,
-  token: string,
-): Promise<{ sourceRevision: string | null; byteSize: number | null; status: number }> {
+type AudioDownloadProbe = {
+  sourceRevision: string | null;
+  byteSize: number | null;
+  status: number;
+  contentType?: string | null;
+  contentLength?: number | null;
+  redirected?: boolean;
+  finalTarget?: string | null;
+};
+
+async function defaultProbeAudio(url: string, token: string): Promise<AudioDownloadProbe> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
   try {
@@ -106,10 +115,20 @@ async function defaultProbeAudio(
     const etag = response.headers.get('etag');
     const ranged = parseContentRangeTotal(response.headers.get('content-range'));
     const length = Number(response.headers.get('content-length'));
+    const contentLength = Number.isFinite(length) && length > 0 ? length : null;
+    const finalTarget = downloadHopTarget(response.url);
+    const requestTarget = downloadHopTarget(url);
     return {
       status: response.status,
       sourceRevision: etag && etag.trim() ? etag.trim() : null,
-      byteSize: ranged ?? (Number.isFinite(length) && length > 0 ? length : null),
+      byteSize: ranged ?? contentLength,
+      contentType: response.headers.get('content-type'),
+      contentLength,
+      redirected: Boolean(
+        (response as Response & { redirected?: boolean }).redirected ||
+          (requestTarget && finalTarget && requestTarget !== finalTarget),
+      ),
+      finalTarget,
     };
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
@@ -248,9 +267,17 @@ async function runDownload(
     let sourceRevision: string | null = null;
     let expectedBytes: number | null = null;
     let probeStatus: number | null = null;
+    let probeContentType: string | null = null;
+    let probeContentLength: number | null = null;
+    let probeRedirected = false;
+    let probeFinalTarget: string | null = null;
     try {
       const probe = await probeAudio(url, token);
       probeStatus = probe.status;
+      probeContentType = probe.contentType ?? null;
+      probeContentLength = probe.contentLength ?? null;
+      probeRedirected = Boolean(probe.redirected);
+      probeFinalTarget = probe.finalTarget ?? null;
       if (probe.status === 401 || probe.status === 403 || probe.status === 404) {
         throw new Error(DOWNLOAD_UNAUTHORIZED_MESSAGE);
       }
@@ -259,8 +286,10 @@ async function runDownload(
       }
       // Non-200/206 (including a timed-out probe status 0) is not fatal.
       // Streaming already proved the file is there; File.createDownloadTask
-      // is the real transfer. A Range probe that ignores Range and buffers
-      // the whole MP3 used to fail longer tracks and leak the connection.
+      // is the real transfer (full GET — a Cloudflare Worker hop, if any,
+      // can disagree on Content-Length / error body / redirect vs Range).
+      // A Range probe that ignores Range and buffers the whole MP3 used to
+      // fail longer tracks and leak the connection.
       sourceRevision = probe.sourceRevision;
       expectedBytes = probe.byteSize;
     } catch (error) {
@@ -277,6 +306,11 @@ async function runDownload(
       performanceId,
       status: probeStatus,
       expectedBytes,
+      contentType: probeContentType,
+      contentLength: probeContentLength,
+      redirected: probeRedirected,
+      finalTarget: probeFinalTarget,
+      requestTarget: downloadHopTarget(url),
     });
 
     if (expectedBytes && host.availableBytes() < expectedBytes + DISK_SAFETY_MARGIN_BYTES) {
@@ -338,6 +372,17 @@ async function runDownload(
     materializedPartUri = partToPromote;
     const size = host.size(partToPromote);
     const partExists = host.exists(partToPromote);
+    const hop = downloadHopSignals({
+      requestUrl: url,
+      requestTarget: downloadHopTarget(url),
+      finalTarget: probeFinalTarget,
+      redirected: probeRedirected,
+      probeExpected: expectedBytes,
+      progressTotal,
+      finalSize: size,
+      destUri: partUri,
+      returnedUri: taskResult?.uri,
+    });
     reportDownloadBreadcrumb('task-complete', {
       performanceId,
       destUri: partUri,
@@ -347,6 +392,15 @@ async function runDownload(
       size,
       progressTotal,
       expectedBytes,
+      contentType: probeContentType,
+      contentLength: probeContentLength,
+      redirected: hop.redirected,
+      destMismatch: hop.destMismatch,
+      progressVsProbe: hop.progressVsProbe,
+      sizeVsProgress: hop.sizeVsProgress,
+      tinyComplete: hop.tinyComplete,
+      requestTarget: downloadHopTarget(url),
+      finalTarget: probeFinalTarget,
     });
 
     if (!partExists) {

@@ -507,6 +507,9 @@ describe('download manager', () => {
         data: expect.objectContaining({
           exists: false,
           size: 0,
+          destMismatch: false,
+          progressVsProbe: 'probe-only',
+          tinyComplete: false,
         }),
       }),
     );
@@ -562,6 +565,69 @@ describe('download manager', () => {
     expect(host.exists('file:///documents/fan-performances/187')).toBe(true);
     expect(host.exists(returnedUri)).toBe(false);
     expect(getDownloadUiSnapshot(memberId, '187')?.status).toBe('downloaded');
+    expect(Sentry.addBreadcrumb).toHaveBeenCalledWith(
+      expect.objectContaining({
+        category: 'download',
+        message: 'task-complete',
+        data: expect.objectContaining({
+          destMismatch: true,
+          destUri: 'file:///documents/fan-performances/187.part',
+          returnedUri,
+        }),
+      }),
+    );
+  });
+
+  it('breadcrumbs a Cloudflare hop host+path without query tokens', async () => {
+    jest.mocked(Sentry.addBreadcrumb).mockClear();
+    const returnedUri = 'file:///cache/task-187';
+    const host = createMemoryDownloadHost({
+      downloadImpl: async () => {
+        host.files.set(returnedUri, new Uint8Array([1, 2, 3, 4]));
+        return { uri: returnedUri };
+      },
+    });
+    setDownloadFileHostForTests(host);
+    setDownloadProbeForTests(async () => ({
+      status: 206,
+      sourceRevision: '"etag-9"',
+      byteSize: 4,
+      redirected: true,
+      finalTarget: 'cdn2.queenzone.org/songfiles/clip.mp3',
+      contentType: 'audio/mpeg',
+      contentLength: 4,
+    }));
+
+    enqueueDownload(track, memberId, async () => 'member-token');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(getDownloadUiSnapshot(memberId, '187')?.status).toBe('downloaded');
+    expect(Sentry.addBreadcrumb).toHaveBeenCalledWith(
+      expect.objectContaining({
+        category: 'download',
+        message: 'probe',
+        data: expect.objectContaining({
+          redirected: true,
+          finalTarget: 'cdn2.queenzone.org/songfiles/clip.mp3',
+          requestTarget: expect.stringMatching(/\/api\/v1\/content\/fan-performances\/187\/audio$/),
+        }),
+      }),
+    );
+    expect(Sentry.addBreadcrumb).toHaveBeenCalledWith(
+      expect.objectContaining({
+        category: 'download',
+        message: 'task-complete',
+        data: expect.objectContaining({
+          destMismatch: true,
+          redirected: true,
+          finalTarget: 'cdn2.queenzone.org/songfiles/clip.mp3',
+        }),
+      }),
+    );
+    const payload = JSON.stringify(jest.mocked(Sentry.addBreadcrumb).mock.calls);
+    expect(payload).not.toMatch(/[?&](sig|token|access_token)=/i);
+    expect(payload).not.toContain('member-token');
+    expect(payload).not.toContain('Bearer');
   });
 
   it('rejects a tiny 100% progress total that does not match a real recording', async () => {
@@ -591,6 +657,19 @@ describe('download manager', () => {
       error: DOWNLOAD_TOO_SMALL_MESSAGE,
     });
     expect(getDownloadUiSnapshot(memberId, '187')?.status).not.toBe('downloaded');
+    expect(Sentry.addBreadcrumb).toHaveBeenCalledWith(
+      expect.objectContaining({
+        category: 'download',
+        message: 'task-complete',
+        data: expect.objectContaining({
+          progressTotal: 200,
+          size: 200,
+          progressVsProbe: 'progress-only',
+          tinyComplete: true,
+          destMismatch: false,
+        }),
+      }),
+    );
   });
 
   it('does not let a tiny progress total overwrite a larger probe Content-Length', async () => {
