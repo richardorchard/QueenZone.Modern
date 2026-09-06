@@ -345,7 +345,7 @@ public sealed class AdminMembersRoutesTests : IClassFixture<WebApplicationFactor
 
         var admin = CreateAdminClient(AdminEmail);
         var adminPage = await admin.GetStringAsync($"/forum/topic/{spam.TopicId}/thread-action-spam");
-        Assert.Contains("Hide all by this author", adminPage);
+        Assert.Contains("Hide all posts by Thread Spammer", adminPage);
         var confirmation = await admin.GetStringAsync($"/forum/post/{spam.StarterPostId}/hide-author");
         Assert.Contains("2 posts", confirmation);
         Assert.Contains("2 started threads", confirmation);
