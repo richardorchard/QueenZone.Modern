@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Finds the ci.yml pull_request run for a PR head SHA that uploaded a
-# web-publish artifact, and prints `run_id=<id>` for GitHub Actions.
+# web-publish artifact, and prints `found=true|false` plus `run_id=<id>`
+# for GitHub Actions. Missing artifact is a soft miss (found=false) so
+# Deploy can publish from the checked-out main/tag SHA instead of failing.
 #
 # Why not `conclusion == success` alone?
 # Mixed web + mobile PRs keep `ci.yml` in_progress for ~10+ minutes after
@@ -21,6 +23,10 @@
 # Usage:
 #   REPO=owner/name HEAD_SHA=abc123 bash ./scripts/Resolve-CiPublishRun.sh
 #   bash ./scripts/Resolve-CiPublishRun.sh --self-test
+#
+# Prints:
+#   found=true|false
+#   run_id=<id>   (empty when found=false)
 set -euo pipefail
 
 MAX_ATTEMPTS="${MAX_ATTEMPTS:-6}"
@@ -125,6 +131,7 @@ resolve() {
     run_id="$(pick_run_id_with_artifact "${repo}" "${runs_json}")"
     if [ -n "${run_id}" ]; then
       echo "Using ci.yml run ${run_id} (artifact web-publish-${run_id})." >&2
+      echo "found=true"
       echo "run_id=${run_id}"
       return 0
     fi
@@ -138,8 +145,10 @@ resolve() {
     break
   done
 
-  echo "::error::No ci.yml pull_request run with a web-publish artifact found for PR head SHA ${head_sha}. Cannot deploy without a tested build artifact." >&2
-  return 1
+  echo "No ci.yml pull_request run with a web-publish artifact for PR head SHA ${head_sha}. Deploy will publish from the checked-out SHA." >&2
+  echo "found=false"
+  echo "run_id="
+  return 0
 }
 
 assert_eq() {
@@ -192,8 +201,8 @@ EOF
 {"artifacts":[{"name":"web-publish-100","expired":false}]}
 EOF
 
-  got="$(REPO=owner/name HEAD_SHA=aaa MAX_ATTEMPTS=1 SLEEP_SECONDS=0 resolve owner/name aaa | grep '^run_id=')"
-  assert_eq prefers-success "run_id=111" "${got}" || fail=1
+  got="$(REPO=owner/name HEAD_SHA=aaa MAX_ATTEMPTS=1 SLEEP_SECONDS=0 resolve owner/name aaa | grep -E '^(found|run_id)=')"
+  assert_eq prefers-success $'found=true\nrun_id=111' "${got}" || fail=1
 
   # --- in_progress with artifact (the #860/#866 race) ---
   cat >"${tmp}/fixtures/repos_owner_name_actions_workflows_ci.yml_runs.json" <<'EOF'
@@ -207,8 +216,8 @@ EOF
 {"artifacts":[{"name":"web-publish-222","expired":false},{"name":"mobile-ios-222","expired":false}]}
 EOF
 
-  got="$(REPO=owner/name HEAD_SHA=bbb MAX_ATTEMPTS=1 SLEEP_SECONDS=0 resolve owner/name bbb | grep '^run_id=')"
-  assert_eq in-progress-with-artifact "run_id=222" "${got}" || fail=1
+  got="$(REPO=owner/name HEAD_SHA=bbb MAX_ATTEMPTS=1 SLEEP_SECONDS=0 resolve owner/name bbb | grep -E '^(found|run_id)=')"
+  assert_eq in-progress-with-artifact $'found=true\nrun_id=222' "${got}" || fail=1
 
   # --- failure after merge (mobile native failed) but web-publish present ---
   cat >"${tmp}/fixtures/repos_owner_name_actions_workflows_ci.yml_runs.json" <<'EOF'
@@ -222,10 +231,10 @@ EOF
 {"artifacts":[{"name":"web-publish-333","expired":false}]}
 EOF
 
-  got="$(REPO=owner/name HEAD_SHA=ccc MAX_ATTEMPTS=1 SLEEP_SECONDS=0 resolve owner/name ccc | grep '^run_id=')"
-  assert_eq failure-with-artifact "run_id=333" "${got}" || fail=1
+  got="$(REPO=owner/name HEAD_SHA=ccc MAX_ATTEMPTS=1 SLEEP_SECONDS=0 resolve owner/name ccc | grep -E '^(found|run_id)=')"
+  assert_eq failure-with-artifact $'found=true\nrun_id=333' "${got}" || fail=1
 
-  # --- no artifact → fail ---
+  # --- no artifact → soft miss (fallback publish) ---
   cat >"${tmp}/fixtures/repos_owner_name_actions_workflows_ci.yml_runs.json" <<'EOF'
 {
   "workflow_runs": [
@@ -237,23 +246,15 @@ EOF
 {"artifacts":[{"name":"mobile-android-444","expired":false}]}
 EOF
 
-  if REPO=owner/name HEAD_SHA=ddd MAX_ATTEMPTS=1 SLEEP_SECONDS=0 resolve owner/name ddd >/dev/null 2>&1; then
-    echo "FAIL no-artifact-should-error" >&2
-    fail=1
-  else
-    echo "PASS no-artifact-should-error" >&2
-  fi
+  got="$(REPO=owner/name HEAD_SHA=ddd MAX_ATTEMPTS=1 SLEEP_SECONDS=0 resolve owner/name ddd | grep -E '^(found|run_id)=')"
+  assert_eq no-artifact-soft-miss $'found=false\nrun_id=' "${got}" || fail=1
 
-  # --- empty runs → fail ---
+  # --- empty runs → soft miss ---
   cat >"${tmp}/fixtures/repos_owner_name_actions_workflows_ci.yml_runs.json" <<'EOF'
 {"workflow_runs":[]}
 EOF
-  if REPO=owner/name HEAD_SHA=eee MAX_ATTEMPTS=1 SLEEP_SECONDS=0 resolve owner/name eee >/dev/null 2>&1; then
-    echo "FAIL empty-runs-should-error" >&2
-    fail=1
-  else
-    echo "PASS empty-runs-should-error" >&2
-  fi
+  got="$(REPO=owner/name HEAD_SHA=eee MAX_ATTEMPTS=1 SLEEP_SECONDS=0 resolve owner/name eee | grep -E '^(found|run_id)=')"
+  assert_eq empty-runs-soft-miss $'found=false\nrun_id=' "${got}" || fail=1
 
   # --- rank helper ---
   assert_eq rank-success 0 "$(rank_run success completed)" || fail=1
