@@ -546,6 +546,40 @@ describe('download manager', () => {
     expect(DOWNLOAD_RATE_LIMITED_MESSAGE.toLowerCase()).not.toContain('wait a minute');
   });
 
+  it('memory host promote refuses a missing or empty .part', () => {
+    const host = createMemoryDownloadHost();
+    expect(() => host.promote('file:///documents/fan-performances/187.part', 'file:///done')).toThrow(
+      DOWNLOAD_PART_MISSING_MESSAGE,
+    );
+    host.files.set('file:///documents/fan-performances/187.part', new Uint8Array());
+    expect(() =>
+      host.promote('file:///documents/fan-performances/187.part', 'file:///done'),
+    ).toThrow(DOWNLOAD_EMPTY_PART_MESSAGE);
+  });
+
+  it('rejects a short file against a larger probe Content-Length as incomplete', async () => {
+    const host = createMemoryDownloadHost({
+      downloadImpl: async ({ destUri }) => {
+        host.files.set(destUri, new Uint8Array(1000));
+        return { uri: destUri };
+      },
+    });
+    setDownloadFileHostForTests(host);
+    setDownloadProbeForTests(async () => ({
+      status: 206,
+      sourceRevision: '"etag-9"',
+      byteSize: 10_000,
+    }));
+
+    enqueueDownload(track, memberId, async () => 'member-token');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(getDownloadUiSnapshot(memberId, '187')).toMatchObject({
+      status: 'failed',
+      error: 'The download did not finish. Try again.',
+    });
+  });
+
   it('native host prefers the downloadAsync File URI and refuses a missing .part move', async () => {
     setDownloadFileHostForTests(null);
     const host = getDownloadFileHost();
@@ -558,8 +592,6 @@ describe('download manager', () => {
     expect(() => host.promote('file:///missing.part', 'file:///done')).toThrow(
       DOWNLOAD_PART_MISSING_MESSAGE,
     );
-    host.writeBytes('file:///empty.part', new Uint8Array());
-    expect(() => host.promote('file:///empty.part', 'file:///done')).toThrow(DOWNLOAD_EMPTY_PART_MESSAGE);
   });
 
   it('sign-out deletes files, partials, and the manifest', async () => {
