@@ -8,3 +8,10 @@ export const LOW_STORAGE_MESSAGE = 'Not enough storage on this device to downloa
 export const DOWNLOAD_FAILED_MESSAGE = 'Could not download this recording. Try again.';
 
 export const DOWNLOAD_UNAUTHORIZED_MESSAGE = 'This recording is not available to download.';
+
+export const DOWNLOAD_RATE_LIMITED_MESSAGE =
+  'Too many audio requests. Wait a minute and try again.';
+
+export const DOWNLOAD_TIMEOUT_MESSAGE = 'The download timed out. Try again.';
+
+export const DOWNLOAD_INCOMPLETE_MESSAGE = 'The download did not finish. Try again.';

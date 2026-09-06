@@ -1,8 +1,10 @@
 import type { FanPerformance } from '../api';
 import { apiV1Url } from '../config';
 import { fanPerformanceAudioPath } from '../audio/formatDuration';
+import { fileLooksLikeHttpError } from './audioBytes';
 import { getDownloadFileHost } from './files';
 import { getCompletedDownload } from './manifest';
+import { discardInvalidLocalDownload } from './manager';
 import { OFFLINE_PLAYBACK_MESSAGE, SIGN_IN_PLAYBACK_MESSAGE } from './messages';
 
 export type ResolvedAudioSource =
@@ -15,6 +17,7 @@ export type ResolveAudioSourceInput = {
   memberId: string | null;
   ensureAccessToken: () => Promise<string | null>;
   isOffline: boolean;
+  ignoreLocal?: boolean;
 };
 
 export async function hasValidLocalDownload(
@@ -27,7 +30,14 @@ export async function hasValidLocalDownload(
   }
 
   const host = getDownloadFileHost();
-  if (!host.exists(entry.localUri) || host.size(entry.localUri) <= 0) {
+  const exists = host.exists(entry.localUri);
+  const size = exists ? host.size(entry.localUri) : 0;
+  const corrupt =
+    !exists ||
+    size <= 0 ||
+    (await fileLooksLikeHttpError((uri, max) => host.readPrefix(uri, max), entry.localUri, size));
+  if (corrupt) {
+    await discardInvalidLocalDownload(memberId, performanceId);
     return null;
   }
 
@@ -37,10 +47,12 @@ export async function hasValidLocalDownload(
 /**
  * Prefer a valid same-member local file. Streaming needs a live Bearer token.
  * Local playback uses retained member identity only — no token refresh.
+ * Missing, empty, or error-page local files are discarded so they cannot
+ * wedge the shared player; playback then falls through to stream.
  */
 export async function resolveAudioSource(input: ResolveAudioSourceInput): Promise<ResolvedAudioSource> {
   const performanceId = String(input.track.id);
-  if (input.memberId) {
+  if (input.memberId && !input.ignoreLocal) {
     const local = await hasValidLocalDownload(input.memberId, performanceId);
     if (local) {
       return { kind: 'local', uri: local.uri };

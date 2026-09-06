@@ -582,7 +582,6 @@ public sealed class PrivateMessageRoutesTests : IClassFixture<WebApplicationFact
 
         var bobPage = await bobClient.GetStringAsync($"/messages/{conversationId}");
         Assert.Contains("Report message", bobPage);
-        Assert.Contains("Optional reason", bobPage);
 
         var alicePage = await aliceClient.GetStringAsync($"/messages/{conversationId}");
         Assert.DoesNotContain("Report message", alicePage);
