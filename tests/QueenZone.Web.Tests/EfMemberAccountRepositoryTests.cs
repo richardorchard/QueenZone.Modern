@@ -408,6 +408,34 @@ public sealed class EfMemberAccountRepositoryTests : IAsyncDisposable
                 .ToListAsync());
     }
 
+    [Fact]
+    public async Task LocalPasswordAccountOperations_ProjectUpdateAndRemoveCredential()
+    {
+        var account = await SeedAccountAsync("reviewer-ef@example.com", "EF Reviewer");
+        account.PasswordHash = "initial-hash";
+        await dbContext.SaveChangesAsync();
+
+        var listed = Assert.Single(await repository.ListLocalPasswordAccountsAsync());
+        Assert.Equal(account.Id, listed.Id);
+        Assert.Equal(account.Email, listed.Email);
+
+        var updated = await repository.UpdateLocalPasswordAccountAsync(
+            account.Id,
+            "updated-reviewer@example.com",
+            "Updated EF Reviewer",
+            "replacement-hash");
+
+        Assert.NotNull(updated);
+        Assert.Equal("UPDATED-REVIEWER@EXAMPLE.COM", updated.NormalizedEmail);
+        Assert.Equal("replacement-hash", updated.PasswordHash);
+
+        Assert.True(await repository.RemoveLocalPasswordAsync(account.Id));
+        var retained = await repository.FindByIdAsync(account.Id);
+        Assert.NotNull(retained);
+        Assert.Null(retained.PasswordHash);
+        Assert.Empty(await repository.ListLocalPasswordAccountsAsync());
+    }
+
     private async Task<MemberAccount> SeedAccountAsync(string email, string displayName)
     {
         return await repository.CreateAsync(new MemberAccount
