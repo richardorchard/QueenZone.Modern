@@ -949,6 +949,23 @@ public sealed class MemberAccountServiceTests
             CancellationToken cancellationToken = default) =>
             inner.SearchMembersAsync(query, pageNumber, pageSize, cancellationToken);
 
+        public Task<IReadOnlyList<LocalPasswordAccountSummary>> ListLocalPasswordAccountsAsync(
+            CancellationToken cancellationToken = default) =>
+            inner.ListLocalPasswordAccountsAsync(cancellationToken);
+
+        public Task<MemberAccount?> UpdateLocalPasswordAccountAsync(
+            Guid memberId,
+            string email,
+            string displayName,
+            string? passwordHash,
+            CancellationToken cancellationToken = default) =>
+            inner.UpdateLocalPasswordAccountAsync(memberId, email, displayName, passwordHash, cancellationToken);
+
+        public Task<bool> RemoveLocalPasswordAsync(
+            Guid memberId,
+            CancellationToken cancellationToken = default) =>
+            inner.RemoveLocalPasswordAsync(memberId, cancellationToken);
+
         public Task<MemberAccount?> SuspendAsync(
             Guid memberId,
             string reason,
