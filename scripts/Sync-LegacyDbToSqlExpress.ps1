@@ -121,9 +121,24 @@ try {
     # cleanup. sys.databases won't show it, so the IF EXISTS/DROP below is skipped,
     # and CREATE DATABASE then fails with "file already exists". Sweep any such
     # orphaned files first so this run can self-heal instead of failing again.
-    $stagingDbId = (sqlcmd -S "localhost\$InstanceName" -h -1 -W -Q "SET NOCOUNT ON; SELECT ISNULL(CONVERT(varchar(10), DB_ID(N'$stagingDatabase')), '')") -join ''
-    if ([string]::IsNullOrWhiteSpace($stagingDbId.Trim())) {
-        $dataPath = ((sqlcmd -S "localhost\$InstanceName" -h -1 -W -Q "SET NOCOUNT ON; SELECT CONVERT(nvarchar(260), SERVERPROPERTY('InstanceDefaultDataPath'))") -join '').Trim()
+    #
+    # Uses PRINT markers rather than parsing a SELECT result set: an earlier
+    # version of this check used `sqlcmd -h -1 -W` and treated any non-blank
+    # output as "database exists", which silently misfired (and skipped the
+    # sweep) on anything unexpected sqlcmd wrote to stdout - defeating the
+    # whole check without any visible error.
+    $stagingDbIdOutput = sqlcmd -S "localhost\$InstanceName" -b -Q "SET NOCOUNT ON; IF DB_ID(N'$stagingDatabase') IS NULL PRINT 'QZ_STAGING_DB_MISSING'; ELSE PRINT 'QZ_STAGING_DB_PRESENT';" 2>&1
+    if ($LASTEXITCODE -ne 0) { throw "Checking for an existing staging database failed with exit code ${LASTEXITCODE}: $($stagingDbIdOutput -join [Environment]::NewLine)" }
+    $stagingDbIdText = $stagingDbIdOutput -join [Environment]::NewLine
+    Write-Host "Staging database catalog check: $stagingDbIdText"
+    if ($stagingDbIdText -notmatch 'QZ_STAGING_DB_(MISSING|PRESENT)') {
+        throw "Could not determine whether $stagingDatabase is registered - unexpected sqlcmd output: $stagingDbIdText"
+    }
+    if ($stagingDbIdText -match 'QZ_STAGING_DB_MISSING') {
+        $dataPathOutput = sqlcmd -S "localhost\$InstanceName" -b -Q "SET NOCOUNT ON; PRINT CONVERT(nvarchar(260), SERVERPROPERTY('InstanceDefaultDataPath'));" 2>&1
+        if ($LASTEXITCODE -ne 0) { throw "Looking up the SQL Express default data path failed with exit code ${LASTEXITCODE}: $($dataPathOutput -join [Environment]::NewLine)" }
+        $dataPath = (($dataPathOutput | Select-Object -Last 1) -as [string]).Trim()
+        Write-Host "SQL Express default data path: $dataPath"
         if (-not [string]::IsNullOrWhiteSpace($dataPath) -and (Test-Path $dataPath)) {
             Get-ChildItem -Path $dataPath -Filter "$stagingDatabase.*" -ErrorAction SilentlyContinue |
                 ForEach-Object {
