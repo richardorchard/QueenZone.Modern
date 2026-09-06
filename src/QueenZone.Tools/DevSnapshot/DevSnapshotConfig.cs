@@ -10,9 +10,11 @@ internal sealed class DevSnapshotConfig
 
     public string TargetStorageAccount { get; init; } = "queenzonedev";
 
-    public int ForumTargetPostCount { get; set; } = 150_000;
+    public int ForumThreadCount { get; init; } = 500;
 
-    public int ForumMinimumPostCount { get; init; } = 100_000;
+    public int NewsArticleCount { get; init; } = 500;
+
+    public int ArticleCount { get; init; } = 500;
 
     public int PhotosPerCategory { get; init; } = 100;
 
@@ -33,11 +35,6 @@ internal sealed class DevSnapshotConfig
         {
             PropertyNameCaseInsensitive = true,
         }) ?? throw new InvalidOperationException("Snapshot configuration is empty.");
-        if (int.TryParse(Environment.GetEnvironmentVariable("DEV_SNAPSHOT_FORUM_TARGET_POST_COUNT"), out var overrideCount))
-        {
-            config.ForumTargetPostCount = overrideCount;
-        }
-
         config.Validate();
         return config;
     }
@@ -59,9 +56,9 @@ internal sealed class DevSnapshotConfig
             throw new InvalidOperationException("The target storage account must be queenzonedev.");
         }
 
-        if (ForumMinimumPostCount < 1 || ForumTargetPostCount < ForumMinimumPostCount)
+        if (ForumThreadCount < 1 || NewsArticleCount < 1 || ArticleCount < 1 || PhotosPerCategory < 1)
         {
-            throw new InvalidOperationException("Forum post limits are invalid.");
+            throw new InvalidOperationException("Snapshot record limits must be positive.");
         }
 
         if (GalleryBudgetBytes < 1 || ForumAttachmentBudgetBytes < 1 || DatabaseMaximumUsedMb <= 0)

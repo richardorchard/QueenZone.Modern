@@ -1,4 +1,4 @@
-import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
+import Svg, { Defs, G, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { useTheme } from '../theme';
 import { archiveIconShapes, type ArchiveIconName } from './icons/archiveSectionIcons';
 
@@ -15,11 +15,17 @@ type Props = {
  * (#1321 handoff): a dark radial-gradient chip with a centred engraved-line
  * glyph. Purely decorative — hidden from the accessibility tree; the row's
  * title + meta carry the accessible label.
+ *
+ * Glyphs live in 24×24 space. iOS react-native-svg ignores nested child Svg
+ * x/y/width/height, so we translate+scale a group instead (#1344).
  */
 export function ArchiveIconPlate({ name, size = 64, style }: Props) {
   const { c, radius } = useTheme();
   const glyphSize = Math.round(size * 0.4375); // 28/64 per handoff
   const strokeWidth = glyphSize <= 20 ? 1.3 : glyphSize >= 34 ? 1.1 : 1.15;
+  const s = glyphSize / 24;
+  const tx = (size - glyphSize) / 2;
+  const ty = tx;
   const gradientId = `archive-icon-plate-${name}`;
   const inset = size * (0.5 / 64);
 
@@ -51,12 +57,8 @@ export function ArchiveIconPlate({ name, size = 64, style }: Props) {
         stroke={c.iconPlateBorder}
         strokeWidth={1}
       />
-      <Svg
-        x={(size - glyphSize) / 2}
-        y={(size - glyphSize) / 2}
-        width={glyphSize}
-        height={glyphSize}
-        viewBox="0 0 24 24"
+      <G
+        transform={`translate(${tx}, ${ty}) scale(${s})`}
         fill="none"
         stroke={c.glyphStroke}
         strokeWidth={strokeWidth}
@@ -64,7 +66,7 @@ export function ArchiveIconPlate({ name, size = 64, style }: Props) {
         strokeLinejoin="round"
       >
         {archiveIconShapes[name]}
-      </Svg>
+      </G>
     </Svg>
   );
 }

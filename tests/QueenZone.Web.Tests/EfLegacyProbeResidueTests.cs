@@ -101,6 +101,7 @@ public sealed class EfLegacyProbeResidueTests
         }
 
         await using var dbContext = CreateSqlServerContext(connectionString);
+        dbContext.Database.SetCommandTimeout(QueenZoneSqlServerOptions.LongRunningCommandTimeoutSeconds);
 
         Assert.False(await NewsResidueQuery(dbContext).AnyAsync(), "Residue found in NEWS_T.");
         Assert.False(await NewsAuditResidueQuery(dbContext).AnyAsync(), "Residue found in NewsAuditLog.");

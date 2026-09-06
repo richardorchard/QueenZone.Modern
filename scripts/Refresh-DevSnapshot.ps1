@@ -7,7 +7,7 @@
   Production SQL and Blob access must be read-only. The script extracts schema only,
   republishes the isolated dev schema, streams curated rows through QueenZone.Tools,
   copies only manifest blobs, applies migrations, rebuilds search, and runs guards.
-  It retries at the minimum forum size only when the database size guard returns exit 3.
+  The checked-in record limits keep each refresh small and repeatable.
 
   Without -Apply, it validates boundaries and prints the planned targets without changing
   SQL or Blob Storage. The App Service connection is deliberately outside this script;
@@ -86,14 +86,9 @@ Assert-SqlBoundary $sourceSql "queenzone-db" $true
 Assert-SqlBoundary $targetSql "queenzone-dev-db" $false
 
 $config = Get-Content $ConfigPath -Raw | ConvertFrom-Json
-$targets = @([int]$config.forumTargetPostCount)
-if ([int]$config.forumMinimumPostCount -ne $targets[0]) {
-    $targets += [int]$config.forumMinimumPostCount
-}
-
 Write-Host "Source: read-only queenzone-db"
 Write-Host "Target: isolated queenzone-dev-db and queenzonedev"
-Write-Host "Forum attempts: $($targets -join ', ') posts"
+Write-Host "Newest content: $($config.forumThreadCount) complete forum threads; $($config.newsArticleCount) news articles; $($config.articleCount) rows per article source; $($config.photosPerCategory) photos per category"
 Write-Host "Guards: database <= $($config.databaseMaximumUsedMb) MB; gallery/forum blobs <= $([math]::Round($config.galleryBudgetBytes / 1MB))/$([math]::Round($config.forumAttachmentBudgetBytes / 1MB)) MB"
 
 if (-not $Apply) {
@@ -115,50 +110,37 @@ try {
         /p:VerifyExtraction=False
     if ($LASTEXITCODE -ne 0) { throw "Schema-only production extract failed." }
 
-    foreach ($forumTarget in $targets) {
-        Write-Host "Building dev snapshot with a $forumTarget-post ceiling."
-        dotnet tool run sqlpackage /Action:Publish `
-            "/SourceFile:$dacpacPath" `
-            "/TargetConnectionString:$targetSql" `
-            /p:ExcludeObjectTypes=Views `
-            /p:DropObjectsNotInSource=True `
-            /p:BlockOnPossibleDataLoss=False
-        if ($LASTEXITCODE -ne 0) { throw "Dev schema publish failed." }
+    Write-Host "Building the newest-first dev snapshot."
+    dotnet tool run sqlpackage /Action:Publish `
+        "/SourceFile:$dacpacPath" `
+        "/TargetConnectionString:$targetSql" `
+        /p:ExcludeObjectTypes=Views `
+        /p:DropObjectsNotInSource=True `
+        /p:BlockOnPossibleDataLoss=False
+    if ($LASTEXITCODE -ne 0) { throw "Dev schema publish failed." }
 
-        $env:DEV_SNAPSHOT_FORUM_TARGET_POST_COUNT = $forumTarget.ToString()
-        $manifest = Join-Path $OutputDirectory "manifest.json"
-        $summary = Join-Path $OutputDirectory "summary.json"
-        dotnet run --project src/QueenZone.Tools --configuration Release --no-restore -- `
-            dev-snapshot copy --config $ConfigPath --manifest $manifest --summary $summary
-        $copyExit = $LASTEXITCODE
-        if ($copyExit -eq 3 -and $forumTarget -ne $targets[-1]) { continue }
-        if ($copyExit -ne 0) { throw "Curated row/blob copy failed with exit code $copyExit." }
+    $manifest = Join-Path $OutputDirectory "manifest.json"
+    $summary = Join-Path $OutputDirectory "summary.json"
+    dotnet run --project src/QueenZone.Tools --configuration Release --no-restore -- `
+        dev-snapshot copy --config $ConfigPath --manifest $manifest --summary $summary
+    if ($LASTEXITCODE -ne 0) { throw "Curated row/blob copy failed with exit code $LASTEXITCODE." }
 
-        $env:ConnectionStrings__QueenZoneLegacy = $targetSql
-        dotnet ef database update `
-            --project src/QueenZone.Data/QueenZone.Data.csproj `
-            --startup-project src/QueenZone.Web/QueenZone.Web.csproj
-        if ($LASTEXITCODE -ne 0) { throw "Dev migrations failed." }
+    $env:ConnectionStrings__QueenZoneLegacy = $targetSql
+    dotnet ef database update `
+        --project src/QueenZone.Data/QueenZone.Data.csproj `
+        --startup-project src/QueenZone.Web/QueenZone.Web.csproj
+    if ($LASTEXITCODE -ne 0) { throw "Dev migrations failed." }
 
-        dotnet run --project src/QueenZone.SearchReindex.Worker --configuration Release --no-restore -- reindex --force
-        if ($LASTEXITCODE -ne 0) { throw "Dev search rebuild failed." }
+    dotnet run --project src/QueenZone.SearchReindex.Worker --configuration Release --no-restore -- reindex --force
+    if ($LASTEXITCODE -ne 0) { throw "Dev search rebuild failed." }
 
-        dotnet run --project src/QueenZone.Tools --configuration Release --no-restore -- `
-            dev-snapshot verify --config $ConfigPath --manifest $manifest --summary $summary
-        $verifyExit = $LASTEXITCODE
-        if ($verifyExit -eq 0) {
-            Write-Host "Dev snapshot passed all database, privacy, relationship, blob, and search guards."
-            exit 0
-        }
-        if ($verifyExit -ne 3 -or $forumTarget -eq $targets[-1]) {
-            throw "Dev snapshot verification failed with exit code $verifyExit."
-        }
-    }
+    dotnet run --project src/QueenZone.Tools --configuration Release --no-restore -- `
+        dev-snapshot verify --config $ConfigPath --manifest $manifest --summary $summary
+    if ($LASTEXITCODE -ne 0) { throw "Dev snapshot verification failed with exit code $LASTEXITCODE." }
 
-    throw "No forum target passed the dev snapshot size guard."
+    Write-Host "Dev snapshot passed all database, privacy, relationship, blob, and search guards."
 }
 finally {
-    Remove-Item Env:DEV_SNAPSHOT_FORUM_TARGET_POST_COUNT -ErrorAction SilentlyContinue
     Remove-Item Env:ConnectionStrings__QueenZoneLegacy -ErrorAction SilentlyContinue
     if (Test-Path $dacpacPath) {
         Remove-Item $dacpacPath -Force

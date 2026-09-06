@@ -12,7 +12,7 @@ on:
         type: boolean
         default: false
       skip_sync:
-        description: "Skip the DB sync and reuse the existing SQL Express mirror (saves the 3-5 minute sqlpackage extract/publish)"
+        description: "Skip the DB sync and reuse the existing SQL Express mirror (currently saves about 25-30 minutes)"
         required: false
         type: boolean
         default: false
@@ -92,7 +92,7 @@ jobs:
     # the Windows box, regardless of its weaker CPU.
     runs-on: [self-hosted, Windows]
     # workflow_dispatch's skip_sync input lets an on-demand run reuse the
-    # existing mirror instead of paying the 3-5 minute sqlpackage extract/publish.
+    # existing mirror instead of paying the roughly 25-30 minute sqlpackage extract/publish.
     if: github.event_name != 'workflow_dispatch' || inputs.skip_sync != true
     timeout-minutes: 45
     environment: dev
