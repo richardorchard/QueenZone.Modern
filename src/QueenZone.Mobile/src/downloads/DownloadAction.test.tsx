@@ -75,6 +75,26 @@ describe('DownloadAction', () => {
       }),
     );
     renderWithProviders(<DownloadAction track={track} />, { navigation: false });
-    expect(screen.getByLabelText(`Download failed for ${track.title}. Double tap to retry`)).toBeOnTheScreen();
+    expect(
+      screen.getByLabelText(
+        `Download failed for ${track.title}: Could not download this recording. Try again. Double tap to retry`,
+      ),
+    ).toBeOnTheScreen();
+    expect(screen.getByText('Could not download this recording. Try again.')).toBeOnTheScreen();
+  });
+
+  it('shows in-situ percent while downloading', () => {
+    setDownloadUiSnapshot(
+      'member-1',
+      transientSnapshot(String(track.id), 'downloading', {
+        title: track.title,
+        performedBy: track.performedBy,
+        byteSize: 256,
+        expectedBytes: 1024,
+      }),
+    );
+    renderWithProviders(<DownloadAction track={track} compact />, { navigation: false });
+    expect(screen.getByText('25%')).toBeOnTheScreen();
+    expect(screen.getByLabelText(`Downloading ${track.title}, 25%`)).toBeOnTheScreen();
   });
 });
