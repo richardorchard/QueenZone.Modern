@@ -26,7 +26,8 @@ export function conversationCacheKey(memberId: string, conversationId: string): 
  * switch, same as {@link conversationCacheKey}.
  */
 export function inboxCacheKey(memberId: string): string {
-  return `messages:member:${memberId}:inbox`;
+  // v2 stores the complete page response rather than the legacy items-only array.
+  return `messages:member:${memberId}:inbox:v2`;
 }
 
 export function privateMemberCachePrefix(memberId: string): string {

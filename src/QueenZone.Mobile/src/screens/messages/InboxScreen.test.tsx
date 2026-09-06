@@ -1,8 +1,8 @@
-import { act, screen, userEvent, waitFor } from '@testing-library/react-native';
+import { screen, userEvent, waitFor } from '@testing-library/react-native';
 import { archiveConversation, fetchInbox } from '../../api/messages';
 import { ApiError } from '../../api/client';
 import { getContentCache } from '../../cache';
-import { inboxConversationFixture, memberProfileFixture, pagedResponse } from '../../test/fixtures';
+import { inboxConversationFixture, pagedResponse } from '../../test/fixtures';
 import { createMockSession } from '../../test/mockSession';
 import { fakeNavigation, renderWithProviders } from '../../test/render';
 import { InboxScreen } from './InboxScreen';
@@ -41,14 +41,6 @@ jest.mock('@react-navigation/native', () => {
 const fetchInboxMock = fetchInbox as jest.MockedFunction<typeof fetchInbox>;
 const archiveConversationMock = archiveConversation as jest.MockedFunction<typeof archiveConversation>;
 const getContentCacheMock = getContentCache as jest.MockedFunction<typeof getContentCache>;
-
-function fakeContentCache() {
-  return {
-    get: jest.fn().mockResolvedValue(null),
-    put: jest.fn().mockResolvedValue(undefined),
-  };
-}
-
 function renderInbox() {
   return renderWithProviders(
     <InboxScreen navigation={fakeNavigation() as never} route={{ key: 'inbox', name: 'Inbox' } as never} />,
@@ -62,10 +54,9 @@ describe('InboxScreen', () => {
     mockSession.profile = null;
     fetchInboxMock.mockReset();
     archiveConversationMock.mockReset();
-    getContentCacheMock.mockReset();
-    getContentCacheMock.mockReturnValue(
-      fakeContentCache() as unknown as ReturnType<typeof getContentCache>,
-    );
+    getContentCacheMock.mockReset().mockReturnValue({
+      get: jest.fn().mockResolvedValue(null),
+    } as unknown as ReturnType<typeof getContentCache>);
   });
 
   it('gates unsigned visitors', () => {
@@ -172,52 +163,28 @@ describe('InboxScreen', () => {
     expect(screen.getByRole('button', { name: 'Try again' })).toBeOnTheScreen();
   });
 
-  it('renders a cached inbox instantly while the fresh fetch is still in flight', async () => {
+  it('renders and retains the cached inbox while a fresh request is pending or fails', async () => {
     mockSession.isSignedIn = true;
     mockSession.accessToken = 'tok';
-    mockSession.profile = memberProfileFixture({ memberId: 'member-1' });
-    const cache = fakeContentCache();
-    cache.get.mockResolvedValue([
+    mockSession.profile = { memberId: 'member-1' } as typeof mockSession.profile;
+    const cached = pagedResponse([
       inboxConversationFixture({
         conversationId: 'convo-cached',
-        otherParticipantId: 'member-9',
         otherParticipantDisplayName: 'Cached Carol',
-        lastMessagePreview: 'From last visit',
-        detailPath: '/messages/convo-cached',
       }),
-    ]);
-    getContentCacheMock.mockReturnValue(cache as unknown as ReturnType<typeof getContentCache>);
-    let resolveFetch: (value: Awaited<ReturnType<typeof fetchInbox>>) => void = () => {};
-    fetchInboxMock.mockReturnValueOnce(
-      new Promise((resolve) => {
-        resolveFetch = resolve;
-      }),
-    );
-    renderInbox();
+    ], 1, 1);
+    const cacheGet = jest.fn().mockResolvedValue(cached);
+    getContentCacheMock.mockReturnValue({ get: cacheGet } as unknown as ReturnType<typeof getContentCache>);
+    let rejectFetch: (error: Error) => void = () => {};
+    fetchInboxMock.mockReturnValueOnce(new Promise((_resolve, reject) => { rejectFetch = reject; }));
 
-    expect(cache.get).toHaveBeenCalledWith('messages:member:member-1:inbox');
+    renderInbox();
     await waitFor(() => expect(screen.getByText('Cached Carol')).toBeOnTheScreen());
+    expect(cacheGet).toHaveBeenCalledWith('messages:member:member-1:inbox:v2');
 
-    await act(async () => {
-      resolveFetch(pagedResponse([], 1, 0));
-    });
-    await waitFor(() => expect(screen.getByText('You have no private messages yet.')).toBeOnTheScreen());
+    rejectFetch(new ApiError(0, 'Unable to reach QueenZone.'));
+    await waitFor(() => expect(screen.getByText('Cached Carol')).toBeOnTheScreen());
+    expect(screen.queryByText('Unable to load')).toBeNull();
   });
 
-  it('persists the freshly loaded first page to the cache', async () => {
-    mockSession.isSignedIn = true;
-    mockSession.accessToken = 'tok';
-    mockSession.profile = memberProfileFixture({ memberId: 'member-1' });
-    const cache = fakeContentCache();
-    getContentCacheMock.mockReturnValue(cache as unknown as ReturnType<typeof getContentCache>);
-    fetchInboxMock.mockResolvedValueOnce(pagedResponse([inboxConversationFixture()], 1, 1));
-    renderInbox();
-    await waitFor(() => expect(screen.getByText('Brian')).toBeOnTheScreen());
-    await waitFor(() =>
-      expect(cache.put).toHaveBeenCalledWith(
-        'messages:member:member-1:inbox',
-        expect.arrayContaining([expect.objectContaining({ conversationId: 'convo-1' })]),
-      ),
-    );
-  });
 });

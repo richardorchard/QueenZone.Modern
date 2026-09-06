@@ -3,6 +3,7 @@ import { Alert, Pressable, Text, View, type ListRenderItem } from 'react-native'
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { archiveConversation, fetchInbox, type InboxConversation } from '../../api/messages';
+import type { ApiPagedResponse } from '../../api/types';
 import { getContentCache, inboxCacheKey } from '../../cache';
 import { usePagedContent } from '../../hooks/usePagedContent';
 import type { HomeStackParamList } from '../../navigation/types';
@@ -73,22 +74,23 @@ function InboxList({ navigation }: Pick<Props, 'navigation'>) {
   const { accessToken, profile } = useSession();
   const memberId = accessToken ? resolvePushMemberId(accessToken, profile?.memberId) : null;
   const queueItems = useOfflineQueue(memberId);
+  const cacheKey = memberId ? inboxCacheKey(memberId) : null;
+  const [cachedPage, setCachedPage] = useState<ApiPagedResponse<InboxConversation> | null>(null);
   const skipNextFocusRefresh = useRef(true);
   const [archivingId, setArchivingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const cacheKey = profile ? inboxCacheKey(profile.memberId) : null;
-  const [cachedItems, setCachedItems] = useState<InboxConversation[] | null>(null);
 
   useEffect(() => {
     if (!cacheKey) {
+      setCachedPage(null);
       return;
     }
     let cancelled = false;
     getContentCache()
-      .get<InboxConversation[]>(cacheKey)
+      .get<ApiPagedResponse<InboxConversation>>(cacheKey)
       .then((cached) => {
-        if (!cancelled && cached && cached.length > 0) {
-          setCachedItems(cached);
+        if (!cancelled) {
+          setCachedPage(cached);
         }
       })
       .catch(() => {});
@@ -99,7 +101,7 @@ function InboxList({ navigation }: Pick<Props, 'navigation'>) {
 
   const paged = usePagedContent<InboxConversation>(
     useCallback(
-      (page, signal) => {
+      (page, signal, mode) => {
         if (!accessToken) {
           return Promise.resolve({
             items: [],
@@ -109,7 +111,12 @@ function InboxList({ navigation }: Pick<Props, 'navigation'>) {
             totalPages: 0,
           });
         }
-        return fetchInbox(accessToken, { page, pageSize: inboxPageSize, signal });
+        return fetchInbox(accessToken, {
+          page,
+          pageSize: inboxPageSize,
+          signal,
+          networkOnly: mode === 'refresh',
+        });
       },
       [accessToken],
     ),
@@ -128,16 +135,8 @@ function InboxList({ navigation }: Pick<Props, 'navigation'>) {
     }, [paged.refresh]),
   );
 
-  // Persist the freshest first page so the next cold start can render instantly.
-  useEffect(() => {
-    if (!cacheKey || paged.page !== 1 || paged.loading || paged.error) {
-      return;
-    }
-    void getContentCache().put(cacheKey, paged.items).catch(() => {});
-  }, [cacheKey, paged.page, paged.loading, paged.error, paged.items]);
-
-  const showingCacheOnly = paged.loading && paged.items.length === 0 && !!cachedItems && cachedItems.length > 0;
-  const sourceItems = showingCacheOnly && cachedItems ? cachedItems : paged.items;
+  const usingCachedPage = cachedPage !== null && paged.items.length === 0 && (paged.loading || paged.error !== null);
+  const sourceItems = usingCachedPage ? cachedPage.items : paged.items;
   const displayItems = useMemo(
     () => overlayQueuedComposes(sourceItems, queueItems),
     [queueItems, sourceItems],
@@ -243,7 +242,9 @@ function InboxList({ navigation }: Pick<Props, 'navigation'>) {
       paged={{
         ...paged,
         items: displayItems,
-        refreshing: paged.refreshing || showingCacheOnly,
+        loading: paged.loading && !usingCachedPage,
+        refreshing: paged.refreshing || (usingCachedPage && paged.loading),
+        error: usingCachedPage ? null : paged.error,
       }}
       keyExtractor={inboxKeyExtractor}
       loadingLabel="Loading messages…"

@@ -1,8 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { waitFor } from '@testing-library/react-native';
 import { registerDevice, unregisterDevice } from './api';
 import { getOrCreateDeviceId, peekDeviceId } from './deviceId';
 import { checkNotificationPermission, ensureAndroidNotificationChannel, getDeviceToken, requestNotificationPermission } from './pushToken';
 import { clearPushRegistration, refreshPushRegistration, syncPushRegistration } from './pushRegistration';
+import { deferred } from '../test/fixtures';
 
 jest.mock('./api', () => ({
   registerDevice: jest.fn(),
@@ -70,6 +72,18 @@ describe('pushRegistration', () => {
       await syncPushRegistration('access-token', memberA);
 
       expect(registerDeviceMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('single-flights concurrent registration attempts for the same member', async () => {
+      const pending = deferred<Awaited<ReturnType<typeof registerDevice>>>();
+      registerDeviceMock.mockReturnValueOnce(pending.promise);
+
+      const first = syncPushRegistration('access-token', memberA);
+      const second = syncPushRegistration('newer-access-token', memberA);
+
+      await waitFor(() => expect(registerDeviceMock).toHaveBeenCalledTimes(1));
+      pending.resolve({ deviceId: 'device-1', platform: 'apns', updatedAt: '' });
+      await expect(Promise.all([first, second])).resolves.toEqual([undefined, undefined]);
     });
 
     it('does not re-register when the access token refreshes for the same member', async () => {
