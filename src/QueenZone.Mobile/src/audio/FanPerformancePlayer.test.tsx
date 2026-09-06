@@ -8,7 +8,7 @@ import { lockScreenAlbumTitle, lockScreenMetadata, lockScreenOptions } from './l
 import { resolveLockScreenArtworkUrl } from './lockScreenArtwork';
 import { createMemoryStorage } from '../cache/storage';
 import { createMemoryDownloadHost, setDownloadFileHostForTests } from '../downloads/files';
-import { setDownloadManifestStorageForTests, upsertCompletedDownload } from '../downloads/manifest';
+import { getCompletedDownload, setDownloadManifestStorageForTests, upsertCompletedDownload } from '../downloads/manifest';
 import { OFFLINE_PLAYBACK_MESSAGE } from '../downloads/messages';
 import { resetDownloadUiForTests } from '../downloads/uiState';
 import { FanPerformancePlayerProvider, useFanPerformancePlayer } from './FanPerformancePlayer';
@@ -121,6 +121,11 @@ describe('FanPerformancePlayerProvider', () => {
     mockStatus.didJustFinish = false;
     mockStatus.currentTime = 0;
     mockStatus.duration = 0;
+    mockPlayer.replace.mockReset();
+    mockPlayer.play.mockReset();
+    mockPlayer.pause.mockReset();
+    mockPlayer.setActiveForLockScreen.mockReset();
+    mockPlayer.clearLockScreenControls.mockReset();
   });
 
   it('configures the native session for background playback', () => {
@@ -359,6 +364,75 @@ describe('FanPerformancePlayerProvider', () => {
     );
     expect(mockSession.ensureAccessToken).not.toHaveBeenCalled();
     expect(JSON.stringify(mockPlayer.replace.mock.calls[0])).not.toContain('Bearer');
+  });
+
+  it('shows a playback error when a stream replace fails', async () => {
+    mockPlayer.replace.mockImplementationOnce(() => {
+      throw new Error('decoder failed');
+    });
+    const user = userEvent.setup();
+    renderPlayer();
+    await user.press(screen.getByTestId('play-a'));
+    await waitFor(() => expect(screen.getByTestId('error')).toHaveTextContent('Could not start playback.'));
+  });
+
+  it('streams the offline error after a corrupt local file is discarded', async () => {
+    const host = createMemoryDownloadHost();
+    setDownloadFileHostForTests(host);
+    host.files.set('file:///documents/fan-performances/187', new Uint8Array([1, 2, 3, 4]));
+    await upsertCompletedDownload({
+      performanceId: '187',
+      localUri: 'file:///documents/fan-performances/187',
+      title: trackA.title,
+      performedBy: trackA.performedBy,
+      byteSize: 4,
+      sourceRevision: '"etag-1"',
+      completedAt: '2026-09-05T00:00:00.000Z',
+      memberId: 'member-1',
+    });
+    mockPlayer.replace.mockImplementationOnce(() => {
+      throw new Error('corrupt local file');
+    });
+    const { getNetworkStateAsync } = jest.requireMock('expo-network') as {
+      getNetworkStateAsync: jest.Mock;
+    };
+    getNetworkStateAsync.mockResolvedValueOnce({ isConnected: true, isInternetReachable: true });
+    getNetworkStateAsync.mockResolvedValueOnce({ isConnected: false, isInternetReachable: false });
+    const user = userEvent.setup();
+    renderPlayer();
+    await user.press(screen.getByTestId('play-a'));
+    await waitFor(() => expect(screen.getByTestId('error')).toHaveTextContent(OFFLINE_PLAYBACK_MESSAGE));
+  });
+
+  it('falls back to streaming when local replace fails and clears the bad file', async () => {
+    const host = createMemoryDownloadHost();
+    setDownloadFileHostForTests(host);
+    host.files.set('file:///documents/fan-performances/187', new Uint8Array([1, 2, 3, 4]));
+    await upsertCompletedDownload({
+      performanceId: '187',
+      localUri: 'file:///documents/fan-performances/187',
+      title: trackA.title,
+      performedBy: trackA.performedBy,
+      byteSize: 4,
+      sourceRevision: '"etag-1"',
+      completedAt: '2026-09-05T00:00:00.000Z',
+      memberId: 'member-1',
+    });
+    mockPlayer.replace.mockImplementationOnce(() => {
+      throw new Error('corrupt local file');
+    });
+    const user = userEvent.setup();
+    renderPlayer();
+    await user.press(screen.getByTestId('play-a'));
+    await waitFor(() =>
+      expect(mockPlayer.replace).toHaveBeenCalledWith({
+        uri: 'http://qz.test/api/v1/content/fan-performances/187/audio',
+        headers: { Authorization: 'Bearer member-token' },
+        name: trackA.title,
+      }),
+    );
+    expect(await getCompletedDownload('member-1', '187')).toBeNull();
+    expect(host.exists('file:///documents/fan-performances/187')).toBe(false);
   });
 
   it('shows an offline-specific error when the recording is not downloaded', async () => {

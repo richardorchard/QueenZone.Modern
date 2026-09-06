@@ -5,7 +5,9 @@ export type DownloadUiSnapshot = {
   performanceId: string;
   title: string;
   performedBy: string;
+  /** Bytes written so far while downloading; completed size once downloaded. */
   byteSize: number | null;
+  /** Known Content-Length / Content-Range total, when the probe or progress reported one. */
   expectedBytes: number | null;
   error: string | null;
 };

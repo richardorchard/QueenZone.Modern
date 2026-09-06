@@ -1,7 +1,8 @@
 export { DownloadAction, downloadStatusLabel } from './DownloadAction';
 export { FanPerformanceDownloadsList } from './FanPerformanceDownloadsList';
-export { formatByteSize } from './formatBytes';
+export { formatByteSize, formatDownloadProgress } from './formatBytes';
 export {
+  discardInvalidLocalDownload,
   enqueueDownload,
   purgeAllDownloads,
   reconcileDownloads,
@@ -20,6 +21,10 @@ export {
   upsertCompletedDownload,
 } from './manifest';
 export {
+  DOWNLOAD_FAILED_MESSAGE,
+  DOWNLOAD_INCOMPLETE_MESSAGE,
+  DOWNLOAD_RATE_LIMITED_MESSAGE,
+  DOWNLOAD_TIMEOUT_MESSAGE,
   OFFLINE_PLAYBACK_MESSAGE,
   SIGN_IN_PLAYBACK_MESSAGE,
 } from './messages';

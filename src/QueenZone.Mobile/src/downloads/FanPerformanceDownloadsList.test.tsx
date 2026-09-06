@@ -8,7 +8,7 @@ import { testIds } from '../test/testIds';
 import { FanPerformanceDownloadsList } from './FanPerformanceDownloadsList';
 import { setDownloadManifestStorageForTests } from './manifest';
 import { resetDownloadManagerForTests } from './manager';
-import { resetDownloadUiForTests, setDownloadUiSnapshot, snapshotFromEntry } from './uiState';
+import { resetDownloadUiForTests, setDownloadUiSnapshot, snapshotFromEntry, transientSnapshot } from './uiState';
 import { createMemoryDownloadHost, setDownloadFileHostForTests } from './files';
 
 const mockSession = createMockSession();
@@ -67,5 +67,40 @@ describe('FanPerformanceDownloadsList', () => {
 
     await user.press(screen.getByTestId(`${testIds.fanPerformanceDownloadRemovePrefix}${track.id}`));
     await waitFor(() => expect(screen.getByText('No downloaded recordings yet.')).toBeOnTheScreen());
+  });
+
+  it('lists in-progress and failed downloads with their status', () => {
+    setDownloadUiSnapshot(
+      'member-1',
+      transientSnapshot('190', 'queued', {
+        title: 'Now I\'m Here',
+        performedBy: 'Sam',
+      }),
+    );
+    setDownloadUiSnapshot(
+      'member-1',
+      transientSnapshot('188', 'downloading', {
+        title: 'Liar',
+        performedBy: 'Sam',
+        byteSize: 512,
+        expectedBytes: 2048,
+      }),
+    );
+    setDownloadUiSnapshot(
+      'member-1',
+      transientSnapshot('189', 'failed', {
+        title: 'Father To Son',
+        performedBy: 'Sam',
+        error: 'The download timed out. Try again.',
+      }),
+    );
+
+    renderWithProviders(<FanPerformanceDownloadsList />, { navigation: false });
+    expect(screen.getByText('Now I\'m Here')).toBeOnTheScreen();
+    expect(screen.getByText(/Queued/)).toBeOnTheScreen();
+    expect(screen.getByText('Liar')).toBeOnTheScreen();
+    expect(screen.getByText(/Downloading · 25%/)).toBeOnTheScreen();
+    expect(screen.getByText('Father To Son')).toBeOnTheScreen();
+    expect(screen.getAllByText(/The download timed out/).length).toBeGreaterThan(0);
   });
 });

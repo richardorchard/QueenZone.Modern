@@ -291,11 +291,16 @@ partial. One download runs at a time. Repeated taps do not start a second copy.
 
 A versioned, account-scoped manifest (beside `ContentCache`, not inside it)
 stores only completed rows: performance id, local URI, title/performer, byte
-size, `sourceRevision` (the audio response **ETag**), completed time, and owning
-`memberId`. Startup reconcile drops missing or zero-length files and scrubs
-orphan `.part` files. There is no silent eviction — members remove a download
-explicitly. Size is shown when known. The manager checks `Paths.availableDiskSpace`
-with an 8 MB margin before writing.
+size, `sourceRevision` (the audio response **ETag** when the size probe got
+headers), completed time, and owning `memberId`. Startup reconcile drops missing
+or zero-length files and scrubs orphan `.part` files. A `Range: bytes=0-0` probe
+is best-effort only (12s timeout, body cancelled immediately) so a proxy that
+ignores Range cannot buffer a whole MP3 in JS or fail longer tracks. Missing
+ETag is allowed. Partial, empty, or HTTP-error-page files are discarded and
+playback falls back to the authenticated stream so a failed download cannot
+wedge the shared player. There is no silent eviction of a completed download —
+members remove it explicitly. Size and in-situ percent are shown when known.
+The manager checks `Paths.availableDiskSpace` with an 8 MB margin before writing.
 
 `FanPerformancePlayer.load` resolves every source through `resolveAudioSource`
 (listing, detail, Play All / Shuffle, next/previous). A valid same-member local
