@@ -80,6 +80,20 @@ SELECT CONVERT(bit, CASE WHEN
     }
 }
 
+function Clear-DevSearchReindexRunRequests([string] $ConnectionString) {
+    $connection = [System.Data.SqlClient.SqlConnection]::new($ConnectionString)
+    try {
+        $connection.Open()
+        $command = $connection.CreateCommand()
+        $command.CommandText = "DELETE FROM dbo.SearchReindexRunRequests;"
+        $deleted = $command.ExecuteNonQuery()
+        Write-Host "Removed $deleted refresh-only search reindex run record(s)."
+    }
+    finally {
+        $connection.Dispose()
+    }
+}
+
 $sourceSql = Get-RequiredEnvironment "DEV_SNAPSHOT_SOURCE_SQL_READONLY"
 $targetSql = Get-RequiredEnvironment "DEV_SNAPSHOT_TARGET_SQL"
 Assert-SqlBoundary $sourceSql "queenzone-db" $true
@@ -133,6 +147,7 @@ try {
 
     dotnet run --project src/QueenZone.SearchReindex.Worker --configuration Release --no-restore -- reindex --force
     if ($LASTEXITCODE -ne 0) { throw "Dev search rebuild failed." }
+    Clear-DevSearchReindexRunRequests $targetSql
 
     dotnet run --project src/QueenZone.Tools --configuration Release --no-restore -- `
         dev-snapshot verify --config $ConfigPath --manifest $manifest --summary $summary
