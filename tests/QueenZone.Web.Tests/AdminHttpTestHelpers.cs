@@ -122,6 +122,6 @@ internal static partial class AdminHttpTestHelpers
         return int.Parse(editPath.Split('/')[3], System.Globalization.CultureInfo.InvariantCulture);
     }
 
-    [GeneratedRegex("""name="__RequestVerificationToken" value="(?<token>[^"]+)""", RegexOptions.IgnoreCase)]
+    [GeneratedRegex("""name="__RequestVerificationToken"[^>]*value="(?<token>[^"]+)""", RegexOptions.IgnoreCase)]
     private static partial Regex AntiforgeryTokenRegex();
 }

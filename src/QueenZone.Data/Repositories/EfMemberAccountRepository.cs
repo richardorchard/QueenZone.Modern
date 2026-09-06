@@ -300,6 +300,63 @@ public sealed class EfMemberAccountRepository(QueenZoneDbContext dbContext) : IM
         return new MemberSearchResult(members, totalCount);
     }
 
+    public async Task<IReadOnlyList<LocalPasswordAccountSummary>> ListLocalPasswordAccountsAsync(
+        CancellationToken cancellationToken = default) =>
+        await dbContext.MemberAccounts
+            .AsNoTracking()
+            .Where(account => account.PasswordHash != null)
+            .OrderBy(account => account.Email)
+            .Select(account => new LocalPasswordAccountSummary(
+                account.Id,
+                account.Email,
+                account.DisplayName,
+                account.CreatedAt,
+                account.LastLoginAt,
+                account.IsSuspended))
+            .ToListAsync(cancellationToken);
+
+    public async Task<MemberAccount?> UpdateLocalPasswordAccountAsync(
+        Guid memberId,
+        string email,
+        string displayName,
+        string? passwordHash,
+        CancellationToken cancellationToken = default)
+    {
+        var account = await dbContext.MemberAccounts
+            .SingleOrDefaultAsync(candidate => candidate.Id == memberId, cancellationToken);
+        if (account?.PasswordHash is null)
+        {
+            return null;
+        }
+
+        account.Email = email;
+        account.NormalizedEmail = Normalize(email);
+        account.DisplayName = displayName;
+        if (passwordHash is not null)
+        {
+            account.PasswordHash = passwordHash;
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return account;
+    }
+
+    public async Task<bool> RemoveLocalPasswordAsync(
+        Guid memberId,
+        CancellationToken cancellationToken = default)
+    {
+        var account = await dbContext.MemberAccounts
+            .SingleOrDefaultAsync(candidate => candidate.Id == memberId, cancellationToken);
+        if (account?.PasswordHash is null)
+        {
+            return false;
+        }
+
+        account.PasswordHash = null;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
     public async Task<MemberAccount?> SuspendAsync(
         Guid memberId,
         string reason,

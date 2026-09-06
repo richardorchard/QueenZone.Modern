@@ -11,6 +11,8 @@ Version-neutral preparation material for the first public QueenZone mobile relea
 
 The packs deliberately do not contain passwords, API keys, signing material, service-account JSON or personal reviewer contact details. Enter those directly into the store consoles.
 
+Production reviewer accounts are managed at `/admin/reviewer-accounts`. The admin can create an account, update its email or display name, reset its password, or remove password sign-in while retaining the member record and content. Passwords are one-way hashed and cannot be recovered or listed; the form can reveal a new password only while the admin is entering it.
+
 Store icons and the Google Play feature graphic are deterministic exports. Regenerate them after `npm ci` with `./docs/release/store-submission/generate-assets.sh` (ImageMagick required).
 
 ## Shared product facts
