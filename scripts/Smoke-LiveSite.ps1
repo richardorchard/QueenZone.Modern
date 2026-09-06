@@ -57,6 +57,7 @@ if (-not $warmed) {
 
 $paths = @(
     "/health",
+    "/health/ready",
     "/",
     "/news",
     "/forum",
@@ -80,6 +81,11 @@ foreach ($path in $paths) {
         }
         if ($path -eq "/health" -and $response.Content -notmatch '"status"\s*:\s*"ok"') {
             Write-Host "FAIL  $url -> 200 but body missing status=ok"
+            $failed++
+            continue
+        }
+        if ($path -eq "/health/ready" -and $response.Content -notmatch '"status"\s*:\s*"Healthy"') {
+            Write-Host "FAIL  $url -> 200 but body missing status=Healthy"
             $failed++
             continue
         }

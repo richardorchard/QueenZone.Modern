@@ -321,7 +321,7 @@ Feature work should happen on an agent-prefixed branch such as `grok/news-pagina
 
 Every qualifying web merge to `main` deploys automatically to the isolated dev environment through `.github/workflows/deploy-dev.yml`; workflow/docs-only and mobile-only merges skip the web deploy. The production `Deploy` workflow (`.github/workflows/deploy.yml`) runs only for a `v*` tag or a manual dispatch from `main`. Despite its legacy Azure resource name, production is the `queenzone-dev` App Service at `https://www.queenzone.org`.
 
-`.github/workflows/ci.yml` runs the required build, test, coverage, migration consistency, smoke, and Playwright checks on pull requests. The dev and production deploy workflows reuse the exact tested `web-publish` artifact; they do not rebuild or rerun CI.
+`.github/workflows/ci.yml` runs the required build, test, coverage, migration consistency, smoke, and Playwright checks on pull requests. The dev and production deploy workflows reuse the tested `web-publish` artifact when it is still present. If resolve cannot find that zip and a website Deploy is still required, they publish from the checked-out `main`/tag SHA. Manual dispatch and `v*` tags skip when the classified range is mobile-only or otherwise non-web — they do not walk back to an older web tip or rerun CI.
 
 ### Promote a verified dev release to production
 
@@ -336,7 +336,7 @@ git tag vX.Y.Z <verified-commit-sha>
 git push origin vX.Y.Z
 ```
 
-The `v*` tag triggers the production workflow. That workflow resolves the tagged commit back to the PR head SHA and deploys the matching CI artifact, then applies migrations and runs production smoke checks. You can also open **Actions → Deploy → Run workflow**, select `main`, and run the same production deployment without creating a tag.
+The `v*` tag triggers the production workflow. That workflow classifies the previous-tag…this-tag span (skip when the entire span is non-web), resolves the tagged commit back to the PR head SHA, and deploys the matching CI `web-publish` artifact when it is still present. If that zip is gone and the span includes website changes, it publishes from the tagged SHA instead of walking back to an older web tip. You can also open **Actions → Deploy → Run workflow**, select `main`, and run the same production deployment without creating a tag (dispatch classifies tip vs previous `main` commit and skips a mobile-only tip).
 
 Dev runs deterministic sample data until the approval-gated [curated snapshot workflow](docs/architecture/dev-curated-snapshot.md) completes. That workflow builds a production-compatible legacy schema, loads a capped sanitised public sample, copies only manifest assets into `queenzonedev`, rebuilds search, and enables the dev-only connection after size, privacy, smoke, and browser checks pass. The dev App Service setting `DevSnapshot__Ready` keeps later `deploy-dev.yml` runs in sample mode until that proof exists.
 
