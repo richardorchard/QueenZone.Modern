@@ -16,6 +16,7 @@ import {
 import { useSession } from '../session/SessionContext';
 import type { FanPerformance } from '../api';
 import {
+  discardInvalidLocalDownload,
   registerPlaybackStopper,
   resolveAudioSource,
   setActivePlaybackId,
@@ -94,15 +95,42 @@ export function FanPerformancePlayerProvider({ children }: { children: ReactNode
         setError(null);
         setCurrent(track);
         setActivePlaybackId(String(track.id));
-        player.replace(
-          source.kind === 'local'
-            ? { uri: source.uri, name: track.title }
-            : { uri: source.uri, headers: source.headers, name: track.title },
-        );
-        player.setActiveForLockScreen(true, lockScreenMetadata(track, artworkUrl), {
-          ...lockScreenOptions,
-        });
-        player.play();
+        const apply = (next: typeof source) => {
+          player.replace(
+            next.kind === 'local'
+              ? { uri: next.uri, name: track.title }
+              : { uri: next.uri, headers: next.headers, name: track.title },
+          );
+          player.setActiveForLockScreen(true, lockScreenMetadata(track, artworkUrl), {
+            ...lockScreenOptions,
+          });
+          player.play();
+        };
+
+        try {
+          apply(source);
+        } catch {
+          if (source.kind !== 'local' || !memberId) {
+            setError('Could not start playback.');
+            return;
+          }
+          await discardInvalidLocalDownload(memberId, String(track.id));
+          const streamed = await resolveAudioSource({
+            track,
+            memberId,
+            ensureAccessToken,
+            isOffline: await detectOffline(),
+            ignoreLocal: true,
+          });
+          if (generation !== loadGenerationRef.current) {
+            return;
+          }
+          if (streamed.kind === 'error') {
+            setError(streamed.message);
+            return;
+          }
+          apply(streamed);
+        }
       })();
     },
     [ensureAccessToken, memberId, player],

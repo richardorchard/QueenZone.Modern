@@ -25,9 +25,10 @@ describe('lockScreenOptions', () => {
 });
 
 describe('lockScreenArtworkUrlOrOmit', () => {
-  it('keeps a bundled file URI and drops network or blob URLs', () => {
+  it('keeps a bundled file URI and drops scheme-less, asset, network, or blob URLs', () => {
     assert.equal(lockScreenArtworkUrlOrOmit('file:///app/assets/icon.png'), 'file:///app/assets/icon.png');
-    assert.equal(lockScreenArtworkUrlOrOmit('asset:/icon.png'), 'asset:/icon.png');
+    assert.equal(lockScreenArtworkUrlOrOmit('asset:/icon.png'), undefined);
+    assert.equal(lockScreenArtworkUrlOrOmit('assets_icon'), undefined);
     assert.equal(lockScreenArtworkUrlOrOmit('https://cdn.example/cover.jpg'), undefined);
     assert.equal(lockScreenArtworkUrlOrOmit('http://localhost:8081/assets/icon.png'), undefined);
     assert.equal(lockScreenArtworkUrlOrOmit('blob:https://qz.test/1'), undefined);

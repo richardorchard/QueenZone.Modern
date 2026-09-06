@@ -1,4 +1,5 @@
 import { Directory, File, Paths } from 'expo-file-system';
+import { DOWNLOAD_EMPTY_PART_MESSAGE, DOWNLOAD_PART_MISSING_MESSAGE } from './messages';
 import { DOWNLOAD_DIRECTORY_NAME } from './types';
 
 export type DownloadProbe = {
@@ -18,13 +19,14 @@ export type DownloadFileHost = {
   listAllUris(): string[];
   promote(partUri: string, completedUri: string): void;
   writeBytes(uri: string, bytes: Uint8Array): void;
+  readPrefix(uri: string, maxBytes: number): Promise<Uint8Array | null>;
   download(input: {
     url: string;
     destUri: string;
     headers: Record<string, string>;
     onProgress?: (written: number, total: number) => void;
     signal?: AbortSignal;
-  }): Promise<void>;
+  }): Promise<{ uri?: string } | void>;
 };
 
 function joinUri(root: string, name: string): string {
@@ -110,6 +112,12 @@ function createNativeHost(): DownloadFileHost {
     },
     promote(partUri, completedUri) {
       const part = fileFor(partUri);
+      if (!part.exists) {
+        throw new Error(DOWNLOAD_PART_MISSING_MESSAGE);
+      }
+      if (!part.size || part.size <= 0) {
+        throw new Error(DOWNLOAD_EMPTY_PART_MESSAGE);
+      }
       const completed = fileFor(completedUri);
       if (completed.exists) {
         completed.delete();
@@ -122,6 +130,18 @@ function createNativeHost(): DownloadFileHost {
         file.create({ intermediates: true, overwrite: true });
       }
       file.write(bytes);
+    },
+    async readPrefix(uri, maxBytes) {
+      try {
+        const file = fileFor(uri) as { exists: boolean; bytes?: () => Uint8Array | Promise<Uint8Array> };
+        if (!file.exists || typeof file.bytes !== 'function') {
+          return null;
+        }
+        const bytes = await Promise.resolve(file.bytes());
+        return bytes ? bytes.subarray(0, Math.min(maxBytes, bytes.length)) : null;
+      } catch {
+        return null;
+      }
     },
     async download({ url, destUri, headers, onProgress, signal }) {
       audioDir();
@@ -142,6 +162,8 @@ function createNativeHost(): DownloadFileHost {
       if (!file) {
         throw new Error('Download did not complete.');
       }
+      const returnedUri = typeof file.uri === 'string' ? file.uri.trim() : '';
+      return { uri: returnedUri || dest.uri };
     },
   };
 }
@@ -168,6 +190,7 @@ export function createMemoryDownloadHost(
     options.downloadImpl ??
     (async ({ destUri }) => {
       files.set(destUri, new Uint8Array([1, 2, 3, 4]));
+      return { uri: destUri };
     });
 
   return {
@@ -185,13 +208,24 @@ export function createMemoryDownloadHost(
     listAllUris: () => [...files.keys()],
     promote: (partUri, completedUri) => {
       const bytes = files.get(partUri);
-      files.delete(partUri);
-      if (bytes) {
-        files.set(completedUri, bytes);
+      if (!bytes) {
+        throw new Error(DOWNLOAD_PART_MISSING_MESSAGE);
       }
+      if (bytes.byteLength <= 0) {
+        throw new Error(DOWNLOAD_EMPTY_PART_MESSAGE);
+      }
+      files.delete(partUri);
+      files.set(completedUri, bytes);
     },
     writeBytes: (uri, bytes) => {
       files.set(uri, bytes);
+    },
+    readPrefix: async (uri, maxBytes) => {
+      const bytes = files.get(uri);
+      if (!bytes) {
+        return null;
+      }
+      return bytes.subarray(0, Math.min(maxBytes, bytes.length));
     },
     download: downloadImpl,
   };

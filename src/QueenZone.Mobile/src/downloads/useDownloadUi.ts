@@ -14,7 +14,7 @@ export function useDownloadUi(performanceId: number | string): DownloadUiSnapsho
   const id = String(performanceId);
   const cacheKey = memberId ? downloadUiCacheKey(memberId, id) : '';
   useStoreVersion(cacheKey);
-  if (!memberId) {
+  if (!memberId || !id || id === 'undefined' || id === 'NaN') {
     return null;
   }
   return getDownloadUiSnapshot(memberId, id);
