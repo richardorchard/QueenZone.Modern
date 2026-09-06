@@ -14,7 +14,10 @@
 # mobile coverage gate / floors change (those run inside mobile-js).
 # A mobile-only change does not set code=true: the website binary is
 # unchanged, so web tests and App Service deploy should not run.
-# Mixed mobile + web still sets both flags.
+# Deploy / Deploy-dev classify the range from
+# scripts/Resolve-DeployChangeRange.sh (push span, dispatch tip vs parent,
+# or previous v* tag … this tag) and skip rather than walk back to an
+# older web tip. Mixed mobile + web still sets both flags.
 # mobile_native=true only when a change can affect generated Android/iOS
 # projects or native compilation. Pure TypeScript/TSX changes keep the faster
 # mobile JS and contract checks without rebuilding both native apps.
@@ -211,6 +214,17 @@ if [ "${1:-}" = "--self-test" ]; then
   assert_classify deploy-yml-only \
     "code=false${nl}migrations=false${nl}mobile=false${nl}mobile_native=false${nl}mobile_api_contracts=false" \
     ".github/workflows/deploy.yml" \
+    || fail=1
+
+  assert_classify deploy-range-script \
+    "code=true${nl}migrations=false${nl}mobile=false${nl}mobile_native=false${nl}mobile_api_contracts=false" \
+    "scripts/Resolve-DeployChangeRange.sh" \
+    || fail=1
+
+  assert_classify dispatch-mobile-plus-docs \
+    "code=false${nl}migrations=false${nl}mobile=true${nl}mobile_native=false${nl}mobile_api_contracts=false" \
+    "src/QueenZone.Mobile/App.tsx" \
+    "docs/architecture/testing-policy.md" \
     || fail=1
 
   assert_classify mobile-coverage-gate \

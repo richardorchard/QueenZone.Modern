@@ -24,23 +24,28 @@ concurrency:
 # a manual dispatch from main. ci.yml already ran the full test/coverage/
 # e2e suite against this exact tree as a required status check before the
 # merge was allowed (see branch protection on main), so none of that re-runs
-# here. This workflow no longer rebuilds — it reuses the exact binaries
-# ci.yml already built and tested on the PR, resolved below by PR head SHA.
-# Docs/infra/design/workflow-only and mobile-only merges skip
-# migrate/deploy/post-deploy-smoke (see `changes`) since ci.yml never
-# produced a website binary to reuse for those.
-# Mixed web+mobile merges still deploy the website: resolve-ci-run keys
-# off the web-publish artifact (not overall ci.yml success), because
-# long Mobile iOS/Android jobs can leave the workflow in_progress after
-# required web checks — and merge — already passed.
+# here.
+#
+# Reuse-first: when the matching PR ci.yml run still has a non-expired
+# web-publish-{run_id} artifact, download and ship that zip. No rebuild.
+# Fallback: if resolve cannot find web-publish (mobile-only CI skip,
+# retention prune, no PR run) *and* a website Deploy is still required,
+# publish from the checked-out main/tag SHA, stamp that SHA, and deploy.
+# Skip (do not walk back): workflow_dispatch classifies tip vs previous
+# main commit; v* tags classify the previous-tag…this-tag span. Mobile-only
+# / docs-only / workflow-only → code=false → skip resolve/migrate/deploy/
+# smoke. Never redeploy an older web tip under a newer tag or dispatch.
+# Mixed web+mobile still deploys: resolve-ci-run keys off the web-publish
+# artifact (not overall ci.yml success), because long Mobile iOS/Android
+# jobs can leave the workflow in_progress after required web checks — and
+# merge — already passed.
 # post-deploy-smoke is the safety net after the real deploy.
 jobs:
   # Mirrors ci.yml's non-web bypass (scripts/classify-pipeline-changes.sh).
-  # ci.yml skips `build` (no web-publish artifact) for those PRs, so deploy
-  # has nothing to download — and there's genuinely nothing to redeploy.
-  # Without this gate, resolve-ci-run still finds the successful-but-skipped
-  # ci.yml run and `deploy` fails downloading an artifact that was never
-  # uploaded.
+  # Skip when the classified range is mobile-only / docs / workflow-only —
+  # nothing to redeploy, and walking back to an older web tip is forbidden.
+  # workflow_dispatch classifies tip vs previous main commit (do not force
+  # code=true). v* tags classify previous v* tag … this tag.
   changes:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main'
@@ -54,27 +59,40 @@ jobs:
           fetch-depth: 0
       - name: Self-test change classifier
         run: bash ./scripts/classify-pipeline-changes.sh --self-test
+      - name: Self-test deploy change range
+        run: bash ./scripts/Resolve-DeployChangeRange.sh --self-test
+      - name: Self-test post-deploy smoke matcher
+        run: bash ./scripts/Invoke-PostDeploySmoke.sh --self-test
+      - name: Self-test CI publish-run resolver
+        run: bash ./scripts/Resolve-CiPublishRun.sh --self-test
       - name: Check for code changes
         id: check
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          BEFORE: ${{ github.event.before }}
+          SHA: ${{ github.sha }}
         run: |
-          # A production tag can span several merges since the previous release.
-          # Fail closed by running every deploy stage instead of diffing the tag
-          # creation event's all-zero `before` SHA.
-          if [ "${{ github.event_name }}" != "push" ] || [ "${{ github.ref_type }}" = "tag" ] || [ -z "${{ github.event.before }}" ]; then
+          range="$(bash ./scripts/Resolve-DeployChangeRange.sh)"
+          echo "$range"
+          fail_closed="$(printf '%s\n' "$range" | sed -n 's/^fail_closed=//p')"
+          if [ "$fail_closed" = "true" ]; then
             echo "code=true" >> "$GITHUB_OUTPUT"
             echo "migrations=true" >> "$GITHUB_OUTPUT"
             echo "mobile=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-
-          git diff --name-only ${{ github.event.before }}...${{ github.sha }} \
+          base_sha="$(printf '%s\n' "$range" | sed -n 's/^base_sha=//p')"
+          head_sha="$(printf '%s\n' "$range" | sed -n 's/^head_sha=//p')"
+          git diff --name-only "${base_sha}...${head_sha}" \
             | bash ./scripts/classify-pipeline-changes.sh \
             >> "$GITHUB_OUTPUT"
 
   # Finds the ci.yml run that built+tested this exact code, so `deploy` can
-  # download its publish artifact instead of rebuilding. A tag checkout resolves
-  # to its target commit; that commit on main is not always the PR head that
-  # ci.yml ran against:
+  # download its publish artifact instead of rebuilding. Soft-miss (found=false)
+  # is not a hard fail: deploy then publishes from the checked-out SHA.
+  # A tag checkout resolves to its target commit; that commit on main is not
+  # always the PR head that ci.yml ran against:
   #   - merge commits (2 parents): second parent is the PR head
   #   - squash/rebase merges (1 parent): look up the associated PR head via API
   #   - direct pushes with no PR: fall back to github.sha itself
@@ -83,8 +101,10 @@ jobs:
     needs: changes
     if: (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main') && needs.changes.outputs.code == 'true'
     outputs:
+      found: ${{ steps.find.outputs.found }}
       run_id: ${{ steps.find.outputs.run_id }}
       head_sha: ${{ steps.sha.outputs.head_sha }}
+      expect_build_version: ${{ steps.stamp.outputs.expect_build_version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -132,13 +152,28 @@ jobs:
         run: |
           bash ./scripts/Resolve-CiPublishRun.sh >> "$GITHUB_OUTPUT"
 
+      - name: Choose build stamp
+        id: stamp
+        run: |
+          FOUND="${{ steps.find.outputs.found }}"
+          HEAD_SHA="${{ steps.sha.outputs.head_sha }}"
+          CHECKOUT_SHA=$(git rev-parse HEAD)
+          if [ "$FOUND" = "true" ]; then
+            echo "Reuse CI web-publish; smoke expects PR-head stamp ${HEAD_SHA}."
+            echo "expect_build_version=$HEAD_SHA" >> "$GITHUB_OUTPUT"
+          else
+            echo "No web-publish; fallback publish will stamp checkout ${CHECKOUT_SHA}."
+            echo "expect_build_version=$CHECKOUT_SHA" >> "$GITHUB_OUTPUT"
+          fi
+
   migrate:
     name: Apply database migrations
     runs-on: ubuntu-latest
     needs: [changes]
     # Does not wait on resolve-ci-run — that output is only for the zip deploy.
-    # Skip the restore/`database update` when the push did not touch EF paths
-    # (issue #659). workflow_dispatch still fails closed (migrations=true).
+    # Skip the restore/`database update` when the classified range did not
+    # touch EF paths (issue #659). Dispatch and tags use the same classifier
+    # (tip vs parent, or previous-tag…this-tag) — do not force migrations=true.
     if: |
       (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main') &&
       needs.changes.outputs.code == 'true' &&
@@ -359,20 +394,46 @@ jobs:
     # A stuck azure/webapps-deploy poll (e.g. hitting the SCM-restart race
     # this job now waits out) had no bound and hung for ~20 minutes before a
     # manual cancel on the #666 rollout run. Fail loudly instead.
-    timeout-minutes: 10
+    # Fallback publish adds restore+compile, so keep headroom above the reuse path.
+    timeout-minutes: 25
 
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
-      # Reuses the exact binary ci.yml built and tested on the PR — no rebuild.
+      # Reuse-first: exact binary ci.yml built and tested on the PR.
       - name: Download publish artifact from CI run
+        if: needs.resolve-ci-run.outputs.found == 'true'
         uses: actions/download-artifact@v8
         with:
           name: web-publish-${{ needs.resolve-ci-run.outputs.run_id }}
           run-id: ${{ needs.resolve-ci-run.outputs.run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: publish
+
+      # Fallback: no web-publish (retention prune, no PR run). Publish the
+      # checked-out SHA and stamp that SHA — do not walk back to an older tip.
+      - name: Setup .NET
+        if: needs.resolve-ci-run.outputs.found != 'true'
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+          cache: true
+          cache-dependency-path: |
+            **/*.csproj
+            .config/dotnet-tools.json
+
+      - name: Publish website from checkout
+        if: needs.resolve-ci-run.outputs.found != 'true'
+        run: |
+          CHECKOUT_SHA=$(git rev-parse HEAD)
+          SHORT="${CHECKOUT_SHA:0:7}"
+          echo "No CI web-publish — publishing QueenZone.Web from ${CHECKOUT_SHA} (stamp ${SHORT})."
+          dotnet restore src/QueenZone.Web/QueenZone.Web.csproj
+          dotnet publish src/QueenZone.Web/QueenZone.Web.csproj \
+            --configuration Release \
+            --output publish \
+            /p:OverrideGitCommitShort="$SHORT"
 
       - name: Fetch Bitwarden deploy secrets
         id: bitwarden-secrets
@@ -401,7 +462,7 @@ jobs:
         run: |
           bash ./scripts/Invoke-PostDeploySmoke.sh \
             --warmup-only \
-            --expect-build-version "${{ needs.resolve-ci-run.outputs.head_sha }}"
+            --expect-build-version "${{ needs.resolve-ci-run.outputs.expect_build_version }}"
 
   post-deploy-smoke:
     name: Post-deploy smoke
@@ -431,4 +492,4 @@ jobs:
       - name: Post-deploy smoke (custom domain)
         run: |
           bash ./scripts/Invoke-PostDeploySmoke.sh \
-            --expect-build-version "${{ needs.resolve-ci-run.outputs.head_sha }}"
+            --expect-build-version "${{ needs.resolve-ci-run.outputs.expect_build_version }}"
