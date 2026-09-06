@@ -42,7 +42,8 @@ export function DownloadAction({ track, compact = false, onNeedSignIn }: Props) 
   const { c } = useTheme();
   const { accessToken, isRestoring, ensureAccessToken } = useSession();
   const memberId = useDownloadMemberId();
-  const snapshot = useDownloadUi(track.id);
+  const performanceId = String(track.id);
+  const snapshot = useDownloadUi(performanceId);
   const status = snapshot?.status;
   const progressLabel = formatDownloadProgress(snapshot?.byteSize, snapshot?.expectedBytes);
   const sizeLabel =
@@ -59,7 +60,7 @@ export function DownloadAction({ track, compact = false, onNeedSignIn }: Props) 
       return;
     }
     if (status === 'downloaded') {
-      void removeDownload(memberId, String(track.id));
+      void removeDownload(memberId, performanceId);
       return;
     }
     if (status === 'queued' || status === 'downloading' || status === 'removing') {
@@ -100,7 +101,7 @@ export function DownloadAction({ track, compact = false, onNeedSignIn }: Props) 
 
   return (
     <Pressable
-      testID={`${testIds.fanPerformanceDownloadPrefix}${track.id}`}
+      testID={`${testIds.fanPerformanceDownloadPrefix}${performanceId}`}
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityHint={
@@ -116,7 +117,7 @@ export function DownloadAction({ track, compact = false, onNeedSignIn }: Props) 
       style={[
         styles.button,
         compact ? styles.compact : null,
-        compact && showCaption ? styles.compactWide : null,
+        compact && showCaption ? (status === 'failed' ? styles.compactFailed : styles.compactWide) : null,
         { borderColor: c.borderStrong, backgroundColor: c.surfaceRaised },
       ]}
     >
@@ -127,10 +128,10 @@ export function DownloadAction({ track, compact = false, onNeedSignIn }: Props) 
       {showCaption ? (
         <Text
           style={[
-            compact ? type.meta : type.caption,
+            compact && status !== 'failed' ? type.meta : type.caption,
             { color: status === 'failed' ? c.danger : c.textPrimary, flexShrink: 1 },
           ]}
-          numberOfLines={compact ? 2 : 3}
+          numberOfLines={status === 'failed' ? undefined : compact ? 2 : 3}
         >
           {compact && status === 'downloading' ? sizeLabel || '…' : caption}
         </Text>
@@ -161,5 +162,13 @@ const styles = StyleSheet.create({
     maxWidth: 96,
     minHeight: 40,
     paddingHorizontal: space.sm,
+  },
+  compactFailed: {
+    width: undefined,
+    maxWidth: 220,
+    minHeight: 40,
+    paddingHorizontal: space.sm,
+    paddingVertical: space.xs,
+    alignItems: 'flex-start',
   },
 });
