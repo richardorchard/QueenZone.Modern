@@ -33,6 +33,11 @@ describe('Maestro device flows (#1281)', () => {
     assert.match(attach, /id: tab-forum/);
   });
 
+  it('leaves the archive search story before the forum flow switches tabs', () => {
+    const search = readMaestro('flows/06-archive-search.yaml');
+    assert.match(search, /id: news-story-screen[\s\S]*id: news-story-back[\s\S]*id: news-screen/);
+  });
+
   it('dismisses the iOS Open-in-QueenZone confirm after smoke-auth and attach', () => {
     const openAuth = readMaestro('flows/open-smoke-auth.yaml');
     const accept = readMaestro('flows/accept-ios-open-link.yaml');
@@ -60,6 +65,16 @@ describe('device-smoke harness (#1281)', () => {
     assert.match(workflow, /Collect leftover Android smoke logs[\s\S]*timeout-minutes: 2/);
     assert.match(workflow, /Collect leftover Android journeys logs[\s\S]*timeout-minutes: 2/);
     assert.match(workflow, /maestro --version/);
+  });
+
+  it('retries only an iOS driver failure that happened before a flow began', () => {
+    const script = readRepo('run-mobile-device-smoke.sh', scriptsDir);
+    assert.match(script, /iOS driver not ready in time/);
+    assert.match(script, /\[ ! -s "\$results_dir\/junit\.xml" \]/);
+    assert.match(script, /simctl shutdown/);
+    assert.match(script, /simctl bootstatus/);
+    assert.match(script, /debug-driver-startup-first/);
+    assert.match(script, /App flows are not retried/);
   });
 });
 

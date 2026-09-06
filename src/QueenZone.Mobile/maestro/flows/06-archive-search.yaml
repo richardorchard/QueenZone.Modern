@@ -28,3 +28,11 @@ appId: org.queenzone.mobile
     visible:
       id: news-story-screen
     timeout: 20000
+# Search opens news results on the News tab. The story hides the tab bar, so
+# leave through its header before 07-forum tries to switch tabs.
+- tapOn:
+    id: news-story-back
+- extendedWaitUntil:
+    visible:
+      id: news-screen
+    timeout: 15000
