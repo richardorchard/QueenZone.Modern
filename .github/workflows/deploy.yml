@@ -178,6 +178,10 @@ jobs:
       (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main') &&
       needs.changes.outputs.code == 'true' &&
       needs.changes.outputs.migrations == 'true'
+    # GitHub Environment "dev" predates the real dev environment (deploy-dev.yml
+    # uses "dev-migrate"/"dev-deploy" instead) and, despite the name, gates the
+    # Bitwarden mapping used to migrate PRODUCTION's database. Do not confuse it
+    # with the actual dev environment. Tracked for a rename in a follow-up issue.
     environment: dev
 
     steps:
@@ -256,6 +260,9 @@ jobs:
       (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main') &&
       needs.changes.outputs.code == 'true' &&
       needs.resolve-ci-run.result == 'success'
+    # GitHub Environment "deploy" is production's OIDC/ARM identity for this
+    # job — unrelated to the "dev-deploy" environment deploy-dev.yml uses for
+    # the actual dev environment. Tracked for a rename in a follow-up issue.
     environment: deploy
     permissions:
       id-token: write
@@ -388,6 +395,8 @@ jobs:
       needs.resolve-ci-run.result == 'success' &&
       needs.configure-app-settings.result == 'success' &&
       (needs.migrate.result == 'success' || needs.migrate.result == 'skipped')
+    # environment.name "dev" is the same legacy-named GH Environment as the
+    # migrate job above; url below (production) is the source of truth here.
     environment:
       name: dev
       url: https://www.queenzone.org

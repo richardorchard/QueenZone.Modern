@@ -95,6 +95,9 @@ jobs:
     # existing mirror instead of paying the roughly 25-30 minute sqlpackage extract/publish.
     if: github.event_name != 'workflow_dispatch' || inputs.skip_sync != true
     timeout-minutes: 45
+    # GitHub Environment "dev" is the legacy name gating the shared
+    # legacy/production DB Bitwarden mapping (same one deploy.yml uses to
+    # migrate PRODUCTION) -- not the actual dev App Service environment.
     environment: dev
 
     steps:
