@@ -41,6 +41,14 @@ describe('Maestro device flows (#1281)', () => {
     );
   });
 
+  it('resets the forum stack after its thread journey', () => {
+    const forum = readMaestro('flows/07-forum.yaml');
+    assert.match(
+      forum,
+      /id: forum-thread-screen[\s\S]*id: forum-thread-back[\s\S]*id: forum-category-screen[\s\S]*id: tab-forum[\s\S]*id: forum-screen/,
+    );
+  });
+
   it('dismisses the iOS Open-in-QueenZone confirm after smoke-auth and attach', () => {
     const openAuth = readMaestro('flows/open-smoke-auth.yaml');
     const accept = readMaestro('flows/accept-ios-open-link.yaml');
