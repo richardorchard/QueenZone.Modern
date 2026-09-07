@@ -1,5 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react-native';
 import { ApiError } from '../api/client';
+import { OFFLINE_MESSAGE, TIMEOUT_MESSAGE } from '../api/errors';
 import { deferred } from '../test/fixtures';
 import { useDetailQuery } from './useDetailQuery';
 
@@ -96,6 +97,45 @@ describe('useDetailQuery', () => {
     first.resolve('stale');
     await flush();
     expect(result.current).toMatchObject({ data: 'fresh', error: null, loading: false });
+  });
+
+  it('maps a classified timeout to a failed, not pending, query', async () => {
+    const fetcher = jest.fn().mockRejectedValueOnce(ApiError.timeout());
+    const { result } = renderHook(() => useDetailQuery(fetcher));
+
+    await waitFor(() =>
+      expect(result.current).toMatchObject({
+        data: null,
+        error: TIMEOUT_MESSAGE,
+        loading: false,
+      }),
+    );
+  });
+
+  it('maps a classified offline failure to a failed, not pending, query', async () => {
+    const fetcher = jest.fn().mockRejectedValueOnce(ApiError.offline());
+    const { result } = renderHook(() => useDetailQuery(fetcher));
+
+    await waitFor(() =>
+      expect(result.current).toMatchObject({
+        data: null,
+        error: OFFLINE_MESSAGE,
+        loading: false,
+      }),
+    );
+  });
+
+  it('treats a stray AbortError on the initial generation as a timeout failure', async () => {
+    const fetcher = jest.fn().mockRejectedValueOnce(Object.assign(new Error('Aborted'), { name: 'AbortError' }));
+    const { result } = renderHook(() => useDetailQuery(fetcher));
+
+    await waitFor(() =>
+      expect(result.current).toMatchObject({
+        data: null,
+        error: TIMEOUT_MESSAGE,
+        loading: false,
+      }),
+    );
   });
 
   it('does not commit an AbortError from a superseded load', async () => {
