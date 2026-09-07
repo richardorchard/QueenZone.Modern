@@ -69,6 +69,11 @@ describe('Maestro device flows (#1281)', () => {
     assert.match(readMaestro('flows/12-masthead-unread.yaml'), /open-smoke-auth\.yaml/);
     assert.match(readMaestro('flows/10-forum-attach.yaml'), /accept-ios-open-link\.yaml/);
   });
+
+  it('matches the seeded inbox row when iOS merges its accessibility label', () => {
+    const authenticated = readRepo('flows/09-authenticated.yaml', maestroDir);
+    assert.match(authenticated, /text: '\^Contract Other\.\*'/);
+  });
 });
 
 describe('device-smoke harness (#1281)', () => {
@@ -93,17 +98,19 @@ describe('device-smoke harness (#1281)', () => {
     assert.match(script, /simctl shutdown/);
     assert.match(script, /simctl bootstatus/);
     assert.match(script, /debug-driver-startup-first/);
-    assert.match(script, /App flows are not retried/);
+    assert.match(script, /Selector and assertion failures are not retried/);
   });
 
-  it('retries only an Android transport failure before an assertion', () => {
+  it('retries only an Android device transport failure', () => {
     const script = readRepo('run-mobile-device-smoke.sh', scriptsDir);
-    assert.match(script, /<failure>Unknown error<\/failure>/);
-    assert.match(script, /Device server died\|device offline/);
+    assert.match(
+      script,
+      /DeviceServerDiedException\|Device server died\|device offline/,
+    );
     assert.match(script, /debug-android-transport-first/);
     assert.match(script, /adb reconnect offline/);
     assert.match(script, /adb install -r "\$apk"/);
-    assert.match(script, /app assertions are not retried/);
+    assert.match(script, /Selector and assertion failures are not retried/);
   });
 });
 

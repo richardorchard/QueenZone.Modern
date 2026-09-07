@@ -33,4 +33,5 @@ appId: org.queenzone.mobile
     timeout: 20000
 - assertNotVisible:
     id: member-gate
-- assertVisible: Contract Other
+- assertVisible:
+    text: '^Contract Other.*'

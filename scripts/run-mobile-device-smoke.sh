@@ -12,8 +12,9 @@
 #   ./scripts/run-mobile-device-smoke.sh --platform android --prove-failure
 #   ./scripts/run-mobile-device-smoke.sh --platform android --suite journeys
 #
-# Maestro app assertions are not retried. One pre-assertion Android transport
-# failure or iOS driver-startup failure may retry after device recovery.
+# Maestro selector and assertion failures are not retried. One Android device
+# transport failure or pre-flow iOS driver-startup failure may retry after
+# device recovery.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -439,7 +440,7 @@ elif [ "$suite" = "journeys" ]; then
   echo "Running on-demand Maestro journeys (#1071)."
 fi
 
-echo "Running Maestro ($flow). App flows are not retried."
+echo "Running Maestro ($flow). Selector and assertion failures are not retried."
 maestro_args=(
   test "$flow"
   --format junit
@@ -466,18 +467,18 @@ run_maestro_once
 maestro_status=$?
 set -e
 
-# Hosted Android emulators can drop off ADB while Maestro launches the app,
-# before an assertion runs. Run 34068859241 failed in four seconds with an
-# Unknown-error JUnit result and DeviceServerDiedException/device offline in
-# Maestro's debug log. Preserve that attempt, recover ADB, reinstall the same
-# APK, and retry once. Selector and other in-flow failures stay single-attempt.
+# Hosted Android emulators can drop off ADB while Maestro is running. Maestro
+# has emitted both a generic Unknown-error JUnit failure and the full
+# DeviceServerDiedException across observed runs. Preserve that attempt,
+# recover ADB, reinstall the same APK, and retry once. Selector and assertion
+# failures stay single-attempt.
 android_maestro_log="$(find "$results_dir/debug" -path '*/logs/maestro.log' -type f -print -quit 2>/dev/null || true)"
 if [ "$platform" = "android" ] \
   && [ "$maestro_status" -ne 0 ] \
   && [ -n "$android_maestro_log" ] \
-  && grep -q '<failure>Unknown error</failure>' "$results_dir/junit.xml" \
-  && grep -Eq 'Device server died|device offline' "$android_maestro_log"; then
-  echo "Maestro lost the Android device before an assertion; recovering ADB and retrying once."
+  && grep -Eq 'DeviceServerDiedException|Device server died|device offline' "$results_dir/junit.xml" \
+  && grep -Eq 'DeviceServerDiedException|Device server died|device offline' "$android_maestro_log"; then
+  echo "Maestro lost the Android device transport; recovering ADB and retrying once."
   if [ -d "$results_dir/debug" ]; then
     mv "$results_dir/debug" "$results_dir/debug-android-transport-first"
   fi
