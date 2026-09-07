@@ -6,6 +6,7 @@ supported platforms. This project is not part of `QueenZone.sln`.
 Decisions: [ADR 0009](../../docs/decisions/0009-react-native-for-mobile-app.md),
 [ADR 0011](../../docs/decisions/0011-mobile-project-location-and-build-tooling.md),
 [ADR 0012](../../docs/decisions/0012-react-navigation-app-shell.md).
+API versioning / store-lag: [ADR 0019](../../docs/decisions/0019-api-versioning-convention.md).
 Host toolchain: [mobile development environment](../../docs/mobile-development-environment.md).
 
 ## Pinned versions
@@ -170,7 +171,7 @@ writes `extra.appEnv` and `extra.apiBaseUrl`; runtime code reads them via
 | `EXPO_PUBLIC_APP_ENV` | Default API origin |
 | --- | --- |
 | `development` (default) | `http://localhost:5146` (local `QueenZone.Web`) |
-| `staging` | `https://www.queenzone.org` |
+| `staging` | `https://dev.queenzone.org` |
 | `production` | `https://www.queenzone.org` |
 
 Override the origin for any environment without code changes:
@@ -195,7 +196,8 @@ Physical devices need your machine's LAN IP in `EXPO_PUBLIC_API_BASE_URL`.
 The Profile screen (Home masthead avatar) shows the active `appEnv` and resolved origin for a quick check.
 
 Call sites should use `apiV1Url('/content/news')` (or `getAppConfig().apiBaseUrl`)
-rather than hard-coding hosts.
+rather than hard-coding hosts. Path versioning and how long v1 stays live:
+[ADR 0019](../../docs/decisions/0019-api-versioning-convention.md).
 
 ## Crash and error monitoring
 

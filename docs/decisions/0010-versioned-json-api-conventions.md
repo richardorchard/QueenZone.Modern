@@ -31,3 +31,7 @@ Tradeoffs:
 
 - Two error shapes (Problem Details vs OAuth2) must be documented and preserved.
 - OpenAPI is generated at runtime rather than committed as a build artifact; tests assert the served document.
+
+## Related
+
+- [ADR 0019](0019-api-versioning-convention.md) — mobile/store-lag operational convention (how long v1 stays live, how to add `/api/v2` alongside it). JSON conventions stay here.

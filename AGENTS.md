@@ -6,7 +6,7 @@ This repository is the modern QueenZone rebuild. The project is archive-first: i
 
 - `README.md` gives the project overview and local development commands.
 - `docs/architecture/testing-policy.md` defines the required testing layers (including CI Web.Tests mixed sharding).
-- `docs/decisions/` contains accepted architectural decisions.
+- `docs/decisions/` contains accepted architectural decisions ([index](docs/decisions/README.md)).
 - `docs/decisions/0006-hybrid-ef-core-admin-writes.md` is the Dapper vs EF access matrix and contributor rules for SQL in `QueenZone.Data`.
 - `docs/architecture/blob-storage-ugc.md` is the UGC blob upload foundation (`QueenZone.Storage` / `IBlobUploadService`).
 - `docs/architecture/opentofu-inventory.md` is the live Azure/Cloudflare ownership inventory for OpenTofu adoption (`infra/import/` holds sanitised IDs).
@@ -14,6 +14,7 @@ This repository is the modern QueenZone rebuild. The project is archive-first: i
 - `docs/architecture/github-environments.md` is the GitHub Environment map (purpose, secrets/vars, protection, workflows). Production Actions use `prod-release`, `prod-deploy`, `prod-google-play`, and `prod-data-read` — not legacy `dev` / `deploy`.
 - `docs/decisions/0007-rich-text-editor-quill.md` is the shared Quill rich-text editor decision (partial + `/api/uploads/editor-image`).
 - `docs/architecture/json-api-v1.md` is the versioned `/api/v1` JSON API contract (pagination, Problem Details, OpenAPI).
+- `docs/decisions/0019-api-versioning-convention.md` is the mobile/store-lag operational convention (breaking → `/api/v2` alongside v1; keep v1 while installed store builds depend on it). Complements [ADR 0010](docs/decisions/0010-versioned-json-api-conventions.md).
 - `docs/decisions/0009-react-native-for-mobile-app.md` and `docs/decisions/0011-mobile-project-location-and-build-tooling.md` are the mobile client tech and project-location decisions. `docs/decisions/0012-react-navigation-app-shell.md` is the React Navigation shell and public vs member tab boundary. `docs/decisions/0018-mobile-server-state-strategy.md` is the mobile server-state decision (bespoke hooks, not React Query).
 - `docs/mobile-development-environment.md` is the shared Windows/macOS native toolchain (Node 24, JDK 17, Android SDK 36).
 - `docs/backlog/migration-backlog.md` tracks migration work.

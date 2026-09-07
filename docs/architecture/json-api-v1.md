@@ -32,6 +32,7 @@ Later endpoints should be mapped on a `MapGroup("/api/v1")` (or a sub-group) wit
 - Within v1, changes must be additive: new optional fields, new endpoints, new optional query parameters.
 - Do not rename, remove, or change the meaning of existing JSON fields in v1.
 - A new OpenAPI document name (`v2`) is required alongside `/api/v2`.
+- Store-lag operational convention (keep v1 while installed builds depend on it; add v2 as a new prefix/group): [ADR 0019](../decisions/0019-api-versioning-convention.md). JSON conventions remain [ADR 0010](../decisions/0010-versioned-json-api-conventions.md).
 
 ## JSON
 
