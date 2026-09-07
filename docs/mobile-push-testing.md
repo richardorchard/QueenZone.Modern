@@ -22,7 +22,7 @@ device token. The live API must send to production APNs.
 | What | Value |
 | --- | --- |
 | TestFlight workflow | `IOS_APS_ENVIRONMENT=production` in [`.github/workflows/publish-ios-testflight.yml`](../.github/workflows/publish-ios-testflight.yml) (already set; do not change it) |
-| App API origin | `https://www.queenzone.org` (`EXPO_PUBLIC_APP_ENV=staging` still uses that public origin) |
+| App API origin | `https://dev.queenzone.org` (`EXPO_PUBLIC_APP_ENV=staging`; `EXPO_PUBLIC_API_BASE_URL` override still wins) |
 | App Service | `PushNotifications__Apns__Environment=production` (see [`bitwarden-secrets.md`](bitwarden-secrets.md)) |
 | Apple endpoint | `https://api.push.apple.com` |
 
@@ -43,9 +43,9 @@ exported IPA. That is not a reason to send TestFlight traffic to sandbox.
   someone else — you never get a push for your own message or your own reply.
 - For news only: an admin session on `https://www.queenzone.org/admin/news`.
 
-Trigger every category against the same live API the TestFlight app already
-uses (`https://www.queenzone.org`). A local or in-memory host will not reach
-that device token.
+Trigger every category against the same API the TestFlight app already uses
+(`https://dev.queenzone.org` for staging-baked builds). A local or in-memory
+host will not reach that device token.
 
 ### Smallest first check (private message)
 
@@ -179,7 +179,7 @@ The live API must send with the real FCM credentials from
 | What | Value |
 | --- | --- |
 | Android install | Google Play internal testing — [`.github/workflows/publish-android-google-play.yml`](../.github/workflows/publish-android-google-play.yml) |
-| App API origin | `https://www.queenzone.org` (`EXPO_PUBLIC_APP_ENV=staging` still uses that public origin) |
+| App API origin | `https://dev.queenzone.org` (`EXPO_PUBLIC_APP_ENV=staging`; `EXPO_PUBLIC_API_BASE_URL` override still wins) |
 | App Service | `PushNotifications__Fcm__ProjectId` and `PushNotifications__Fcm__ServiceAccountJson` (see [`bitwarden-secrets.md`](bitwarden-secrets.md)) |
 | Firebase | project `queenzone-mobile`, Android app `org.queenzone.mobile` (`src/QueenZone.Mobile/google-services.json` is client config, not the sender credential) |
 | FCM endpoint | `https://fcm.googleapis.com/v1/projects/{project-id}/messages:send` |
@@ -197,9 +197,9 @@ is the Android installation path for this check.
   someone else — you never get a push for your own message or your own reply.
 - For news only: an admin session on `https://www.queenzone.org/admin/news`.
 
-Trigger every category against the same live API the internal-testing app
-already uses (`https://www.queenzone.org`). A local or in-memory host will not
-reach that device token.
+Trigger every category against the same API the internal-testing app already
+uses (`https://dev.queenzone.org` for staging-baked builds). A local or
+in-memory host will not reach that device token.
 
 ### Smallest first check (private message)
 
