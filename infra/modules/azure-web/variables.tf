@@ -45,8 +45,10 @@ variable "custom_hostnames" {
   validation {
     condition = var.environment_name == "production" ? (
       toset(keys(var.custom_hostnames)) == toset(["queenzone.org", "www.queenzone.org"])
+      ) : var.environment_name == "migration" ? (
+      length(var.custom_hostnames) == 0
     ) : alltrue([for hostname in keys(var.custom_hostnames) : hostname == "dev.queenzone.org"])
-    error_message = "Production retains apex/www; dev may bind only dev.queenzone.org."
+    error_message = "Production retains apex/www; migration binds no custom hostname; dev may bind only dev.queenzone.org."
   }
 }
 
@@ -73,12 +75,12 @@ variable "worker_count" {
 }
 
 variable "environment_name" {
-  description = "Selects production safeguards; existing callers remain production."
+  description = "Selects production, migration-candidate, or dev safeguards; existing callers remain production."
   type        = string
   default     = "production"
   validation {
-    condition     = contains(["production", "dev"], var.environment_name)
-    error_message = "Use production or dev."
+    condition     = contains(["production", "migration", "dev"], var.environment_name)
+    error_message = "Use production, migration, or dev."
   }
 }
 
@@ -87,8 +89,8 @@ variable "allow_direct_access" {
   type        = bool
   default     = false
   validation {
-    condition     = !var.allow_direct_access || var.environment_name == "dev"
-    error_message = "Production must retain Cloudflare-only ingress."
+    condition     = !var.allow_direct_access || contains(["migration", "dev"], var.environment_name)
+    error_message = "Only migration and dev apps may allow direct ingress."
   }
 }
 

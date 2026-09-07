@@ -31,3 +31,17 @@ output "azure_web_identity_principal_id" {
   description = "System-assigned identity principal ID; no direct role assignments were present at the 2026-08-15 audit."
   value       = module.azure_web.managed_identity_principal_id
 }
+
+output "migration_target" {
+  description = "Non-sensitive Phase 7 target names used by the staged migration runbook."
+  value = {
+    location        = var.production_target_location
+    web_app         = module.azure_web_target.import_contract.web_app
+    service_plan    = module.azure_web_target.import_contract.service_plan
+    log_analytics   = module.azure_web_target.import_contract.log_analytics
+    app_insights    = module.azure_web_target.import_contract.app_insights
+    sql_server      = module.azure_data_target.import_contract.sql_server
+    sql_database    = module.azure_data_target.import_contract.sql_database
+    storage_account = module.azure_data_target.import_contract.storage_account
+  }
+}

@@ -22,6 +22,13 @@ strategy": stored in the `Queenzone Development` Bitwarden project, with the
 repository variables mapping each to `CLOUDFLARE_API_TOKEN`
 ([`bitwarden-secrets.md`](../bitwarden-secrets.md) has the exact format).
 
+During the staged #1272 production-region migration, both mappings also expose
+the existing `QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING` secret. The
+workflows extract its SQL password into an ephemeral OpenTofu variable through
+[`Export-EphemeralSqlAdminPassword.ps1`](../../scripts/Export-EphemeralSqlAdminPassword.ps1).
+The AzureRM write-only password field sends it to Azure without persisting it
+in the plan or state.
+
 If either token is ever missing or revoked, every workflow below fails fast
 at an explicit "`CLOUDFLARE_API_TOKEN` is not configured" step rather than
 hanging or failing unpredictably later.

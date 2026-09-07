@@ -83,7 +83,7 @@ import {
 }
 
 import {
-  to = module.azure_data.azurerm_mssql_database.production
+  to = module.azure_data.azurerm_mssql_database.production[0]
   id = "${local.azure_sql_base_id}/servers/queenzone-sql-server/databases/queenzone-db"
 }
 
@@ -93,7 +93,7 @@ import {
 }
 
 import {
-  to = module.azure_data.azurerm_mssql_database_extended_auditing_policy.production
+  to = module.azure_data.azurerm_mssql_database_extended_auditing_policy.production[0]
   id = "${local.azure_sql_base_id}/servers/queenzone-sql-server/databases/queenzone-db/extendedAuditingSettings/Default"
 }
 

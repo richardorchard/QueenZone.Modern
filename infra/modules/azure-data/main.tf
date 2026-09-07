@@ -1,10 +1,12 @@
 locals {
-  sql_server_id   = var.existing_sql_server_id != null ? var.existing_sql_server_id : azapi_resource.sql_server[0].id
+  sql_server_id = var.existing_sql_server_id != null ? var.existing_sql_server_id : (
+    var.create_sql_server_with_write_only_password ? azurerm_mssql_server.created[0].id : azapi_resource.sql_server[0].id
+  )
   blob_service_id = var.manage_blob_service ? azapi_resource.blob_service[0].id : "${azapi_resource.storage_account.id}/blobServices/default"
 }
 
 resource "azapi_resource" "sql_server" {
-  count = var.existing_sql_server_id == null ? 1 : 0
+  count = var.existing_sql_server_id == null && !var.create_sql_server_with_write_only_password ? 1 : 0
 
   type      = "Microsoft.Sql/servers@2025-02-01-preview"
   name      = var.sql_server_name
@@ -46,6 +48,39 @@ resource "azapi_resource" "sql_server" {
   }
 }
 
+# New SQL servers use AzureRM's write-only password field. The password is
+# ephemeral in OpenTofu and is therefore sent to Azure without entering the
+# plan or state. Existing production remains at its imported AzAPI address.
+resource "azurerm_mssql_server" "created" {
+  count = var.create_sql_server_with_write_only_password ? 1 : 0
+
+  name                                    = var.sql_server_name
+  resource_group_name                     = var.resource_group_name
+  location                                = var.location
+  version                                 = "12.0"
+  administrator_login                     = "CloudSA6f234939"
+  administrator_login_password_wo         = var.sql_server_administrator_password_wo
+  administrator_login_password_wo_version = var.sql_server_administrator_password_wo_version
+  minimum_tls_version                     = "1.2"
+  public_network_access_enabled           = true
+  outbound_network_restriction_enabled    = false
+
+  azuread_administrator {
+    login_username              = "richard@thinkingwebsites.com.au"
+    object_id                   = "95e57126-c09d-4737-a76b-8281fac1ad6d"
+    tenant_id                   = "c9f094fd-23bf-4a35-a406-bcaacd7e1a8e"
+    azuread_authentication_only = false
+  }
+
+  lifecycle {
+    prevent_destroy = true
+
+    # Operator identity rotation remains outside this stack, matching the
+    # imported production server's existing ownership boundary.
+    ignore_changes = [azuread_administrator]
+  }
+}
+
 resource "azurerm_mssql_firewall_rule" "azure_services" {
   count = var.create_azure_services_firewall_rule ? 1 : 0
 
@@ -60,6 +95,8 @@ resource "azurerm_mssql_firewall_rule" "azure_services" {
 }
 
 resource "azurerm_mssql_database" "production" {
+  count = var.manage_sql_database ? 1 : 0
+
   name      = var.sql_database_name
   server_id = local.sql_server_id
 
@@ -103,7 +140,9 @@ resource "azurerm_mssql_server_extended_auditing_policy" "production" {
 }
 
 resource "azurerm_mssql_database_extended_auditing_policy" "production" {
-  database_id            = azurerm_mssql_database.production.id
+  count = var.manage_sql_database ? 1 : 0
+
+  database_id            = azurerm_mssql_database.production[0].id
   enabled                = false
   log_monitoring_enabled = false
   retention_in_days      = 0
