@@ -178,11 +178,9 @@ jobs:
       (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main') &&
       needs.changes.outputs.code == 'true' &&
       needs.changes.outputs.migrations == 'true'
-    # GitHub Environment "dev" predates the real dev environment (deploy-dev.yml
-    # uses "dev-migrate"/"dev-deploy" instead) and, despite the name, gates the
-    # Bitwarden mapping used to migrate PRODUCTION's database. Do not confuse it
-    # with the actual dev environment. Tracked for a rename in a follow-up issue.
-    environment: dev
+    # Production migrate + zip deploy share prod-release (issue #1377 Option B).
+    # Custom policy: branch main + tags v*. Do not use legacy environment "dev".
+    environment: prod-release
 
     steps:
       - name: Checkout
@@ -260,10 +258,11 @@ jobs:
       (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main') &&
       needs.changes.outputs.code == 'true' &&
       needs.resolve-ci-run.result == 'success'
-    # GitHub Environment "deploy" is production's OIDC/ARM identity for this
-    # job — unrelated to the "dev-deploy" environment deploy-dev.yml uses for
-    # the actual dev environment. Tracked for a rename in a follow-up issue.
-    environment: deploy
+    # Production ARM/OIDC identity for App Service settings (issue #1377
+    # Option B). Custom policy: branch main + tags v*. Distinct from
+    # prod-release (Bitwarden zip deploy) and from deploy-dev.yml's
+    # "dev-deploy". Do not use legacy environment "deploy".
+    environment: prod-deploy
     permissions:
       id-token: write
       contents: read
@@ -395,10 +394,10 @@ jobs:
       needs.resolve-ci-run.result == 'success' &&
       needs.configure-app-settings.result == 'success' &&
       (needs.migrate.result == 'success' || needs.migrate.result == 'skipped')
-    # environment.name "dev" is the same legacy-named GH Environment as the
-    # migrate job above; url below (production) is the source of truth here.
+    # Same prod-release environment as migrate (Bitwarden publish profile).
+    # url below is the public production site, not a GitHub Environment name.
     environment:
-      name: dev
+      name: prod-release
       url: https://www.queenzone.org
     # A stuck azure/webapps-deploy poll (e.g. hitting the SCM-restart race
     # this job now waits out) had no bound and hung for ~20 minutes before a

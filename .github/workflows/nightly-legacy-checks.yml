@@ -95,10 +95,10 @@ jobs:
     # existing mirror instead of paying the roughly 25-30 minute sqlpackage extract/publish.
     if: github.event_name != 'workflow_dispatch' || inputs.skip_sync != true
     timeout-minutes: 45
-    # GitHub Environment "dev" is the legacy name gating the shared
-    # legacy/production DB Bitwarden mapping (same one deploy.yml uses to
-    # migrate PRODUCTION) -- not the actual dev App Service environment.
-    environment: dev
+    # Reads production Azure SQL only to refresh the disposable SQL Express
+    # mirror (issue #1377 Option B). Custom policy: branch main. Do not give
+    # this environment to probe / UI / cleanup jobs.
+    environment: prod-data-read
 
     steps:
       - name: Checkout
@@ -135,7 +135,9 @@ jobs:
     # SQL Express on the Windows box over the LAN (see prerequisites above).
     runs-on: [self-hosted, queenzone]
     timeout-minutes: 20
-    environment: dev
+    # No GitHub Environment: this job only reads the SQL Express mirror over
+    # the LAN. Bitwarden supplies QUEENZONE_SQL_EXPRESS_PROBE_PASSWORD via
+    # repository-level token/mapping — not prod-data-read.
 
     steps:
       - name: Checkout
@@ -176,7 +178,6 @@ jobs:
     if: always() && needs.legacy-read-probes.result == 'success' && (needs.sync-legacy-db.result == 'success' || needs.sync-legacy-db.result == 'skipped')
     runs-on: [self-hosted, Windows]
     timeout-minutes: 30
-    environment: dev
     env:
       ConnectionStrings__QueenZoneLegacy: "Server=localhost\\SQLEXPRESS;Database=queenzone_legacy_sync;Integrated Security=True;TrustServerCertificate=True"
 
@@ -241,7 +242,9 @@ jobs:
             runner: '["self-hosted", "queenzone"]'
     runs-on: ${{ fromJSON(matrix.runner) }}
     timeout-minutes: 45
-    environment: dev
+    # No GitHub Environment: Windows uses Integrated Security on localhost;
+    # macOS fetches the mirror probe password from repository-level Bitwarden
+    # mapping. Do not attach prod-data-read.
 
     steps:
       - name: Kill stray app processes from a previous run (Windows)
@@ -317,7 +320,6 @@ jobs:
     if: always() && needs.legacy-write-probes.result == 'success'
     runs-on: [self-hosted, Windows]
     timeout-minutes: 15
-    environment: dev
     env:
       ConnectionStrings__QueenZoneLegacy: "Server=localhost\\SQLEXPRESS;Database=queenzone_legacy_sync;Integrated Security=True;TrustServerCertificate=True"
 
