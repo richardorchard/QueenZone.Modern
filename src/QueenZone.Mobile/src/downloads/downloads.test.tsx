@@ -216,6 +216,39 @@ describe('download manager', () => {
     expect(getDownloadUiSnapshot(memberId, '187')?.status).toBe('downloaded');
   });
 
+  it('waits for asynchronous file promotion before validating and storing the download', async () => {
+    const host = createMemoryDownloadHost();
+    const promoteNow = host.promote.bind(host);
+    let finishPromote!: () => void;
+    const promotionPending = new Promise<void>((resolve) => {
+      finishPromote = resolve;
+    });
+    host.promote = jest.fn(async (partUri, completedUri) => {
+      await promotionPending;
+      promoteNow(partUri, completedUri);
+    });
+    setDownloadFileHostForTests(host);
+    setDownloadProbeForTests(async () => ({
+      status: 206,
+      sourceRevision: '"etag-9"',
+      byteSize: 4,
+    }));
+
+    enqueueDownload(track, memberId, async () => 'member-token');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(host.promote).toHaveBeenCalled();
+    expect(host.exists('file:///documents/fan-performances/187')).toBe(false);
+    expect(getDownloadUiSnapshot(memberId, '187')?.status).toBe('downloading');
+
+    finishPromote();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(host.files.get('file:///documents/fan-performances/187')?.byteLength).toBe(4);
+    expect((await getCompletedDownload(memberId, '187'))?.byteSize).toBe(4);
+    expect(getDownloadUiSnapshot(memberId, '187')?.status).toBe('downloaded');
+  });
+
   it('rejects a completed file that is an HTTP error payload', async () => {
     const host = createMemoryDownloadHost({
       downloadImpl: async ({ destUri }) => {
