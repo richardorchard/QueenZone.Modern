@@ -55,8 +55,7 @@ describe('Maestro device flows (#1281)', () => {
     assert.match(openAuth, /openLink: \$\{SMOKE_AUTH_URL\}/);
     assert.match(openAuth, /accept-ios-open-link\.yaml/);
     assert.match(accept, /platform: iOS/);
-    assert.match(accept, /extendedWaitUntil:[\s\S]*Open in \.\*QueenZone[\s\S]*timeout: 10000/);
-    assert.match(accept, /Open in \.\*QueenZone/);
+    assert.doesNotMatch(accept, /Open in \.\*QueenZone/);
     assert.match(accept, /\^Open\$/);
 
     assert.match(readMaestro('flows/09-authenticated.yaml'), /open-smoke-auth\.yaml/);
