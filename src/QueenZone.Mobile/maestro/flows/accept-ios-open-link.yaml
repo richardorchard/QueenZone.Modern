@@ -1,10 +1,14 @@
 appId: org.queenzone.mobile
 ---
-# iOS 26 Simulator still shows "Open in QueenZone?" after simctl openurl of
-# queenzone:// on a fresh install (#1281). No-op when the dialog is absent.
+# iOS 26 Simulator shows "Open in QueenZone?" asynchronously after simctl
+# openurl of queenzone:// on a fresh install (#1281). Wait for that exact
+# system prompt before continuing so a delayed dialog cannot cover the app.
 - runFlow:
     when:
-      visible: 'Open in .*QueenZone'
+      platform: iOS
     commands:
+      - extendedWaitUntil:
+          visible: 'Open in .*QueenZone'
+          timeout: 10000
       - tapOn:
           text: '^Open$'
