@@ -490,6 +490,9 @@ It is **not** a substitute for `npm test` (#833), consumer contracts
 live site, Azure SQL, real OAuth, Metro in CI, or member passwords.
 Local `expo start` + Debug remains for developers; device smoke/journeys
 never install `app-debug.apk` or `Debug-iphonesimulator`.
+The Release smoke embed starts signed out and keeps its seeded smoke token in
+memory; it never restores from or writes to the device keychain. Debug and all
+staging/production builds retain the normal SecureStore session lifecycle.
 
 | Smoke is | Smoke is not |
 | --- | --- |

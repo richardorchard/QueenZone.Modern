@@ -113,6 +113,11 @@ function smokeAuthAllowed(): boolean {
   });
 }
 
+function releaseSmokeEmbedEnabled(): boolean {
+  const config = getAppConfig();
+  return config.appEnv === 'development' && config.smokeEmbed === true;
+}
+
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session>({ ...signedOut, isRestoring: true });
   const [refreshToken, setRefreshToken] = useState<string | null>(null);
@@ -171,13 +176,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     void reconcileDownloads(nextId).catch(() => {
       // Offline reconcile can retry on the next launch.
     });
-    void writeStoredIdentityShell({
-      displayName: profile.displayName,
-      memberId: profile.memberId,
-      avatarPath: profile.avatarPath,
-    }).catch(() => {
-      // Token grant is already stored. A shell write miss only delays initials until /me succeeds.
-    });
+    if (!releaseSmokeEmbedEnabled()) {
+      void writeStoredIdentityShell({
+        displayName: profile.displayName,
+        memberId: profile.memberId,
+        avatarPath: profile.avatarPath,
+      }).catch(() => {
+        // Token grant is already stored. A shell write miss only delays initials until /me succeeds.
+      });
+    }
     setSession(() => {
       const next = sessionFromAccessToken(accessToken, {
         displayName: profile.displayName,
@@ -300,6 +307,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [recoverRejectedAccessToken]);
 
   useEffect(() => {
+    // A Release-embedded smoke binary is a fresh, isolated Testing harness.
+    // Maestro clears its state/keychain before launch and injects the seeded
+    // session later, so a SecureStore restore can only add simulator flakiness.
+    if (releaseSmokeEmbedEnabled()) {
+      const next = { ...signedOut, isRestoring: false };
+      sessionRef.current = next;
+      setSession(next);
+      return;
+    }
+
     let cancelled = false;
     let inFlight = false;
     let lockedPending = false;
@@ -478,6 +495,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         return false;
       }
 
+      if (releaseSmokeEmbedEnabled()) {
+        const expiresAt = Date.now() + Math.max(smokeAuthExpiresInSeconds - 30, 30) * 1000;
+        applyTokenState({
+          accessToken: token,
+          refreshToken: smokeAuthRefreshPlaceholder,
+          expiresAt,
+        });
+        const profile = await loadProfile(token);
+        applyProfile(token, profile);
+        return true;
+      }
+
       await applyTokens({
         accessToken: token,
         refreshToken: smokeAuthRefreshPlaceholder,
@@ -485,7 +514,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       });
       return true;
     },
-    [applyTokens],
+    [applyProfile, applyTokenState, applyTokens],
   );
 
   useEffect(() => {
