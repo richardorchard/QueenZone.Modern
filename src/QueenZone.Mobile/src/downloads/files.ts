@@ -17,7 +17,7 @@ export type DownloadFileHost = {
   deleteIfExists(uri: string): void;
   listPartUris(): string[];
   listAllUris(): string[];
-  promote(partUri: string, completedUri: string): void;
+  promote(partUri: string, completedUri: string): void | Promise<void>;
   writeBytes(uri: string, bytes: Uint8Array): void;
   readPrefix(uri: string, maxBytes: number): Promise<Uint8Array | null>;
   download(input: {
@@ -122,7 +122,7 @@ function createNativeHost(): DownloadFileHost {
       if (completed.exists) {
         completed.delete();
       }
-      part.move(completed);
+      return part.move(completed);
     },
     writeBytes(uri, bytes) {
       const file = fileFor(uri);

@@ -603,7 +603,7 @@ describe('ConversationScreen', () => {
   });
 
   it('drops the home-indicator inset from the composer while the iOS keyboard is open', async () => {
-    const listeners: Record<string, Array<() => void>> = {};
+    const listeners: Record<string, (() => void)[]> = {};
     const addListener = jest.spyOn(Keyboard, 'addListener').mockImplementation((event, callback) => {
       listeners[event] ??= [];
       listeners[event].push(callback as () => void);
