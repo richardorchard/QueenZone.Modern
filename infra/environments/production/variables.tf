@@ -32,7 +32,7 @@ variable "azure_resource_group_name" {
 }
 
 variable "azure_location" {
-  description = "Existing Azure region for QueenZone production."
+  description = "Existing resource-group and legacy production region during the staged migration."
   type        = string
   default     = "australiaeast"
 
@@ -40,6 +40,26 @@ variable "azure_location" {
     condition     = var.azure_location == "australiaeast"
     error_message = "The existing QueenZone production estate is in australiaeast."
   }
+}
+
+variable "production_target_location" {
+  description = "Approved target region for the replacement production estate (ADR 0017)."
+  type        = string
+  default     = "eastus"
+
+  validation {
+    condition     = contains(["eastus", "eastus2"], var.production_target_location)
+    error_message = "Production must migrate to eastus, with eastus2 allowed only as ADR 0017's capacity fallback."
+  }
+}
+
+variable "target_sql_admin_password" {
+  description = "Ephemeral SQL administrator password for the replacement server. It must come from Bitwarden and is never stored in plan or state."
+  type        = string
+  default     = null
+  nullable    = true
+  sensitive   = true
+  ephemeral   = true
 }
 
 variable "cloudflare_account_id" {

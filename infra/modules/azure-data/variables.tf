@@ -62,6 +62,38 @@ variable "existing_sql_server_id" {
   }
 }
 
+variable "create_sql_server_with_write_only_password" {
+  description = "Create a new SQL logical server with AzureRM's write-only password field. Existing imported production callers leave this false."
+  type        = bool
+  default     = false
+
+  validation {
+    condition     = !var.create_sql_server_with_write_only_password || var.existing_sql_server_id == null
+    error_message = "A caller cannot create a SQL server and supply an existing SQL server ID."
+  }
+}
+
+variable "sql_server_administrator_password_wo" {
+  description = "Ephemeral SQL administrator password used only when creating a new server; it is never persisted in plan or state."
+  type        = string
+  default     = null
+  nullable    = true
+  sensitive   = true
+  ephemeral   = true
+}
+
+variable "sql_server_administrator_password_wo_version" {
+  description = "Version marker for the write-only SQL administrator password. Increment only when intentionally rotating it."
+  type        = number
+  default     = 1
+}
+
+variable "manage_sql_database" {
+  description = "Manage the SQL database. Migration callers leave this false until Azure's database-copy operation has created the destination database."
+  type        = bool
+  default     = true
+}
+
 variable "create_azure_services_firewall_rule" {
   description = "Whether this module owns the server-wide AllowAllWindowsAzureIps firewall rule."
   type        = bool

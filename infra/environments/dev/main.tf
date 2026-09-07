@@ -45,3 +45,13 @@ module "azure_data" {
   storage_custom_domain_name             = null
   manage_blob_service                    = false
 }
+
+moved {
+  from = module.azure_data.azurerm_mssql_database.production
+  to   = module.azure_data.azurerm_mssql_database.production[0]
+}
+
+moved {
+  from = module.azure_data.azurerm_mssql_database_extended_auditing_policy.production
+  to   = module.azure_data.azurerm_mssql_database_extended_auditing_policy.production[0]
+}
