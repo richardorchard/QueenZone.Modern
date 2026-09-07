@@ -2,7 +2,7 @@ import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useCallback, useMemo, useState } from 'react';
-import { FlatList, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { FlatList, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { ForumRecentThread, PhotoCategoryListItem } from '../../api';
 import { nestedTabParams } from '../../navigation/nestedTab';
@@ -14,6 +14,7 @@ import { formatHomeFooter } from '../../config/buildMetadata';
 import { fonts, space, type, useTheme } from '../../theme';
 import { ArchiveFooter } from '../../ui/ArchiveFooter';
 import { Chip } from '../../ui/Chip';
+import { ThemedRefreshControl } from '../../ui/ThemedRefreshControl';
 import { testIds } from '../../test/testIds';
 import { HomeForumSection } from './HomeForumSection';
 import { HomeGallerySection } from './HomeGallerySection';
@@ -75,11 +76,7 @@ export function HomeScreen({ navigation }: Props) {
       data={[]}
       renderItem={() => null}
       refreshControl={
-        <RefreshControl
-          refreshing={data.pull.refreshing}
-          onRefresh={data.pull.onRefresh}
-          tintColor={c.accentPrimary}
-        />
+        <ThemedRefreshControl refreshing={data.pull.refreshing} onRefresh={data.pull.onRefresh} />
       }
       ListHeaderComponent={
         <>
