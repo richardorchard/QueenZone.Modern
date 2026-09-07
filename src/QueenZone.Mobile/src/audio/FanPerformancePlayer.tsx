@@ -55,6 +55,10 @@ export function FanPerformancePlayerProvider({ children }: { children: ReactNode
   const currentRef = useRef<FanPerformance | null>(null);
   const queueRef = useRef<FanPerformance[]>([]);
   const loadGenerationRef = useRef(0);
+  const activeSourceRef = useRef<{
+    kind: 'local' | 'stream' | 'retrying';
+    performanceId: string;
+  } | null>(null);
   currentRef.current = current;
   queueRef.current = queue;
 
@@ -96,6 +100,10 @@ export function FanPerformancePlayerProvider({ children }: { children: ReactNode
         setCurrent(track);
         setActivePlaybackId(String(track.id));
         const apply = (next: typeof source) => {
+          activeSourceRef.current = {
+            kind: next.kind === 'local' ? 'local' : 'stream',
+            performanceId: String(track.id),
+          };
           player.replace(
             next.kind === 'local'
               ? { uri: next.uri, name: track.title }
@@ -135,6 +143,58 @@ export function FanPerformancePlayerProvider({ children }: { children: ReactNode
     },
     [ensureAccessToken, memberId, player],
   );
+
+  useEffect(() => {
+    if (!status.error) {
+      return;
+    }
+
+    const track = currentRef.current;
+    const activeSource = activeSourceRef.current;
+    if (!track || !activeSource || activeSource.performanceId !== String(track.id)) {
+      setError('Could not start playback.');
+      return;
+    }
+    if (activeSource.kind !== 'local' || !memberId) {
+      setError('Could not start playback.');
+      return;
+    }
+
+    // AVPlayer reports local-file load failures asynchronously. Retry once
+    // through the authenticated stream and remove the unusable local entry.
+    activeSourceRef.current = { ...activeSource, kind: 'retrying' };
+    const generation = ++loadGenerationRef.current;
+    void (async () => {
+      await discardInvalidLocalDownload(memberId, String(track.id));
+      const streamed = await resolveAudioSource({
+        track,
+        memberId,
+        ensureAccessToken,
+        isOffline: await detectOffline(),
+        ignoreLocal: true,
+      });
+      if (generation !== loadGenerationRef.current) {
+        return;
+      }
+      if (streamed.kind === 'error') {
+        setError(streamed.message);
+        return;
+      }
+      if (streamed.kind !== 'stream') {
+        setError('Could not start playback.');
+        return;
+      }
+
+      setError(null);
+      activeSourceRef.current = { kind: 'stream', performanceId: String(track.id) };
+      player.replace({ uri: streamed.uri, headers: streamed.headers, name: track.title });
+      player.play();
+    })().catch(() => {
+      if (generation === loadGenerationRef.current) {
+        setError('Could not start playback.');
+      }
+    });
+  }, [ensureAccessToken, memberId, player, status.error]);
 
   const play = useCallback(
     (track: FanPerformance, nextQueue: FanPerformance[] = []) => {

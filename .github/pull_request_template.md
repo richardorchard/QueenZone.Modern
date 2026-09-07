@@ -18,7 +18,7 @@
 - [ ] Coverage gate passed locally (`scripts/Test-CoverageGate.ps1` with `-BaseRef origin/main`; see `AGENTS.md`)
 - [ ] If this PR changes `src/QueenZone.Mobile`: `npm ci` + `npm run preflight` (combined typecheck of app + tests via `tsconfig.test.json`, lint, unit tests, **Expo Doctor** — not app typecheck + Jest alone)
 - [ ] Route/page tests avoid brittle CSS class or exact markup assertions unless markup shape is the contract
-- [ ] If this PR touches EF migrations / `QueenZoneDbContext` / `Entities/`: `dotnet ef migrations has-pending-model-changes` passed, and CI **EF migrations (Azure SQL)** is green (or you ran `dotnet ef database update` against the migration SQL Server locally)
+- [ ] If this PR touches EF migrations / `QueenZoneDbContext` / `Entities/`: `dotnet ef migrations has-pending-model-changes` passed, and CI **EF migrations (SQL Express mirror)** is green (or you ran `dotnet ef database update` against the SQL Express mirror locally). Production Azure SQL apply is `deploy.yml` migrate after merge.
 
 ## Legacy database checks
 

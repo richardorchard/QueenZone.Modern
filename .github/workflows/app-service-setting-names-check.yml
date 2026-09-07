@@ -26,7 +26,9 @@ jobs:
   check-setting-names:
     name: Verify required setting names are present
     runs-on: ubuntu-latest
-    environment: deploy
+    # Production ARM/OIDC identity (issue #1377 Option B). Custom policy:
+    # branch main + tags v*. Scheduled runs use the default branch (main).
+    environment: prod-deploy
     permissions:
       id-token: write
       contents: read

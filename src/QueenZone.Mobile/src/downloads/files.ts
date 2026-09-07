@@ -1,4 +1,5 @@
-import { Directory, File, Paths } from 'expo-file-system';
+import { Directory, File, FileMode, Paths } from 'expo-file-system';
+import type { DownloadAudioExtension } from './audioBytes';
 import { DOWNLOAD_EMPTY_PART_MESSAGE, DOWNLOAD_PART_MISSING_MESSAGE } from './messages';
 import { DOWNLOAD_DIRECTORY_NAME } from './types';
 
@@ -10,7 +11,7 @@ export type DownloadProbe = {
 export type DownloadFileHost = {
   documentDirectoryUri(): string;
   availableBytes(): number;
-  completedUri(performanceId: string): string;
+  completedUri(performanceId: string, extension: DownloadAudioExtension | null): string;
   partUri(performanceId: string): string;
   exists(uri: string): boolean;
   size(uri: string): number;
@@ -33,9 +34,12 @@ function joinUri(root: string, name: string): string {
   return `${root.replace(/\/+$/, '')}/${name}`;
 }
 
-export function opaqueFileName(performanceId: string, part = false): string {
+export function opaqueFileName(
+  performanceId: string,
+  extension: DownloadAudioExtension | 'part' | null,
+): string {
   const id = performanceId.replace(/[^A-Za-z0-9_-]/g, '');
-  return part ? `${id}.part` : id;
+  return extension ? `${id}.${extension}` : id;
 }
 
 function createNativeHost(): DownloadFileHost {
@@ -59,11 +63,11 @@ function createNativeHost(): DownloadFileHost {
       const space = Paths.availableDiskSpace;
       return typeof space === 'number' && Number.isFinite(space) ? space : Number.POSITIVE_INFINITY;
     },
-    completedUri(performanceId) {
-      return new File(audioDir(), opaqueFileName(performanceId)).uri;
+    completedUri(performanceId, extension) {
+      return new File(audioDir(), opaqueFileName(performanceId, extension)).uri;
     },
     partUri(performanceId) {
-      return new File(audioDir(), opaqueFileName(performanceId, true)).uri;
+      return new File(audioDir(), opaqueFileName(performanceId, 'part')).uri;
     },
     exists(uri) {
       try {
@@ -133,12 +137,16 @@ function createNativeHost(): DownloadFileHost {
     },
     async readPrefix(uri, maxBytes) {
       try {
-        const file = fileFor(uri) as { exists: boolean; bytes?: () => Uint8Array | Promise<Uint8Array> };
-        if (!file.exists || typeof file.bytes !== 'function') {
+        const file = fileFor(uri);
+        if (!file.exists) {
           return null;
         }
-        const bytes = await Promise.resolve(file.bytes());
-        return bytes ? bytes.subarray(0, Math.min(maxBytes, bytes.length)) : null;
+        const handle = file.open(FileMode.ReadOnly);
+        try {
+          return handle.readBytes(maxBytes);
+        } finally {
+          handle.close();
+        }
       } catch {
         return null;
       }
@@ -201,8 +209,8 @@ export function createMemoryDownloadHost(
     files,
     documentDirectoryUri: () => root,
     availableBytes: () => options.availableBytes ?? 64 * 1024 * 1024,
-    completedUri: (performanceId) => joinUri(root, opaqueFileName(performanceId)),
-    partUri: (performanceId) => joinUri(root, opaqueFileName(performanceId, true)),
+    completedUri: (performanceId, extension) => joinUri(root, opaqueFileName(performanceId, extension)),
+    partUri: (performanceId) => joinUri(root, opaqueFileName(performanceId, 'part')),
     exists: (uri) => files.has(uri),
     size: (uri) => files.get(uri)?.byteLength ?? 0,
     deleteIfExists: (uri) => {
