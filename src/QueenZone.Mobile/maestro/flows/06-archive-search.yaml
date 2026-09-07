@@ -28,3 +28,34 @@ appId: org.queenzone.mobile
     visible:
       id: news-story-screen
     timeout: 20000
+# Search opens news results on the News tab. The story hides the tab bar, so
+# leave through its header before 07-forum tries to switch tabs.
+- tapOn:
+    id: news-story-back
+- extendedWaitUntil:
+    visible:
+      id: news-screen
+    timeout: 15000
+# Cross-tab navigation preserves Search on the Home stack. Restore the Home
+# root so later flows do not inherit the hidden-tab Search detail screen.
+- tapOn:
+    id: tab-home
+- extendedWaitUntil:
+    visible:
+      id: search-screen
+    timeout: 15000
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - back
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          text: '^Home$'
+- extendedWaitUntil:
+    visible:
+      id: home-screen
+    timeout: 15000

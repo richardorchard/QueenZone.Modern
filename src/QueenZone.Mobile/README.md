@@ -540,7 +540,12 @@ when `mobile=true` (with skip-success stubs) and then enabling branch
 protection; record the date on #872. See
 [`docs/architecture/testing-policy.md`](../../docs/architecture/testing-policy.md).
 Failures upload `maestro-results/` (screenshots, JUnit, host/app logs).
-Maestro flows are not retried.
+Maestro app assertions are not retried. The harness retries one Android ADB
+transport loss only when Maestro reports an Unknown-error result plus a dead or
+offline device before any assertion. It recovers ADB, reinstalls the same APK,
+and preserves the first diagnostics. An iOS driver startup may likewise retry
+once only when no JUnit file exists; the harness reboots the Simulator and
+preserves the first driver log.
 
 On-demand journeys (`maestro/journeys.yaml`, #1071–#1074) are a
 **separate job pair** in the same workflow: `Mobile Android device

@@ -12,8 +12,8 @@
 #   ./scripts/run-mobile-device-smoke.sh --platform android --prove-failure
 #   ./scripts/run-mobile-device-smoke.sh --platform android --suite journeys
 #
-# Maestro flows are not retried. A single emulator/simulator boot failure is
-# the runner's problem (android-emulator-runner / simctl), not a test retry.
+# Maestro app assertions are not retried. One pre-assertion Android transport
+# failure or iOS driver-startup failure may retry after device recovery.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -439,8 +439,7 @@ elif [ "$suite" = "journeys" ]; then
   echo "Running on-demand Maestro journeys (#1071)."
 fi
 
-echo "Running Maestro ($flow). Flows are not retried."
-set +e
+echo "Running Maestro ($flow). App flows are not retried."
 maestro_args=(
   test "$flow"
   --format junit
@@ -455,9 +454,84 @@ if [ "$suite" = "journeys" ]; then
     -e "ATTACH_TOPIC_ID=${ATTACH_TOPIC_ID}"
   )
 fi
-maestro "${maestro_args[@]}"
+
+maestro_console_log="$results_dir/maestro-console.log"
+run_maestro_once() {
+  maestro "${maestro_args[@]}" 2>&1 | tee -a "$maestro_console_log"
+  return "${PIPESTATUS[0]}"
+}
+
+set +e
+run_maestro_once
 maestro_status=$?
 set -e
+
+# Hosted Android emulators can drop off ADB while Maestro launches the app,
+# before an assertion runs. Run 34068859241 failed in four seconds with an
+# Unknown-error JUnit result and DeviceServerDiedException/device offline in
+# Maestro's debug log. Preserve that attempt, recover ADB, reinstall the same
+# APK, and retry once. Selector and other in-flow failures stay single-attempt.
+android_maestro_log="$(find "$results_dir/debug" -path '*/logs/maestro.log' -type f -print -quit 2>/dev/null || true)"
+if [ "$platform" = "android" ] \
+  && [ "$maestro_status" -ne 0 ] \
+  && [ -n "$android_maestro_log" ] \
+  && grep -q '<failure>Unknown error</failure>' "$results_dir/junit.xml" \
+  && grep -Eq 'Device server died|device offline' "$android_maestro_log"; then
+  echo "Maestro lost the Android device before an assertion; recovering ADB and retrying once."
+  if [ -d "$results_dir/debug" ]; then
+    mv "$results_dir/debug" "$results_dir/debug-android-transport-first"
+  fi
+  if [ -f "$results_dir/junit.xml" ]; then
+    mv "$results_dir/junit.xml" "$results_dir/junit-android-transport-first.xml"
+  fi
+  adb reconnect offline || true
+  adb kill-server || true
+  adb start-server
+  android_ready=false
+  for _ in $(seq 1 45); do
+    if [ "$(adb get-state 2>/dev/null || true)" = "device" ] \
+      && [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; then
+      android_ready=true
+      break
+    fi
+    sleep 2
+  done
+  if [ "$android_ready" = true ]; then
+    adb install -r "$apk"
+    set +e
+    run_maestro_once
+    maestro_status=$?
+    set -e
+  else
+    echo "Android emulator did not return online after the Maestro transport failure." >&2
+  fi
+fi
+
+# Hosted macOS occasionally exits Maestro's xcodebuild driver process before
+# XCTest starts listening. Run 34061996744 failed this way, while the same
+# Maestro/Xcode/Simulator combination started successfully hours earlier. A
+# missing JUnit file proves no app flow began. Reboot the Simulator and retry
+# only that infrastructure startup; assertion and in-flow failures stay
+# single-attempt.
+if [ "$platform" = "ios" ] \
+  && [ "$maestro_status" -ne 0 ] \
+  && [ ! -s "$results_dir/junit.xml" ] \
+  && grep -q "iOS driver not ready in time" "$maestro_console_log"; then
+  echo "Maestro iOS driver failed before any flow began; rebooting the Simulator and retrying driver startup once."
+  if [ -d "$results_dir/debug" ]; then
+    mv "$results_dir/debug" "$results_dir/debug-driver-startup-first"
+  fi
+  retry_udid="${IOS_SIM_UDID:-$(xcrun simctl list devices booted | grep -oE '[0-9A-F-]{36}' | head -n 1)}"
+  if [ -n "$retry_udid" ]; then
+    xcrun simctl shutdown "$retry_udid" || true
+    xcrun simctl boot "$retry_udid"
+    xcrun simctl bootstatus "$retry_udid" -b
+  fi
+  set +e
+  run_maestro_once
+  maestro_status=$?
+  set -e
+fi
 
 if [ "$maestro_status" -ne 0 ]; then
   echo "Maestro failed with status $maestro_status" >&2
