@@ -67,7 +67,7 @@ Issue [#1394](https://github.com/richardorchard/QueenZone.Modern/issues/1394). #
 2. Done. Tag `v2026.09.07.1` succeeded using `prod-release` + `prod-deploy`.
 3. Done. `publish-android-google-play.yml` succeeded on `main` using `prod-google-play` (Play run `34095308960`).
 4. Done. Nightly `sync-legacy-db` succeeded using `prod-data-read` (Nightly Sync `34096958201`).
-5. Done. Gilfoyle deleted `dev` and `deploy` in Settings (API list above). If either name reappears, a stale workflow auto-created it — delete it again in Settings; flip this sentence only.
+5. Done. Gilfoyle deleted `dev` and `deploy` in Settings (API list above) and removed the Entra FIC subject `environment:deploy`. If either environment name reappears, a stale workflow auto-created it — delete it again in Settings; flip this sentence only.
 
 ## Required status check rename
 

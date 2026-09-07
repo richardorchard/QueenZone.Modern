@@ -166,7 +166,7 @@ Account id `f93121b2086286e79a7a9fdb8d03cb4c`. Zone id `079fc2f37095c82fb3a2b4da
 | Environment `prod-google-play` | outside | Custom policy: branch `main`. Play signing / store upload only (`publish-android-google-play.yml`). |
 | Environment `prod-data-read` | outside | Custom policy: branch `main`. Production read used only to refresh/resync the SQL Express mirror. |
 | Environment `dev` (legacy) | outside | **Deleted in Settings** (2026-09-07, #1394). Retired from workflows in #1377. Do not recreate. |
-| Environment `deploy` (legacy) | outside | **Deleted in Settings** (2026-09-07, #1394). Retired from workflows in #1377. ARM/OIDC now lives on `prod-deploy`. Do not recreate. |
+| Environment `deploy` (legacy) | outside | **Deleted in Settings** (2026-09-07, #1394). Entra FIC subject `environment:deploy` removed. Retired from workflows in #1377. ARM/OIDC now lives on `prod-deploy`. Do not recreate. |
 | Environment `opentofu-plan` | outside | Protected branches only. Reader on `Queenzone-RG` plus state-container data access. See [`opentofu-state-and-identity.md`](opentofu-state-and-identity.md). |
 | Environment `opentofu-apply` | outside | Protected branches + `richardorchard` approval. Contributor on `Queenzone-RG`. Do not reuse for routine zip deploys. |
 | Repo secret `BITWARDEN_SECRETS_MANAGER_ACCESS_TOKEN` | outside | Token only; never OpenTofu state |

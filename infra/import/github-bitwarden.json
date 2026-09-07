@@ -18,7 +18,7 @@
         "status": "deleted",
         "protectionRules": [],
         "opentofuTreatment": "outside",
-        "notes": "Deleted in Settings 2026-09-07 (#1394). Do not recreate. ARM/OIDC moved to prod-deploy; Play moved to prod-google-play."
+        "notes": "Deleted in Settings 2026-09-07 (#1394). Entra FIC subject environment:deploy removed. Do not recreate. ARM/OIDC moved to prod-deploy; Play moved to prod-google-play."
       },
       {
         "name": "prod-release",
