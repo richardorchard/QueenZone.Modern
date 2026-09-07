@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ApiError } from '../api/client';
+import { ApiError, TIMEOUT_MESSAGE } from '../api/errors';
 import { PagedRequestCoordinator } from './usePagedContent';
 
 function isAbortError(err: unknown): boolean {
@@ -7,7 +7,13 @@ function isAbortError(err: unknown): boolean {
 }
 
 function errorMessage(err: unknown): string {
-  return err instanceof ApiError ? err.message : 'Something went wrong.';
+  if (err instanceof ApiError) {
+    return err.message;
+  }
+  if (isAbortError(err)) {
+    return TIMEOUT_MESSAGE;
+  }
+  return 'Something went wrong.';
 }
 
 export type DetailQuery<T> = {
@@ -47,7 +53,9 @@ export function useDetailQuery<T>(fetcher: (signal: AbortSignal) => Promise<T>):
         setLoading(false);
       })
       .catch((err: unknown) => {
-        if (!coordinator.isCurrent(generation) || signal.aborted || isAbortError(err)) {
+        // Same swallow rule as useHomeSection: ignore abort only when this
+        // generation was superseded or the request signal was aborted.
+        if (!coordinator.isCurrent(generation) || signal.aborted) {
           return;
         }
         setData(null);

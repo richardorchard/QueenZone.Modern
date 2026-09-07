@@ -1,15 +1,9 @@
 import type { ComponentType, ReactNode } from 'react';
-import {
-  FlatList,
-  RefreshControl,
-  StyleSheet,
-  View,
-  type FlatListProps,
-  type ListRenderItem,
-} from 'react-native';
+import { FlatList, StyleSheet, View, type FlatListProps, type ListRenderItem } from 'react-native';
 import type { PagedState } from '../hooks/usePagedContent';
 import { useTheme } from '../theme';
 import { EmptyBlock, ErrorBlock, ListFooterLoading, LoadingBlock } from './ScreenStates';
+import { ThemedRefreshControl } from './ThemedRefreshControl';
 
 type OwnedListProp =
   | 'data'
@@ -108,11 +102,7 @@ export function PagedListScreen<T>({
         </>
       }
       refreshControl={
-        <RefreshControl
-          refreshing={paged.refreshing}
-          onRefresh={paged.refresh}
-          tintColor={c.accentPrimary}
-        />
+        <ThemedRefreshControl refreshing={paged.refreshing} onRefresh={paged.refresh} />
       }
       onEndReached={paged.loadMore}
       onEndReachedThreshold={END_REACHED_THRESHOLD}
