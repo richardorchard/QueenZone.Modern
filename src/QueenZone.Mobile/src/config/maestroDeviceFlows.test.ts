@@ -74,6 +74,13 @@ describe('Maestro device flows (#1281)', () => {
     const authenticated = readRepo('flows/09-authenticated.yaml', maestroDir);
     assert.match(authenticated, /text: '\^Contract Other\.\*'/);
   });
+
+  it('bounds news story recovery to one retry of the read-only error action', () => {
+    const newsStory = readRepo('flows/04-news-story.yaml', maestroDir);
+    assert.match(newsStory, /retry:\s+maxRetries: 1/);
+    assert.match(newsStory, /text: '\^Try again\$'/);
+    assert.match(newsStory, /id: news-story-screen/);
+  });
 });
 
 describe('device-smoke harness (#1281)', () => {
