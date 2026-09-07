@@ -1,20 +1,37 @@
 {
   "auditDate": "2026-08-12",
-  "refreshedDate": "2026-08-24",
+  "refreshedDate": "2026-09-07",
   "issue": 624,
-  "refreshNotes": "Added the four live APNs App Service setting names created for #846 and the Android FCM setting names for #847. Secret values were not recorded. GitHub environments and Azure/Cloudflare resource IDs were not re-probed.",
+  "refreshNotes": "#1394: legacy GitHub Environments dev and deploy deleted in Settings (verified via Environments API; neither name present). Added live prod-release / prod-deploy / prod-google-play / prod-data-read inventory rows. Secret values were not recorded. Azure/Cloudflare resource IDs were not re-probed.",
 
   "github": {
     "environments": [
       {
         "name": "dev",
+        "status": "deleted",
         "protectionRules": [],
         "opentofuTreatment": "outside",
-        "notes": "Used by deploy.yml for Bitwarden publish-profile zip deploy; app deploy stays in GitHub Actions"
+        "notes": "Deleted in Settings 2026-09-07 (#1394). Do not recreate. Retired from workflows in #1377."
       },
       {
         "name": "deploy",
-        "protectionRules": ["branch_policy"],
+        "status": "deleted",
+        "protectionRules": [],
+        "opentofuTreatment": "outside",
+        "notes": "Deleted in Settings 2026-09-07 (#1394). Do not recreate. ARM/OIDC moved to prod-deploy; Play moved to prod-google-play."
+      },
+      {
+        "name": "prod-release",
+        "protectionRules": ["custom_branch_policy"],
+        "variableNames": [
+          "BITWARDEN_APP_SERVICE_DEPLOY_SECRETS"
+        ],
+        "opentofuTreatment": "outside",
+        "notes": "Production migrate + zip deploy (deploy.yml). Custom policy: branch main + tags v*. Secret values not recorded."
+      },
+      {
+        "name": "prod-deploy",
+        "protectionRules": ["custom_branch_policy"],
         "variableNames": [
           "ARM_CLIENT_ID",
           "ARM_SUBSCRIPTION_ID",
@@ -22,6 +39,24 @@
         ],
         "opentofuTreatment": "outside",
         "notes": "OIDC identity QueenZone Deploy; Website Contributor on site queenzone-dev only. Writes WEBSITE_WARMUP_PATH via ARM (also deletes WEBSITE_WARMUP_STATUSES/WEBSITE_RUN_FROM_PACKAGE if either reappears live). Sibling of OpenTofu plan/apply, not an OpenTofu principal."
+      },
+      {
+        "name": "prod-google-play",
+        "protectionRules": ["custom_branch_policy"],
+        "variableNames": [
+          "BITWARDEN_MOBILE_BUILD_SECRETS",
+          "SENTRY_DSN",
+          "SENTRY_ORG",
+          "SENTRY_PROJECT"
+        ],
+        "opentofuTreatment": "outside",
+        "notes": "Play signing / store upload (publish-android-google-play.yml). No ARM. Secret values not recorded."
+      },
+      {
+        "name": "prod-data-read",
+        "protectionRules": ["custom_branch_policy"],
+        "opentofuTreatment": "outside",
+        "notes": "Production read used only to refresh/resync the SQL Express mirror. Narrow Bitwarden map (publish profile + migration connection string). Secret values not recorded."
       },
       {
         "name": "opentofu-plan",
