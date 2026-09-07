@@ -35,6 +35,7 @@ const mockStatus = {
   isLoaded: true,
   isBuffering: false,
   didJustFinish: false,
+  error: null as string | null,
 };
 
 const mockSession = createMockSession();
@@ -121,6 +122,7 @@ describe('FanPerformancePlayerProvider', () => {
     mockStatus.didJustFinish = false;
     mockStatus.currentTime = 0;
     mockStatus.duration = 0;
+    mockStatus.error = null;
     mockPlayer.replace.mockReset();
     mockPlayer.play.mockReset();
     mockPlayer.pause.mockReset();
@@ -433,6 +435,49 @@ describe('FanPerformancePlayerProvider', () => {
     );
     expect(await getCompletedDownload('member-1', '187')).toBeNull();
     expect(host.exists('file:///documents/fan-performances/187')).toBe(false);
+  });
+
+  it('falls back to streaming when iOS reports an asynchronous local playback error', async () => {
+    const host = createMemoryDownloadHost();
+    setDownloadFileHostForTests(host);
+    host.files.set('file:///documents/fan-performances/187.mp3', new Uint8Array([1, 2, 3, 4]));
+    await upsertCompletedDownload({
+      performanceId: '187',
+      localUri: 'file:///documents/fan-performances/187.mp3',
+      title: trackA.title,
+      performedBy: trackA.performedBy,
+      byteSize: 4,
+      sourceRevision: '"etag-1"',
+      completedAt: '2026-09-05T00:00:00.000Z',
+      memberId: 'member-1',
+    });
+    const user = userEvent.setup();
+    const view = renderPlayer();
+    await user.press(screen.getByTestId('play-a'));
+    await waitFor(() =>
+      expect(mockPlayer.replace).toHaveBeenCalledWith({
+        uri: 'file:///documents/fan-performances/187.mp3',
+        name: trackA.title,
+      }),
+    );
+
+    mockPlayer.replace.mockClear();
+    mockStatus.error = 'The operation could not be completed';
+    view.rerender(
+      <FanPerformancePlayerProvider>
+        <Probe />
+      </FanPerformancePlayerProvider>,
+    );
+
+    await waitFor(() =>
+      expect(mockPlayer.replace).toHaveBeenCalledWith({
+        uri: 'http://qz.test/api/v1/content/fan-performances/187/audio',
+        headers: { Authorization: 'Bearer member-token' },
+        name: trackA.title,
+      }),
+    );
+    expect(await getCompletedDownload('member-1', '187')).toBeNull();
+    expect(host.exists('file:///documents/fan-performances/187.mp3')).toBe(false);
   });
 
   it('shows an offline-specific error when the recording is not downloaded', async () => {
