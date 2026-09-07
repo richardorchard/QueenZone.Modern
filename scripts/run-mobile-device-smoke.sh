@@ -472,12 +472,11 @@ set -e
 # DeviceServerDiedException across observed runs. Preserve that attempt,
 # recover ADB, reinstall the same APK, and retry once. Selector and assertion
 # failures stay single-attempt.
-android_maestro_log="$(find "$results_dir/debug" -path '*/logs/maestro.log' -type f -print -quit 2>/dev/null || true)"
 if [ "$platform" = "android" ] \
   && [ "$maestro_status" -ne 0 ] \
-  && [ -n "$android_maestro_log" ] \
+  && [ -d "$results_dir/debug" ] \
   && grep -Eq 'DeviceServerDiedException|Device server died|device offline' "$results_dir/junit.xml" \
-  && grep -Eq 'DeviceServerDiedException|Device server died|device offline' "$android_maestro_log"; then
+  && grep -ERq 'DeviceServerDiedException|Device server died|device offline' "$results_dir/debug"; then
   echo "Maestro lost the Android device transport; recovering ADB and retrying once."
   if [ -d "$results_dir/debug" ]; then
     mv "$results_dir/debug" "$results_dir/debug-android-transport-first"

@@ -107,6 +107,7 @@ describe('device-smoke harness (#1281)', () => {
       script,
       /DeviceServerDiedException\|Device server died\|device offline/,
     );
+    assert.match(script, /grep -ERq[\s\S]*"\$results_dir\/debug"/);
     assert.match(script, /debug-android-transport-first/);
     assert.match(script, /adb reconnect offline/);
     assert.match(script, /adb install -r "\$apk"/);
