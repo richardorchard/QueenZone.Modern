@@ -1,6 +1,7 @@
 import { createAsyncStorageAdapter } from '../cache/asyncStorageAdapter';
 import type { KeyValueStorage } from '../cache/storage';
 import { getDownloadFileHost } from './files';
+import { resolveDownloadAudioExtension } from './audioBytes';
 import {
   DOWNLOAD_MANIFEST_SCHEMA_VERSION,
   type DownloadManifest,
@@ -121,6 +122,16 @@ export async function reconcileDownloadManifest(memberId: string): Promise<Downl
       if (exists) {
         host.deleteIfExists(entry.localUri);
       }
+      dirty = true;
+      continue;
+    }
+
+    const leaf = entry.localUri.split('/').pop() ?? '';
+    if (!leaf.includes('.')) {
+      const extension = resolveDownloadAudioExtension(await host.readPrefix(entry.localUri, 4));
+      const migratedUri = host.completedUri(entry.performanceId, extension);
+      await host.promote(entry.localUri, migratedUri);
+      entry.localUri = migratedUri;
       dirty = true;
     }
   }

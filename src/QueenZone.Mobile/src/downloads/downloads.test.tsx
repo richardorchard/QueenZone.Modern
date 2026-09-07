@@ -84,7 +84,7 @@ describe('download manifest reconciliation', () => {
     expect(await getCompletedDownload(memberId, '187')).toBeNull();
   });
 
-  it('keeps a valid completed file until it is removed', async () => {
+  it('migrates a valid extensionless download for iOS playback', async () => {
     const host = createMemoryDownloadHost();
     setDownloadFileHostForTests(host);
     host.files.set('file:///documents/fan-performances/187', new Uint8Array([1, 2, 3, 4]));
@@ -92,6 +92,9 @@ describe('download manifest reconciliation', () => {
 
     const kept = await reconcileDownloadManifest(memberId);
     expect(kept.entries['187']?.sourceRevision).toBe('"etag-1"');
+    expect(kept.entries['187']?.localUri).toBe('file:///documents/fan-performances/187.mp3');
+    expect(host.exists('file:///documents/fan-performances/187')).toBe(false);
+    expect(host.exists('file:///documents/fan-performances/187.mp3')).toBe(true);
     await removeCompletedDownload(memberId, '187');
     expect(await getCompletedDownload(memberId, '187')).toBeNull();
   });
@@ -209,11 +212,35 @@ describe('download manager', () => {
     await Promise.resolve();
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    expect(host.files.get('file:///documents/fan-performances/187')?.byteLength).toBe(4);
+    expect(host.files.get('file:///documents/fan-performances/187.mp3')?.byteLength).toBe(4);
     expect(host.exists('file:///documents/fan-performances/187.part')).toBe(false);
     const stored = await getCompletedDownload(memberId, '187');
     expect(stored?.sourceRevision).toBe('"etag-9"');
     expect(getDownloadUiSnapshot(memberId, '187')?.status).toBe('downloaded');
+  });
+
+  it('keeps a FLAC extension for iOS local playback', async () => {
+    const host = createMemoryDownloadHost({
+      downloadImpl: async ({ destUri }) => {
+        host.files.set(destUri, new Uint8Array([0x66, 0x4c, 0x61, 0x43, 0x00]));
+        return { uri: destUri };
+      },
+    });
+    setDownloadFileHostForTests(host);
+    setDownloadProbeForTests(async () => ({
+      status: 206,
+      sourceRevision: '"flac-etag"',
+      byteSize: 5,
+      contentType: 'audio/flac',
+    }));
+
+    enqueueDownload(track, memberId, async () => 'member-token');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(host.exists('file:///documents/fan-performances/187.flac')).toBe(true);
+    expect((await getCompletedDownload(memberId, '187'))?.localUri).toBe(
+      'file:///documents/fan-performances/187.flac',
+    );
   });
 
   it('waits for asynchronous file promotion before validating and storing the download', async () => {
@@ -238,13 +265,13 @@ describe('download manager', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(host.promote).toHaveBeenCalled();
-    expect(host.exists('file:///documents/fan-performances/187')).toBe(false);
+    expect(host.exists('file:///documents/fan-performances/187.mp3')).toBe(false);
     expect(getDownloadUiSnapshot(memberId, '187')?.status).toBe('downloading');
 
     finishPromote();
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    expect(host.files.get('file:///documents/fan-performances/187')?.byteLength).toBe(4);
+    expect(host.files.get('file:///documents/fan-performances/187.mp3')?.byteLength).toBe(4);
     expect((await getCompletedDownload(memberId, '187'))?.byteSize).toBe(4);
     expect(getDownloadUiSnapshot(memberId, '187')?.status).toBe('downloaded');
   });
@@ -459,7 +486,7 @@ describe('download manager', () => {
     enqueueDownload(track, memberId, async () => 'member-token');
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    expect(host.files.get('file:///documents/fan-performances/187')?.byteLength).toBe(4);
+    expect(host.files.get('file:///documents/fan-performances/187.mp3')?.byteLength).toBe(4);
     expect(getDownloadUiSnapshot(memberId, '187')?.status).toBe('downloaded');
   });
 
@@ -595,7 +622,7 @@ describe('download manager', () => {
     enqueueDownload(track, memberId, async () => 'member-token');
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    expect(host.exists('file:///documents/fan-performances/187')).toBe(true);
+    expect(host.exists('file:///documents/fan-performances/187.mp3')).toBe(true);
     expect(host.exists(returnedUri)).toBe(false);
     expect(getDownloadUiSnapshot(memberId, '187')?.status).toBe('downloaded');
     expect(Sentry.addBreadcrumb).toHaveBeenCalledWith(

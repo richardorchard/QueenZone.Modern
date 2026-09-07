@@ -1,7 +1,7 @@
 import type { FanPerformance } from '../api';
 import { apiV1Url } from '../config';
 import { fanPerformanceAudioPath } from '../audio/formatDuration';
-import { fileLooksLikeHttpError } from './audioBytes';
+import { fileLooksLikeHttpError, resolveDownloadAudioExtension } from './audioBytes';
 import {
   adoptProgressTotal,
   canPromotePart,
@@ -242,7 +242,7 @@ async function runDownload(
   const performanceId = String(track.id);
   const host = getDownloadFileHost();
   const partUri = host.partUri(performanceId);
-  const completedUri = host.completedUri(performanceId);
+  let completedUri: string | null = null;
 
   setDownloadUiSnapshot(
     memberId,
@@ -427,6 +427,12 @@ async function runDownload(
       throw new Error(messageForFinalizeFailure('missing-part'));
     }
 
+    const audioPrefix = await host.readPrefix(partToPromote, 4);
+    completedUri = host.completedUri(
+      performanceId,
+      resolveDownloadAudioExtension(audioPrefix, probeContentType),
+    );
+
     try {
       await host.promote(partToPromote, completedUri);
     } catch (error) {
@@ -463,7 +469,9 @@ async function runDownload(
   } catch (error) {
     host.deleteIfExists(partUri);
     host.deleteIfExists(materializedPartUri);
-    host.deleteIfExists(completedUri);
+    if (completedUri) {
+      host.deleteIfExists(completedUri);
+    }
     const message = messageForDownloadError(error);
     setDownloadUiSnapshot(
       memberId,
@@ -487,7 +495,9 @@ export async function removeDownload(memberId: string, performanceId: string): P
     }),
   );
   stopPlaybackIf(performanceId);
-  host.deleteIfExists(host.completedUri(performanceId));
+  host.deleteIfExists(host.completedUri(performanceId, null));
+  host.deleteIfExists(host.completedUri(performanceId, 'mp3'));
+  host.deleteIfExists(host.completedUri(performanceId, 'flac'));
   host.deleteIfExists(host.partUri(performanceId));
   await removeCompletedDownload(memberId, performanceId);
   clearDownloadUiSnapshot(memberId, performanceId);
@@ -495,7 +505,9 @@ export async function removeDownload(memberId: string, performanceId: string): P
 
 export async function discardInvalidLocalDownload(memberId: string, performanceId: string): Promise<void> {
   const host = getDownloadFileHost();
-  host.deleteIfExists(host.completedUri(performanceId));
+  host.deleteIfExists(host.completedUri(performanceId, null));
+  host.deleteIfExists(host.completedUri(performanceId, 'mp3'));
+  host.deleteIfExists(host.completedUri(performanceId, 'flac'));
   host.deleteIfExists(host.partUri(performanceId));
   await removeCompletedDownload(memberId, performanceId);
   clearDownloadUiSnapshot(memberId, performanceId);
