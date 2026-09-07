@@ -58,8 +58,13 @@ describe('Maestro device flows (#1281)', () => {
     assert.doesNotMatch(accept, /Open in \.\*QueenZone/);
     assert.match(accept, /\^Open\$/);
 
-    assert.match(readMaestro('flows/09-authenticated.yaml'), /open-smoke-auth\.yaml/);
-    assert.match(readMaestro('flows/09-authenticated.yaml'), /id: profile-messages/);
+    const authenticated = readMaestro('flows/09-authenticated.yaml');
+    assert.equal(authenticated.match(/open-smoke-auth\.yaml/g)?.length, 2);
+    assert.match(
+      authenticated,
+      /id: home-profile[\s\S]*visible:[\s\S]*id: profile-signed-out[\s\S]*runFlow: open-smoke-auth\.yaml[\s\S]*id: profile-signed-in/,
+    );
+    assert.match(authenticated, /id: profile-messages/);
     assert.match(readMaestro('flows/12-masthead-unread.yaml'), /open-smoke-auth\.yaml/);
     assert.match(readMaestro('flows/10-forum-attach.yaml'), /accept-ios-open-link\.yaml/);
   });

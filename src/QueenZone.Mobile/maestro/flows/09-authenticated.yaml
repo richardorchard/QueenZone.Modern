@@ -8,6 +8,14 @@ appId: org.queenzone.mobile
     id: tab-home
 - tapOn:
     id: home-profile
+- runFlow:
+    when:
+      visible:
+        id: profile-signed-out
+    commands:
+      # iOS can accept the system Open prompt without delivering the first
+      # foreground URL event. Retry only that confirmed transport miss.
+      - runFlow: open-smoke-auth.yaml
 - extendedWaitUntil:
     visible:
       id: profile-signed-in
