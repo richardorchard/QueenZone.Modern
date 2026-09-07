@@ -216,6 +216,39 @@ describe('download manager', () => {
     expect(getDownloadUiSnapshot(memberId, '187')?.status).toBe('downloaded');
   });
 
+  it('waits for asynchronous file promotion before validating and storing the download', async () => {
+    const host = createMemoryDownloadHost();
+    const promoteNow = host.promote.bind(host);
+    let finishPromote!: () => void;
+    const promotionPending = new Promise<void>((resolve) => {
+      finishPromote = resolve;
+    });
+    host.promote = jest.fn(async (partUri, completedUri) => {
+      await promotionPending;
+      promoteNow(partUri, completedUri);
+    });
+    setDownloadFileHostForTests(host);
+    setDownloadProbeForTests(async () => ({
+      status: 206,
+      sourceRevision: '"etag-9"',
+      byteSize: 4,
+    }));
+
+    enqueueDownload(track, memberId, async () => 'member-token');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(host.promote).toHaveBeenCalled();
+    expect(host.exists('file:///documents/fan-performances/187')).toBe(false);
+    expect(getDownloadUiSnapshot(memberId, '187')?.status).toBe('downloading');
+
+    finishPromote();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(host.files.get('file:///documents/fan-performances/187')?.byteLength).toBe(4);
+    expect((await getCompletedDownload(memberId, '187'))?.byteSize).toBe(4);
+    expect(getDownloadUiSnapshot(memberId, '187')?.status).toBe('downloaded');
+  });
+
   it('rejects a completed file that is an HTTP error payload', async () => {
     const host = createMemoryDownloadHost({
       downloadImpl: async ({ destUri }) => {
@@ -779,7 +812,8 @@ describe('download manager', () => {
   });
 
   it('native host uses the completed one-shot File URI and refuses a missing .part move', async () => {
-    const { File } = jest.requireMock('expo-file-system') as typeof import('expo-file-system');
+    const expoFileSystem = jest.requireMock('expo-file-system') as typeof import('expo-file-system');
+    const { File } = expoFileSystem;
     const oneShot = jest.spyOn(File, 'downloadFileAsync');
     const task = jest.spyOn(File, 'createDownloadTask');
     setDownloadFileHostForTests(null);
@@ -802,6 +836,32 @@ describe('download manager', () => {
     expect(() => host.promote('file:///missing.part', 'file:///done')).toThrow(
       DOWNLOAD_PART_MISSING_MESSAGE,
     );
+
+    let finishMove!: () => void;
+    const movePending = new Promise<void>((resolve) => {
+      finishMove = resolve;
+    });
+    const move = jest.fn(() => movePending);
+    jest.spyOn(expoFileSystem, 'File').mockImplementation((...parts: unknown[]) => {
+      const uri = parts.map(String).join('/');
+      return {
+        uri,
+        exists: uri.endsWith('.part'),
+        size: 4,
+        delete: jest.fn(),
+        move,
+      } as unknown as InstanceType<typeof File>;
+    });
+
+    const promotion = host.promote(
+      'file:///documents/fan-performances/178.part',
+      'file:///documents/fan-performances/178',
+    );
+    expect(move).toHaveBeenCalledWith(expect.objectContaining({
+      uri: 'file:///documents/fan-performances/178',
+    }));
+    finishMove();
+    await promotion;
   });
 
   it('sign-out deletes files, partials, and the manifest', async () => {

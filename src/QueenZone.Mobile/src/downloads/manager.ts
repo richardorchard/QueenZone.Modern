@@ -428,7 +428,7 @@ async function runDownload(
     }
 
     try {
-      host.promote(partToPromote, completedUri);
+      await host.promote(partToPromote, completedUri);
     } catch (error) {
       reportDownloadBreadcrumb('promote-error', {
         performanceId,
