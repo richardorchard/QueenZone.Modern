@@ -1,4 +1,5 @@
-import { screen, userEvent, waitFor } from '@testing-library/react-native';
+import { RefreshControl } from 'react-native';
+import { fireEvent, screen, userEvent, waitFor } from '@testing-library/react-native';
 import { submissionsApiUrl } from '../../api/submissions';
 import { jsonResponse } from '../../test/fixtures';
 import { createMockSession } from '../../test/mockSession';
@@ -219,5 +220,19 @@ describe('MySubmissionsScreen', () => {
     const user = userEvent.setup();
     await user.press(screen.getByRole('button', { name: 'Retry loading submissions' }));
     await waitFor(() => expect(screen.getByText('Live in Montreal')).toBeOnTheScreen());
+  });
+
+  it('pull-to-refresh reloads every submission kind through ThemedRefreshControl', async () => {
+    renderSubmissions();
+    await waitFor(() => expect(screen.getByText('Live in Montreal')).toBeOnTheScreen());
+    const callsBeforeRefresh = fetchMock.mock.calls.length;
+
+    fireEvent(screen.UNSAFE_getByType(RefreshControl), 'refresh');
+
+    await waitFor(() => expect(fetchMock.mock.calls.length).toBeGreaterThan(callsBeforeRefresh));
+    expect(fetchMock).toHaveBeenCalledWith(photosUrl, expect.any(Object));
+    expect(fetchMock).toHaveBeenCalledWith(newsUrl, expect.any(Object));
+    expect(fetchMock).toHaveBeenCalledWith(articlesUrl, expect.any(Object));
+    expect(fetchMock).toHaveBeenCalledWith(fanPerformancesUrl, expect.any(Object));
   });
 });
