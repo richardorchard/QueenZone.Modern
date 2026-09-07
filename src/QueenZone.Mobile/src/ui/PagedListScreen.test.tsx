@@ -2,7 +2,7 @@ import { FlatList, RefreshControl, Text } from 'react-native';
 import { fireEvent, screen, userEvent } from '@testing-library/react-native';
 import type { PagedState } from '../hooks/usePagedContent';
 import { flushVirtualizedList, renderWithProviders } from '../test/render';
-import { dark } from '../theme';
+import { dark, palette } from '../theme';
 import { PagedListScreen } from './PagedListScreen';
 
 type Item = { id: number; title: string };
@@ -65,7 +65,7 @@ describe('PagedListScreen', () => {
     expect(screen.getByText('No items yet.')).toBeOnTheScreen();
   });
 
-  it('renders rows and owns end-reached threshold plus refresh tint', () => {
+  it('renders rows and owns end-reached threshold plus themed refresh colours', () => {
     const loadMore = jest.fn();
     const refresh = jest.fn();
     renderList(
@@ -95,6 +95,8 @@ describe('PagedListScreen', () => {
 
     const refreshControl = screen.UNSAFE_getByType(RefreshControl);
     expect(refreshControl.props.tintColor).toBe(dark.accentPrimary);
+    expect(refreshControl.props.colors).toEqual([dark.accentPrimary]);
+    expect(refreshControl.props.progressBackgroundColor).toBe(palette.grey800);
 
     fireEvent(list, 'onEndReached');
     expect(loadMore).toHaveBeenCalledTimes(1);
