@@ -49,7 +49,9 @@ jobs:
     if: always() && github.ref == 'refs/heads/main' && needs.preflight.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 35
-    environment: deploy
+    # Play signing / store upload only (issue #1377 Option B). Custom policy:
+    # branch main. Distinct from prod-deploy (ARM/OIDC).
+    environment: prod-google-play
     defaults:
       run:
         working-directory: src/QueenZone.Mobile
@@ -146,7 +148,7 @@ jobs:
             SENTRY_PROJECT; do
             eval "value=\${$name-}"
             if [ -z "$value" ]; then
-              echo "::error::$name is not configured for the deploy environment."
+              echo "::error::$name is not configured for the prod-google-play environment."
               missing=1
             else
               echo "$name is set (length ${#value})"
@@ -157,7 +159,7 @@ jobs:
           fi
           if [ "$PUBLISH_TO_PLAY" = "true" ]; then
             if [ -z "$GOOGLE_PLAY_SERVICE_ACCOUNT_JSON" ]; then
-              echo "::error::GOOGLE_PLAY_SERVICE_ACCOUNT_JSON is not configured for the deploy environment."
+              echo "::error::GOOGLE_PLAY_SERVICE_ACCOUNT_JSON is not configured for the prod-google-play environment."
               exit 1
             fi
             echo "GOOGLE_PLAY_SERVICE_ACCOUNT_JSON is set (length ${#GOOGLE_PLAY_SERVICE_ACCOUNT_JSON})"
