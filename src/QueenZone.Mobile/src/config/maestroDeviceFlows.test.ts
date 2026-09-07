@@ -59,6 +59,7 @@ describe('Maestro device flows (#1281)', () => {
     assert.match(accept, /\^Open\$/);
 
     assert.match(readMaestro('flows/09-authenticated.yaml'), /open-smoke-auth\.yaml/);
+    assert.match(readMaestro('flows/09-authenticated.yaml'), /id: profile-messages/);
     assert.match(readMaestro('flows/12-masthead-unread.yaml'), /open-smoke-auth\.yaml/);
     assert.match(readMaestro('flows/10-forum-attach.yaml'), /accept-ios-open-link\.yaml/);
   });

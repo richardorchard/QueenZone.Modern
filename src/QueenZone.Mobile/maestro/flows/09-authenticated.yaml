@@ -15,7 +15,8 @@ appId: org.queenzone.mobile
 - assertVisible:
     id: profile-display-name
 - assertVisible: Contract Member
-- tapOn: Messages
+- tapOn:
+    id: profile-messages
 - extendedWaitUntil:
     visible:
       id: inbox-screen

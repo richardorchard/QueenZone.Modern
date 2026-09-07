@@ -89,6 +89,7 @@ export const testIds = {
   profileSignedOut: 'profile-signed-out',
   profileSignedIn: 'profile-signed-in',
   profileDisplayName: 'profile-display-name',
+  profileMessages: 'profile-messages',
   profileBack: 'profile-back',
   profileRestoring: 'profile-restoring',
   fanPerformanceSessionRestoring: 'fan-performance-session-restoring',

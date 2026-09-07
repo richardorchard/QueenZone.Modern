@@ -88,6 +88,7 @@ describe('ProfileScreen', () => {
     mockSession.refreshProfile.mockResolvedValue(mockSession.profile);
     renderProfile();
     expect(screen.getByText('Freddie')).toBeOnTheScreen();
+    expect(screen.getByTestId('profile-messages')).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeOnTheScreen();
   });
 
