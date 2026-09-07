@@ -195,19 +195,18 @@ describe('SessionProvider', () => {
     runtime.__DEV__ = false;
     mockAppConfig.smokeEmbed = true;
     try {
-      readStored.mockResolvedValue(null);
+      readStored.mockReturnValue(new Promise(() => {}));
       renderSession();
       await waitFor(() => expect(screen.getByText('signed-out')).toBeOnTheScreen());
+      expect(readStored).not.toHaveBeenCalled();
 
       await user.press(screen.getByText('do-smoke-auth'));
       await waitFor(() => expect(screen.getByText('signed-in')).toBeOnTheScreen());
       expect(screen.getByText('smoke-applied')).toBeOnTheScreen();
       expect(signInWithProvider).not.toHaveBeenCalled();
-      expect(writeStored).toHaveBeenCalledWith({
-        accessToken: 'smoke-access',
-        refreshToken: 'smoke-debug-no-refresh',
-        expiresIn: 3600,
-      });
+      expect(writeStored).not.toHaveBeenCalled();
+      expect(writeIdentity).not.toHaveBeenCalled();
+      expect(fetchJsonMock).toHaveBeenCalledWith('/me', { accessToken: 'smoke-access' });
     } finally {
       runtime.__DEV__ = previous;
     }

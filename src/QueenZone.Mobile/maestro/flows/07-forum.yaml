@@ -28,3 +28,11 @@ appId: org.queenzone.mobile
     visible:
       id: forum-category-screen
     timeout: 15000
+# Reselecting the active Forum tab invokes reselectRoot and clears the
+# preserved Category stack before later flows return to this tab.
+- tapOn:
+    id: tab-forum
+- extendedWaitUntil:
+    visible:
+      id: forum-screen
+    timeout: 15000

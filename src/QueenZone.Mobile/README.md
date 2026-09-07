@@ -490,6 +490,9 @@ It is **not** a substitute for `npm test` (#833), consumer contracts
 live site, Azure SQL, real OAuth, Metro in CI, or member passwords.
 Local `expo start` + Debug remains for developers; device smoke/journeys
 never install `app-debug.apk` or `Debug-iphonesimulator`.
+The Release smoke embed starts signed out and keeps its seeded smoke token in
+memory; it never restores from or writes to the device keychain. Debug and all
+staging/production builds retain the normal SecureStore session lifecycle.
 
 | Smoke is | Smoke is not |
 | --- | --- |
@@ -545,7 +548,9 @@ transport loss only when Maestro reports an Unknown-error result plus a dead or
 offline device before any assertion. It recovers ADB, reinstalls the same APK,
 and preserves the first diagnostics. An iOS driver startup may likewise retry
 once only when no JUnit file exists; the harness reboots the Simulator and
-preserves the first driver log.
+preserves the first driver log. The authenticated smoke flow repeats only the
+iOS smoke-auth deep link when the profile explicitly remains signed out after
+the system Open prompt; it does not repeat failed app assertions.
 
 On-demand journeys (`maestro/journeys.yaml`, #1071–#1074) are a
 **separate job pair** in the same workflow: `Mobile Android device

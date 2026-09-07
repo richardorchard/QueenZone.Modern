@@ -41,17 +41,45 @@ describe('Maestro device flows (#1281)', () => {
     );
   });
 
+  it('resets the forum stack after its thread journey', () => {
+    const forum = readMaestro('flows/07-forum.yaml');
+    assert.match(
+      forum,
+      /id: forum-thread-screen[\s\S]*id: forum-thread-back[\s\S]*id: forum-category-screen[\s\S]*id: tab-forum[\s\S]*id: forum-screen/,
+    );
+  });
+
   it('dismisses the iOS Open-in-QueenZone confirm after smoke-auth and attach', () => {
     const openAuth = readMaestro('flows/open-smoke-auth.yaml');
     const accept = readMaestro('flows/accept-ios-open-link.yaml');
     assert.match(openAuth, /openLink: \$\{SMOKE_AUTH_URL\}/);
     assert.match(openAuth, /accept-ios-open-link\.yaml/);
-    assert.match(accept, /Open in \.\*QueenZone/);
+    assert.match(accept, /platform: iOS/);
+    assert.doesNotMatch(accept, /Open in \.\*QueenZone/);
     assert.match(accept, /\^Open\$/);
 
-    assert.match(readMaestro('flows/09-authenticated.yaml'), /open-smoke-auth\.yaml/);
+    const authenticated = readMaestro('flows/09-authenticated.yaml');
+    assert.equal(authenticated.match(/open-smoke-auth\.yaml/g)?.length, 1);
+    assert.equal(authenticated.match(/openLink: \$\{SMOKE_AUTH_URL\}/g)?.length, 1);
+    assert.match(
+      authenticated,
+      /id: home-profile[\s\S]*platform: iOS[\s\S]*visible:[\s\S]*id: profile-signed-out[\s\S]*openLink: \$\{SMOKE_AUTH_URL\}[\s\S]*id: profile-signed-in/,
+    );
+    assert.match(authenticated, /id: profile-messages/);
     assert.match(readMaestro('flows/12-masthead-unread.yaml'), /open-smoke-auth\.yaml/);
     assert.match(readMaestro('flows/10-forum-attach.yaml'), /accept-ios-open-link\.yaml/);
+  });
+
+  it('matches the seeded inbox row when iOS merges its accessibility label', () => {
+    const authenticated = readRepo('flows/09-authenticated.yaml', maestroDir);
+    assert.match(authenticated, /text: '\^Contract Other\.\*'/);
+  });
+
+  it('bounds news story recovery to one retry of the read-only error action', () => {
+    const newsStory = readRepo('flows/04-news-story.yaml', maestroDir);
+    assert.match(newsStory, /retry:\s+maxRetries: 1/);
+    assert.match(newsStory, /text: '\^Try again\$'/);
+    assert.match(newsStory, /id: news-story-screen/);
   });
 });
 
@@ -77,17 +105,20 @@ describe('device-smoke harness (#1281)', () => {
     assert.match(script, /simctl shutdown/);
     assert.match(script, /simctl bootstatus/);
     assert.match(script, /debug-driver-startup-first/);
-    assert.match(script, /App flows are not retried/);
+    assert.match(script, /Selector and assertion failures are not retried/);
   });
 
-  it('retries only an Android transport failure before an assertion', () => {
+  it('retries only an Android device transport failure', () => {
     const script = readRepo('run-mobile-device-smoke.sh', scriptsDir);
-    assert.match(script, /<failure>Unknown error<\/failure>/);
-    assert.match(script, /Device server died\|device offline/);
+    assert.match(
+      script,
+      /DeviceServerDiedException\|Device server died\|device offline/,
+    );
+    assert.match(script, /grep -ERq[\s\S]*"\$results_dir\/debug"/);
     assert.match(script, /debug-android-transport-first/);
     assert.match(script, /adb reconnect offline/);
     assert.match(script, /adb install -r "\$apk"/);
-    assert.match(script, /app assertions are not retried/);
+    assert.match(script, /Selector and assertion failures are not retried/);
   });
 });
 

@@ -69,6 +69,7 @@ export function SettingsRow({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? title}
+      testID={testID}
       onPress={onPress}
       {...press}
       style={({ pressed }) => (Platform.OS === 'ios' && pressed ? { backgroundColor: 'rgba(255,255,255,0.04)' } : null)}
