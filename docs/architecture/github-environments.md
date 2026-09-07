@@ -4,7 +4,7 @@ Issue: [#1377](https://github.com/richardorchard/QueenZone.Modern/issues/1377) (
 
 This is the durable map of GitHub Environments used by QueenZone Actions. Environments live only in GitHub Settings today; workflows reference them by exact name. Create and protect an environment **before** merging a workflow that first references it — GitHub auto-creates an unprotected environment on first use.
 
-Do **not** merge workflow PRs that introduce or retarget production environments until `prod-release`, `prod-deploy`, `prod-google-play`, and `prod-data-read` exist with variables/secrets copied and the custom deployment policies below applied.
+The four production environments exist (Gilfoyle / Delivery, #1377). Each uses **custom** deployment policies (`custom_branch_policies=true`, `protected_branches=false`). Environment **secret counts are 0 by design**: `BITWARDEN_SECRETS_MANAGER_ACCESS_TOKEN` stays a repository secret. Only environment **variables** (Bitwarden UUID→name maps, ARM IDs, Sentry) live on the environments.
 
 ## Why not rename `dev` / `deploy` in place
 
@@ -25,14 +25,14 @@ Production `dotnet ef database update` stays on `deploy.yml` `migrate` (tag `v*`
 
 ## Production environments
 
-| Environment | Purpose | Secrets / variables (copy from) | Protection | Workflows / jobs |
+| Environment | Purpose | Environment variables (confirmed) | Protection | Workflows / jobs |
 | --- | --- | --- | --- | --- |
-| `prod-release` | Production migrate + zip deploy | From legacy `dev`: `BITWARDEN_SECRETS_MANAGER_ACCESS_TOKEN` (if stored on the environment; repo-level token is also used), `BITWARDEN_APP_SERVICE_DEPLOY_SECRETS`. Bitwarden mapping must yield `AZURE_WEBAPP_PUBLISH_PROFILE`, `QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING`, and `MOBILE_AUTH_SIGNING_KEY`. | **Custom** branch `main` + tags `v*` | `deploy.yml` `migrate`; `deploy.yml` `deploy` |
-| `prod-deploy` | ARM/OIDC App Service settings | From legacy `deploy`: `ARM_CLIENT_ID`, `ARM_TENANT_ID`, `ARM_SUBSCRIPTION_ID`. `configure-app-settings` also needs Bitwarden token + `BITWARDEN_APP_SERVICE_DEPLOY_SECRETS` (for `MOBILE_AUTH_SIGNING_KEY`). | **Custom** branch `main` + tags `v*` | `deploy.yml` `configure-app-settings`; `app-service-setting-names-check.yml` |
-| `prod-google-play` | Play signing / store upload | From legacy `deploy` (Play-related only): Bitwarden token, `BITWARDEN_MOBILE_BUILD_SECRETS`, `SENTRY_DSN`, `SENTRY_ORG`, `SENTRY_PROJECT`. Mapping must yield Android keystore outputs, `SENTRY_AUTH_TOKEN`, and `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`. Do **not** copy ARM OIDC vars here. | **Custom** branch `main` | `publish-android-google-play.yml` `publish-android` only |
-| `prod-data-read` | Read production to refresh/resync the SQL Express mirror | From legacy `dev`: Bitwarden token + `BITWARDEN_APP_SERVICE_DEPLOY_SECRETS` so sqlpackage can read `QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING`. | **Custom** branch `main` (scheduled runs use the default branch) | `nightly-legacy-checks.yml` `sync-legacy-db`; `test-migrations-against-mirror.yml` `resync-mirror` only |
+| `prod-release` | Production migrate + zip deploy | `BITWARDEN_APP_SERVICE_DEPLOY_SECRETS` (publish profile, migration connection string, `MOBILE_AUTH_SIGNING_KEY`, and the rest of that mapping). Repo-level Bitwarden token. | **Custom** branch `main` + tags `v*` | `deploy.yml` `migrate`; `deploy.yml` `deploy` |
+| `prod-deploy` | ARM/OIDC App Service settings | `ARM_CLIENT_ID`, `ARM_TENANT_ID`, `ARM_SUBSCRIPTION_ID` only. No ARM vars on any other prod environment. `configure-app-settings` still reads the repo-level Bitwarden token + repo/environment mapping for `MOBILE_AUTH_SIGNING_KEY` when that job also fetches Bitwarden. | **Custom** branch `main` + tags `v*` | `deploy.yml` `configure-app-settings`; `app-service-setting-names-check.yml` |
+| `prod-google-play` | Play signing / store upload | `BITWARDEN_MOBILE_BUILD_SECRETS` plus Sentry vars (`SENTRY_DSN`, `SENTRY_ORG`, `SENTRY_PROJECT`). Mapping yields Android keystore outputs, `SENTRY_AUTH_TOKEN`, and `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`. **No ARM.** | **Custom** branch `main` | `publish-android-google-play.yml` `publish-android` only |
+| `prod-data-read` | Read production to refresh/resync the SQL Express mirror | Narrow Bitwarden map: publish profile + migration connection string **only** (not the probe-password / mobile-auth entries). Repo-level Bitwarden token. | **Custom** branch `main` (scheduled runs use the default branch) | `nightly-legacy-checks.yml` `sync-legacy-db`; `test-migrations-against-mirror.yml` `resync-mirror` only |
 
-`SIXLABORS_LICENSE_KEY` stays a **repository** secret (workflow `env:`), not an environment secret.
+`SIXLABORS_LICENSE_KEY` and `BITWARDEN_SECRETS_MANAGER_ACCESS_TOKEN` stay **repository** secrets. Do not add environment secrets to these four environments unless a later split requires it.
 
 Development App Service environments (`dev-migrate`, `dev-deploy`, `dev-data-refresh`) are unchanged. See [`dev-curated-snapshot.md`](dev-curated-snapshot.md) and [`opentofu-dev-environment.md`](opentofu-dev-environment.md).
 
