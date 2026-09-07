@@ -35,7 +35,10 @@ describe('Maestro device flows (#1281)', () => {
 
   it('leaves the archive search story before the forum flow switches tabs', () => {
     const search = readMaestro('flows/06-archive-search.yaml');
-    assert.match(search, /id: news-story-screen[\s\S]*id: news-story-back[\s\S]*id: news-screen/);
+    assert.match(
+      search,
+      /id: news-story-screen[\s\S]*id: news-story-back[\s\S]*id: news-screen[\s\S]*id: tab-home[\s\S]*id: search-screen[\s\S]*platform: Android[\s\S]*- back[\s\S]*platform: iOS[\s\S]*text: '\^Home\$'[\s\S]*id: home-screen/,
+    );
   });
 
   it('dismisses the iOS Open-in-QueenZone confirm after smoke-auth and attach', () => {
