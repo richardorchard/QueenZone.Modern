@@ -17,6 +17,11 @@ if ($actualVersion -ne $expectedVersion) {
     throw "OpenTofu $expectedVersion is required; found $actualVersion."
 }
 
+& (Join-Path $PSScriptRoot "Test-AzureMigrationTargetCapacity.ps1") -SelfTest
+if ($LASTEXITCODE -ne 0) {
+    throw "Azure migration target capacity self-test failed."
+}
+
 & $tofu.Source fmt -check -recursive $infraPath
 if ($LASTEXITCODE -ne 0) {
     throw "OpenTofu formatting failed."

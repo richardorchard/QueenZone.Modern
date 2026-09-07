@@ -70,6 +70,7 @@ run "migration_target_uses_write_only_password_and_defers_database" {
 
   variables {
     create_sql_server_with_write_only_password = true
+    blob_service_is_preexisting                = false
     manage_sql_database                        = false
     sql_server_name                            = "queenzone-prod-sql"
     storage_account_name                       = "queenzoneprod"
@@ -78,5 +79,10 @@ run "migration_target_uses_write_only_password_and_defers_database" {
   assert {
     condition     = length(azapi_resource.sql_server) == 0 && length(azurerm_mssql_server.created) == 1 && length(azurerm_mssql_database.production) == 0
     error_message = "The migration target must create its server with the write-only password and defer the database until Azure copy completes."
+  }
+
+  assert {
+    condition     = length(azapi_resource.blob_service) == 0 && length(azapi_update_resource.blob_service_settings) == 1
+    error_message = "A new StorageV2 account must patch its automatically created blob service instead of creating the child again."
   }
 }

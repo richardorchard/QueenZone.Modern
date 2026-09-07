@@ -129,6 +129,12 @@ variable "manage_blob_service" {
   default     = true
 }
 
+variable "blob_service_is_preexisting" {
+  description = "Whether the default blob service predates this apply and must be managed as an imported resource. New StorageV2 accounts create this child automatically and must patch it instead."
+  type        = bool
+  default     = true
+}
+
 variable "containers" {
   description = "Live Blob container ACLs approved for import. None means private; test and missing future UGC containers are excluded."
   type        = map(string)

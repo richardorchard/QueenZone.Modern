@@ -28,6 +28,18 @@ has passed its checks. Never run `tofu destroy` against either estate.
 
 ## Stage 1: build the parallel target
 
+The production apply plan runs `Test-AzureMigrationTargetCapacity.ps1` before
+the approval gate. If the target App Service plan or SQL logical server does
+not yet exist, the check fails closed unless the requested App Service SKU has
+enough regional capacity and Azure SQL reports logical-server provisioning as
+available for the subscription.
+
+On **7 September 2026**, the first eastus apply stopped with B1 capacity at
+`0/0` and Azure SQL status `Visible` with `ProvisioningDisabled`. It created
+only the target Storage account, Log Analytics workspace, and Application
+Insights component. Request B1 quota of at least one instance and an Azure SQL
+regional provisioning exception before retrying.
+
 The initial configuration keeps the imported `module.azure_web` and
 `module.azure_data` unchanged. `module.azure_web_target` and
 `module.azure_data_target` create the parallel resources. The candidate app

@@ -85,6 +85,19 @@ jobs:
           tofu_version: 1.12.5
           tofu_wrapper: false
 
+      - name: Azure login for migration capacity preflight
+        if: matrix.root == 'production'
+        uses: azure/login@v3
+        with:
+          client-id: ${{ vars.ARM_CLIENT_ID }}
+          tenant-id: ${{ vars.ARM_TENANT_ID }}
+          subscription-id: ${{ vars.ARM_SUBSCRIPTION_ID }}
+
+      - name: Check migration target capacity
+        if: matrix.root == 'production'
+        shell: pwsh
+        run: ./scripts/Test-AzureMigrationTargetCapacity.ps1
+
       - name: Format, safety, init, and validate
         shell: pwsh
         run: ./scripts/Test-OpenTofu.ps1
