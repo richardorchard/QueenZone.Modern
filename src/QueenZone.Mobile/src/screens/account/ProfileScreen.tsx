@@ -142,6 +142,7 @@ export function ProfileScreen({ navigation }: Props) {
         title="Messages"
         value={unreadCount > 0 ? String(unreadCount) : undefined}
         accessibilityLabel={messagesA11yLabel(unreadCount)}
+        testID={testIds.profileMessages}
         onPress={() => navigation.navigate('Inbox')}
       />
       <SettingsRow title="My submissions" onPress={() => navigation.navigate('MySubmissions')} />

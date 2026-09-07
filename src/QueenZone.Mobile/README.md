@@ -6,6 +6,7 @@ supported platforms. This project is not part of `QueenZone.sln`.
 Decisions: [ADR 0009](../../docs/decisions/0009-react-native-for-mobile-app.md),
 [ADR 0011](../../docs/decisions/0011-mobile-project-location-and-build-tooling.md),
 [ADR 0012](../../docs/decisions/0012-react-navigation-app-shell.md).
+API versioning / store-lag: [ADR 0019](../../docs/decisions/0019-api-versioning-convention.md).
 Host toolchain: [mobile development environment](../../docs/mobile-development-environment.md).
 
 ## Pinned versions
@@ -170,7 +171,7 @@ writes `extra.appEnv` and `extra.apiBaseUrl`; runtime code reads them via
 | `EXPO_PUBLIC_APP_ENV` | Default API origin |
 | --- | --- |
 | `development` (default) | `http://localhost:5146` (local `QueenZone.Web`) |
-| `staging` | `https://www.queenzone.org` |
+| `staging` | `https://dev.queenzone.org` |
 | `production` | `https://www.queenzone.org` |
 
 Override the origin for any environment without code changes:
@@ -195,7 +196,8 @@ Physical devices need your machine's LAN IP in `EXPO_PUBLIC_API_BASE_URL`.
 The Profile screen (Home masthead avatar) shows the active `appEnv` and resolved origin for a quick check.
 
 Call sites should use `apiV1Url('/content/news')` (or `getAppConfig().apiBaseUrl`)
-rather than hard-coding hosts.
+rather than hard-coding hosts. Path versioning and how long v1 stays live:
+[ADR 0019](../../docs/decisions/0019-api-versioning-convention.md).
 
 ## Crash and error monitoring
 
@@ -490,6 +492,9 @@ It is **not** a substitute for `npm test` (#833), consumer contracts
 live site, Azure SQL, real OAuth, Metro in CI, or member passwords.
 Local `expo start` + Debug remains for developers; device smoke/journeys
 never install `app-debug.apk` or `Debug-iphonesimulator`.
+The Release smoke embed starts signed out and keeps its seeded smoke token in
+memory; it never restores from or writes to the device keychain. Debug and all
+staging/production builds retain the normal SecureStore session lifecycle.
 
 | Smoke is | Smoke is not |
 | --- | --- |
@@ -545,7 +550,9 @@ transport loss only when Maestro reports an Unknown-error result plus a dead or
 offline device before any assertion. It recovers ADB, reinstalls the same APK,
 and preserves the first diagnostics. An iOS driver startup may likewise retry
 once only when no JUnit file exists; the harness reboots the Simulator and
-preserves the first driver log.
+preserves the first driver log. The authenticated smoke flow repeats only the
+iOS smoke-auth deep link when the profile explicitly remains signed out after
+the system Open prompt; it does not repeat failed app assertions.
 
 On-demand journeys (`maestro/journeys.yaml`, #1071–#1074) are a
 **separate job pair** in the same workflow: `Mobile Android device

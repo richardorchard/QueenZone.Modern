@@ -1,10 +1,11 @@
 appId: org.queenzone.mobile
 ---
-# iOS 26 Simulator still shows "Open in QueenZone?" after simctl openurl of
-# queenzone:// on a fresh install (#1281). No-op when the dialog is absent.
+# iOS 26 Simulator shows "Open in QueenZone?" asynchronously after simctl
+# openurl of queenzone:// on a fresh install (#1281). Its alert title is not
+# consistently exposed to XCTest, but the exact Open button is.
 - runFlow:
     when:
-      visible: 'Open in .*QueenZone'
+      platform: iOS
     commands:
       - tapOn:
           text: '^Open$'

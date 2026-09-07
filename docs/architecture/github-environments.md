@@ -8,12 +8,12 @@ The four production environments exist (Gilfoyle / Delivery, #1377). Each uses *
 
 ## Why not rename `dev` / `deploy` in place
 
-GitHub can rename an environment and keep its secrets and variables. That is the wrong move here:
+GitHub can rename an environment and keep its secrets and variables. That was the wrong move here:
 
-- Legacy `dev` is being **split**. It previously gated production migrate + zip deploy (`deploy.yml`), PR-time production Azure SQL writes (`ci.yml`), production reads that refresh the SQL Express mirror, and vestigial mirror-only probe jobs. One rename cannot express those four trust boundaries.
-- Legacy `deploy` is being **split**. It previously gated the production ARM/OIDC identity **and** Google Play signing/upload. Those credentials must not share an environment.
+- Legacy `dev` was **split**. It previously gated production migrate + zip deploy (`deploy.yml`), PR-time production Azure SQL writes (`ci.yml`), production reads that refresh the SQL Express mirror, and vestigial mirror-only probe jobs. One rename cannot express those four trust boundaries.
+- Legacy `deploy` was **split**. It previously gated the production ARM/OIDC identity **and** Google Play signing/upload. Those credentials must not share an environment.
 
-Leave the legacy `dev` and `deploy` environments in Settings until every workflow reference is gone and a tag-based production release has succeeded. Then delete them in a follow-up (see [Legacy environment retirement](#legacy-environment-retirement)).
+Those names are **deleted in Settings** (verified 2026-09-07). Workflows use `prod-release`, `prod-deploy`, `prod-google-play`, and `prod-data-read`. Do not recreate `dev` or `deploy`. See [Legacy environment retirement](#legacy-environment-retirement).
 
 ## Option B: PR-time Azure SQL writes stop
 
@@ -59,15 +59,15 @@ GitHub Environments are **not** managed in `infra/` today (`github_repository_en
 
 ## Legacy environment retirement
 
-Do **not** delete legacy `dev` or `deploy` in the #1377 workflow PR.
+Issue [#1394](https://github.com/richardorchard/QueenZone.Modern/issues/1394). #1377 remapped workflows; Gilfoyle deleted the leftover Settings names. This repo slice records that — it does not gate Settings delete.
 
-Post-merge checklist (separate follow-up):
+`gh api repos/richardorchard/QueenZone.Modern/environments` on 2026-09-07: **`dev` and `deploy` are absent**. Live names: `dev-data-refresh`, `dev-deploy`, `dev-migrate`, `opentofu-apply`, `opentofu-plan`, `prod-data-read`, `prod-deploy`, `prod-google-play`, `prod-release`.
 
-1. Search the default branch: no `environment: dev`, `environment: deploy`, `name: dev`, or `name: deploy` remains under `.github/workflows/` (ignore `dev-migrate` / `dev-deploy` / `dev-data-refresh` and `deploy-dev.yml`).
-2. A `v*` production release has succeeded using `prod-release` + `prod-deploy`.
-3. `publish-android-google-play.yml` has succeeded on `main` using `prod-google-play` (or is confirmed unused and still remapped).
-4. Nightly `sync-legacy-db` and an optional `test-migrations-against-mirror` resync have succeeded using `prod-data-read`.
-5. Then delete `dev` and `deploy` in GitHub Settings so a stale workflow cannot silently recreate them.
+1. Done. Exact workflow search on `main` is clean: no `environment: dev`, `environment: deploy`, `name: dev`, or `name: deploy` under `.github/workflows/` (kept `dev-migrate` / `dev-deploy` / `dev-data-refresh` and `deploy-dev.yml`).
+2. Done. Tag `v2026.09.07.1` succeeded using `prod-release` + `prod-deploy`.
+3. Done. `publish-android-google-play.yml` succeeded on `main` using `prod-google-play` (Play run `34095308960`).
+4. Done. Nightly `sync-legacy-db` succeeded using `prod-data-read` (Nightly Sync `34096958201`).
+5. Done. Gilfoyle deleted `dev` and `deploy` in Settings (API list above) and removed the Entra FIC subject `environment:deploy`. If either environment name reappears, a stale workflow auto-created it — delete it again in Settings; flip this sentence only.
 
 ## Required status check rename
 
