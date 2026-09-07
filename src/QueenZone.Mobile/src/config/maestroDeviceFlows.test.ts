@@ -76,6 +76,16 @@ describe('device-smoke harness (#1281)', () => {
     assert.match(script, /debug-driver-startup-first/);
     assert.match(script, /App flows are not retried/);
   });
+
+  it('retries only an Android transport failure before an assertion', () => {
+    const script = readRepo('run-mobile-device-smoke.sh', scriptsDir);
+    assert.match(script, /<failure>Unknown error<\/failure>/);
+    assert.match(script, /Device server died\|device offline/);
+    assert.match(script, /debug-android-transport-first/);
+    assert.match(script, /adb reconnect offline/);
+    assert.match(script, /adb install -r "\$apk"/);
+    assert.match(script, /app assertions are not retried/);
+  });
 });
 
 describe('device-smoke Release embed (#1322)', () => {

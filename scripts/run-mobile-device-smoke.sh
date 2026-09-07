@@ -12,8 +12,8 @@
 #   ./scripts/run-mobile-device-smoke.sh --platform android --prove-failure
 #   ./scripts/run-mobile-device-smoke.sh --platform android --suite journeys
 #
-# Maestro flows are not retried. A single emulator/simulator boot failure is
-# the runner's problem (android-emulator-runner / simctl), not a test retry.
+# Maestro app assertions are not retried. One pre-assertion Android transport
+# failure or iOS driver-startup failure may retry after device recovery.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -465,6 +465,47 @@ set +e
 run_maestro_once
 maestro_status=$?
 set -e
+
+# Hosted Android emulators can drop off ADB while Maestro launches the app,
+# before an assertion runs. Run 34068859241 failed in four seconds with an
+# Unknown-error JUnit result and DeviceServerDiedException/device offline in
+# Maestro's debug log. Preserve that attempt, recover ADB, reinstall the same
+# APK, and retry once. Selector and other in-flow failures stay single-attempt.
+android_maestro_log="$(find "$results_dir/debug" -path '*/logs/maestro.log' -type f -print -quit 2>/dev/null || true)"
+if [ "$platform" = "android" ] \
+  && [ "$maestro_status" -ne 0 ] \
+  && [ -n "$android_maestro_log" ] \
+  && grep -q '<failure>Unknown error</failure>' "$results_dir/junit.xml" \
+  && grep -Eq 'Device server died|device offline' "$android_maestro_log"; then
+  echo "Maestro lost the Android device before an assertion; recovering ADB and retrying once."
+  if [ -d "$results_dir/debug" ]; then
+    mv "$results_dir/debug" "$results_dir/debug-android-transport-first"
+  fi
+  if [ -f "$results_dir/junit.xml" ]; then
+    mv "$results_dir/junit.xml" "$results_dir/junit-android-transport-first.xml"
+  fi
+  adb reconnect offline || true
+  adb kill-server || true
+  adb start-server
+  android_ready=false
+  for _ in $(seq 1 45); do
+    if [ "$(adb get-state 2>/dev/null || true)" = "device" ] \
+      && [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; then
+      android_ready=true
+      break
+    fi
+    sleep 2
+  done
+  if [ "$android_ready" = true ]; then
+    adb install -r "$apk"
+    set +e
+    run_maestro_once
+    maestro_status=$?
+    set -e
+  else
+    echo "Android emulator did not return online after the Maestro transport failure." >&2
+  fi
+fi
 
 # Hosted macOS occasionally exits Maestro's xcodebuild driver process before
 # XCTest starts listening. Run 34061996744 failed this way, while the same
