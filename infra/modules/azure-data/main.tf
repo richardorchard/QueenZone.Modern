@@ -2,7 +2,26 @@ locals {
   sql_server_id = var.existing_sql_server_id != null ? var.existing_sql_server_id : (
     var.create_sql_server_with_write_only_password ? azurerm_mssql_server.created[0].id : azapi_resource.sql_server[0].id
   )
-  blob_service_id = var.manage_blob_service ? azapi_resource.blob_service[0].id : "${azapi_resource.storage_account.id}/blobServices/default"
+  blob_service_id = var.manage_blob_service && var.blob_service_is_preexisting ? azapi_resource.blob_service[0].id : "${azapi_resource.storage_account.id}/blobServices/default"
+  blob_service_body = {
+    properties = {
+      containerDeleteRetentionPolicy = {
+        days    = 7
+        enabled = true
+      }
+      cors = {
+        corsRules = []
+      }
+      deleteRetentionPolicy = {
+        allowPermanentDelete = false
+        days                 = 7
+        enabled              = true
+      }
+      staticWebsite = {
+        enabled = false
+      }
+    }
+  }
 }
 
 resource "azapi_resource" "sql_server" {
@@ -215,37 +234,33 @@ resource "azapi_resource" "storage_account" {
 }
 
 resource "azapi_resource" "blob_service" {
-  count = var.manage_blob_service ? 1 : 0
+  count = var.manage_blob_service && var.blob_service_is_preexisting ? 1 : 0
 
   type      = "Microsoft.Storage/storageAccounts/blobServices@2026-04-01"
   name      = "default"
   parent_id = azapi_resource.storage_account.id
 
-  body = {
-    properties = {
-      containerDeleteRetentionPolicy = {
-        days    = 7
-        enabled = true
-      }
-      cors = {
-        corsRules = []
-      }
-      deleteRetentionPolicy = {
-        allowPermanentDelete = false
-        days                 = 7
-        enabled              = true
-      }
-      staticWebsite = {
-        enabled = false
-      }
-    }
-  }
+  body = local.blob_service_body
 
   response_export_values = []
 
   lifecycle {
     prevent_destroy = true
   }
+}
+
+# A new StorageV2 account creates blobServices/default automatically. Patch
+# that child after account creation instead of attempting a second create.
+# Imported estates retain azapi_resource.blob_service above so their existing
+# state address and prevent_destroy protection remain unchanged.
+resource "azapi_update_resource" "blob_service_settings" {
+  count = var.manage_blob_service && !var.blob_service_is_preexisting ? 1 : 0
+
+  type        = "Microsoft.Storage/storageAccounts/blobServices@2026-04-01"
+  resource_id = "${azapi_resource.storage_account.id}/blobServices/default"
+  body        = local.blob_service_body
+
+  response_export_values = []
 }
 
 resource "azapi_resource" "container" {
