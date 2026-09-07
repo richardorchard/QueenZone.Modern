@@ -73,9 +73,14 @@ the secret name.
 
 ### `BITWARDEN_APP_SERVICE_DEPLOY_SECRETS`
 
-Used by `.github/workflows/deploy.yml` (`migrate` and `deploy` jobs), `.github/workflows/ci.yml`
-(`ef-migrations` job — same-repo PRs touching migration paths only), and
-`.github/workflows/nightly-legacy-checks.yml` (`sync-legacy-db` and `legacy-read-probes` jobs):
+Used by `.github/workflows/deploy.yml` (`migrate` and `deploy` on `prod-release`;
+`configure-app-settings` on `prod-deploy`), `.github/workflows/nightly-legacy-checks.yml`
+(`sync-legacy-db` on `prod-data-read`; `legacy-read-probes` and macOS `ui-e2e-realdata`
+via repository-level token/mapping for the SQL Express probe password only), and
+`.github/workflows/test-migrations-against-mirror.yml` (`resync-mirror` on `prod-data-read`).
+`ci.yml` `ef-migrations` does **not** use this mapping — it applies to the SQL Express
+mirror with Integrated Security (issue #1377 Option B). See
+[`docs/architecture/github-environments.md`](architecture/github-environments.md):
 
 ```yaml
 743274c8-1837-4abd-b223-b4980080709f > AZURE_WEBAPP_PUBLISH_PROFILE
