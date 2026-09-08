@@ -251,6 +251,60 @@ describe('ComposerScreen', () => {
     }
   });
 
+  it('uses a pending smoke attachment when Inject is pressed', async () => {
+    mockAppConfig.appEnv = 'development';
+    renderComposer({ threadId: 1002, threadTitle: 'Ranking every studio album' });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Files' })).toBeOnTheScreen());
+
+    fireEvent.press(screen.getByTestId(testIds.forumComposerAttachFiles));
+    stashSmokeAttachAsset({
+      uri: 'file:///tmp/pending.txt',
+      name: 'pending.txt',
+      mimeType: 'text/plain',
+    });
+    fireEvent.press(screen.getByTestId(testIds.forumComposerAttachInject));
+
+    await waitFor(() => expect(screen.getByText('pending.txt')).toBeOnTheScreen());
+    expect(writeAsStringAsync).not.toHaveBeenCalled();
+  });
+
+  it('shows an attachment error when Android cannot create the smoke fixture', async () => {
+    const originalOs = Platform.OS;
+    Object.defineProperty(Platform, 'OS', { configurable: true, value: 'android' });
+    mockAppConfig.appEnv = 'development';
+    (writeAsStringAsync as jest.Mock).mockRejectedValue(new Error('cache unavailable'));
+    try {
+      renderComposer({ threadId: 1002, threadTitle: 'Ranking every studio album' });
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Files' })).toBeOnTheScreen());
+
+      fireEvent.press(screen.getByTestId(testIds.forumComposerAttachFiles));
+      fireEvent.press(screen.getByTestId(testIds.forumComposerAttachInject));
+
+      await waitFor(() => expect(screen.getByText('Could not open the file picker.')).toBeOnTheScreen());
+      expect(screen.queryByTestId(testIds.forumComposerAttachment)).toBeNull();
+    } finally {
+      Object.defineProperty(Platform, 'OS', { configurable: true, value: originalOs });
+    }
+  });
+
+  it('uses the copied Documents fixture when Inject is pressed on iOS', async () => {
+    const originalOs = Platform.OS;
+    Object.defineProperty(Platform, 'OS', { configurable: true, value: 'ios' });
+    mockAppConfig.appEnv = 'development';
+    try {
+      renderComposer({ threadId: 1002, threadTitle: 'Ranking every studio album' });
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Files' })).toBeOnTheScreen());
+
+      fireEvent.press(screen.getByTestId(testIds.forumComposerAttachFiles));
+      fireEvent.press(screen.getByTestId(testIds.forumComposerAttachInject));
+
+      await waitFor(() => expect(screen.getByText('attach.txt')).toBeOnTheScreen());
+      expect(writeAsStringAsync).not.toHaveBeenCalled();
+    } finally {
+      Object.defineProperty(Platform, 'OS', { configurable: true, value: originalOs });
+    }
+  });
+
   it('consumes a pending smoke-attach file when Files is tapped in Debug', async () => {
     mockAppConfig.appEnv = 'development';
     stashSmokeAttachAsset({
