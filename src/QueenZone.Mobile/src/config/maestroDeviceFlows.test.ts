@@ -207,6 +207,10 @@ describe('device-smoke harness (#1281)', () => {
 
   it('releases Gradle memory and isolates hosted from P0 Android runners', () => {
     const workflow = readRepo('mobile-device-smoke.yml', workflowsDir);
+    const releaseJob = workflow.slice(
+      workflow.indexOf('  mobile-android-release:'),
+      workflow.indexOf('  mobile-ios-journeys:'),
+    );
     assert.equal((workflow.match(/\.\/gradlew --stop/g) ?? []).length, 3);
     assert.equal((workflow.match(/api-level: 36/g) ?? []).length, 2);
     assert.equal((workflow.match(/-gpu swiftshader_indirect/g) ?? []).length, 2);
@@ -214,6 +218,7 @@ describe('device-smoke harness (#1281)', () => {
     assert.match(workflow, /mobile-android-release:[\s\S]*github\.event\.inputs\.suite == 'release'/);
     assert.match(workflow, /mobile-android-release:[\s\S]*Export installed Android SDK/);
     assert.match(workflow, /ANDROID_HOME=\$SDK_ROOT/);
+    assert.doesNotMatch(releaseJob, /actions\/cache/);
   });
 
   it('boots and targets a dedicated hardware-rendered Android release emulator', () => {
