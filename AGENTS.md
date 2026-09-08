@@ -12,6 +12,7 @@ This repository is the modern QueenZone rebuild. The project is archive-first: i
 - `docs/architecture/opentofu-inventory.md` is the live Azure/Cloudflare ownership inventory for OpenTofu adoption (`infra/import/` holds sanitised IDs).
 - `docs/architecture/opentofu-contributor-runbook.md` is the OpenTofu operating contract, including `prevent_destroy` on SQL, Storage, and other irreplaceable resources. OpenTofu does not manage blob objects or SQL rows, and it will not automatically refuse to destroy a data store unless that lifecycle flag is set.
 - `docs/architecture/github-environments.md` is the GitHub Environment map (purpose, secrets/vars, protection, workflows). Production Actions use `prod-release`, `prod-deploy`, `prod-google-play`, and `prod-data-read` — not legacy `dev` / `deploy`.
+- `docs/architecture/codeql.md` is the default CodeQL scan contract: Expo Android modules are path-ignored and `java-kotlin` is skipped because no first-party Java/Kotlin remains (#1418 Option A). Do not add an Android SDK CodeQL build.
 - `docs/decisions/0007-rich-text-editor-quill.md` is the shared Quill rich-text editor decision (partial + `/api/uploads/editor-image`).
 - `docs/architecture/json-api-v1.md` is the versioned `/api/v1` JSON API contract (pagination, Problem Details, OpenAPI).
 - `docs/decisions/0019-api-versioning-convention.md` is the mobile/store-lag operational convention (breaking → `/api/v2` alongside v1; keep v1 while installed store builds depend on it). Complements [ADR 0010](docs/decisions/0010-versioned-json-api-conventions.md).
