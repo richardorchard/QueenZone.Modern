@@ -74,7 +74,9 @@ function hideTabBarIfDetail(
   };
 }
 
-/** Archive uses `{ always: true }` so a later tab press lands on ArchiveHub, not leftover Timeline. */
+/** Archive and Forum use `{ always: true }` so a later tab press lands on
+ * the tab root, not leftover Timeline / Category (#1387). */
+
 export function reselectRoot(
   tabName: keyof RootTabParamList,
   screen: string,
@@ -189,7 +191,7 @@ function MainTabs() {
           tabBarIcon: tabIcon(MessageSquare),
           ...hideTabBarIfDetail(visibleTabBarStyle, route, 'ForumIndex'),
         })}
-        listeners={reselectRoot('ForumTab', 'ForumIndex')}
+        listeners={reselectRoot('ForumTab', 'ForumIndex', { always: true })}
       />
     </Tab.Navigator>
   );
