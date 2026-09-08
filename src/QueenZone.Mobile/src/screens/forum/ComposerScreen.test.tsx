@@ -119,6 +119,13 @@ describe('ComposerScreen', () => {
     );
   });
 
+  it('exposes a Maestro testID on the reply body, not only placeholder copy', async () => {
+    renderComposer({ threadId: 1002, threadTitle: 'Ranking every studio album' });
+    await waitFor(() => expect(screen.getByTestId(testIds.forumComposerBody)).toBeOnTheScreen());
+    expect(screen.getByLabelText('Reply body')).toBeOnTheScreen();
+    expect(screen.getByPlaceholderText('Write a reply')).toBeOnTheScreen();
+  });
+
   it('publishes a reply and goes back', async () => {
     const { navigation } = renderComposer({ threadId: 1002, threadTitle: 'Ranking every studio album' });
 
