@@ -7,6 +7,7 @@ import { Platform, View, type ViewStyle } from 'react-native';
 import { SignInScreen } from '../screens/account/SignInScreen';
 import { testIds } from '../test/testIds';
 import { useTheme } from '../theme';
+import { EnvBanner } from '../ui/EnvBanner';
 import { NotificationBridge } from '../notifications/NotificationBridge';
 import { NewsShareBridge } from '../share/news/NewsShare';
 import { WidgetLinkBridge } from '../widgets/WidgetLinkBridge';
@@ -201,22 +202,24 @@ export function RootNavigator() {
   const { c } = useTheme();
   return (
     <View style={{ flex: 1 }}>
-      <RootStack.Navigator screenOptions={{ headerShown: false }}>
-        <RootStack.Screen name="Tabs" component={MainTabs} />
-        <RootStack.Screen
-          name="SignIn"
-          component={SignInScreen}
-          options={({ navigation }) => ({
-            ...stackScreenOptions(c),
-            headerShown: true,
-            title: 'Sign in',
-            presentation: 'fullScreenModal',
-            headerLeft: () => (
-              <HeaderCloseButton testID={testIds.signInClose} onPress={() => navigation.goBack()} />
-            ),
-          })}
-        />
-      </RootStack.Navigator>
+      <EnvBanner>
+        <RootStack.Navigator screenOptions={{ headerShown: false }}>
+          <RootStack.Screen name="Tabs" component={MainTabs} />
+          <RootStack.Screen
+            name="SignIn"
+            component={SignInScreen}
+            options={({ navigation }) => ({
+              ...stackScreenOptions(c),
+              headerShown: true,
+              title: 'Sign in',
+              presentation: 'fullScreenModal',
+              headerLeft: () => (
+                <HeaderCloseButton testID={testIds.signInClose} onPress={() => navigation.goBack()} />
+              ),
+            })}
+          />
+        </RootStack.Navigator>
+      </EnvBanner>
       <NotificationBridge />
       <NewsShareBridge />
       <WidgetLinkBridge />

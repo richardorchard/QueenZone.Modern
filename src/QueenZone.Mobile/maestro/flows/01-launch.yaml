@@ -13,3 +13,9 @@ appId: org.queenzone.mobile
     visible:
       id: home-hero
     timeout: 30000
+# Reserved non-prod bar (#1407). Smoke embeds show it; assert via env-banner
+# so it cannot collide with home-screen / home-hero / home-profile.
+- extendedWaitUntil:
+    visible:
+      id: env-banner
+    timeout: 10000

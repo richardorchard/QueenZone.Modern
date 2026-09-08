@@ -60,6 +60,7 @@ public class SmokeTests : E2EPageTest
 
         await Expect(Page.GetByText("Latest news")).ToBeVisibleAsync();
         await Expect(Page.Locator("a.qz-card[href='/news']")).ToBeVisibleAsync();
+        await Expect(Page.Locator("[data-testid='env-banner']")).ToHaveTextAsync("LOCAL");
 
         await AssertNoEncodingArtifactsAsync();
     }
