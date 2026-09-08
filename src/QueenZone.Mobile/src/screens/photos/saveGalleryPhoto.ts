@@ -8,10 +8,10 @@ export const saveGalleryPhotoCopy = {
 } as const;
 
 /**
- * Public CDN GET (no Authorization) → cache file → add-only Photos.
+ * Public CDN GET (no Authorization) → cache file.
  * Refuses non-`cdn.queenzone.org` URLs the same way the viewer does.
  */
-export async function saveGalleryPhoto(imageUrl: string, signal?: AbortSignal): Promise<void> {
+export async function cacheGalleryPhoto(imageUrl: string, signal?: AbortSignal): Promise<string> {
   const source = photoCdnSource(imageUrl);
   if (!source) {
     throw new Error(saveGalleryPhotoCopy.refused);
@@ -33,7 +33,12 @@ export async function saveGalleryPhoto(imageUrl: string, signal?: AbortSignal): 
   }
 
   const bytes = new Uint8Array(await response.arrayBuffer());
-  const fileUri = await writeCachedLocalFile(galleryCacheFileName(source.uri), bytes);
+  return writeCachedLocalFile(galleryCacheFileName(source.uri), bytes);
+}
+
+/** Public CDN GET (no Authorization) → cache file → add-only Photos. */
+export async function saveGalleryPhoto(imageUrl: string, signal?: AbortSignal): Promise<void> {
+  const fileUri = await cacheGalleryPhoto(imageUrl, signal);
   await saveLocalFileToPhotos(fileUri);
 }
 
