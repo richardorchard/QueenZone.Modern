@@ -258,8 +258,10 @@ public sealed class SearchReindexBuilderTests
         var indexService = new InMemorySearchIndexService(store);
         var authorId = Guid.NewGuid();
         var articleSubmissionRepository = new InMemoryArticleSubmissionRepository();
+        var longBody = "Full body about studio sessions and the making of the album. " +
+            string.Concat(Enumerable.Repeat("Extra detail padding this out. ", 10));
         var published = await articleSubmissionRepository.UpsertDraftAsync(new ArticleSubmissionDraft(
-            null, authorId, "Community feature about studio work", "Excerpt text", "Body about the album sessions.", null, null));
+            null, authorId, "Community feature about studio work", "Excerpt text", longBody, null, null));
         await articleSubmissionRepository.SubmitForReviewAsync(published.Id, authorId);
         await articleSubmissionRepository.UpdateStatusAsync(
             published.Id, ArticleSubmissionStatus.ApprovedForPublishing, "reviewer@queenzone.test", null, null);
