@@ -112,6 +112,22 @@ describe('InboxScreen', () => {
     expect(navigation.navigate).toHaveBeenCalledWith('Archived');
   });
 
+  it('starts a new message from the inbox action', async () => {
+    const navigation = fakeNavigation();
+    mockSession.isSignedIn = true;
+    mockSession.accessToken = 'tok';
+    fetchInboxMock.mockResolvedValueOnce(pagedResponse([], 1, 0));
+    renderWithProviders(
+      <InboxScreen navigation={navigation as never} route={{ key: 'inbox', name: 'Inbox' } as never} />,
+    );
+    await waitFor(() => expect(screen.getByText('You have no private messages yet.')).toBeOnTheScreen());
+
+    const user = userEvent.setup();
+    await user.press(screen.getByTestId('inbox-compose'));
+
+    expect(navigation.navigate).toHaveBeenCalledWith('ComposeMessage');
+  });
+
   it('archives a conversation from the inbox row and refreshes the list', async () => {
     mockSession.isSignedIn = true;
     mockSession.accessToken = 'tok';
