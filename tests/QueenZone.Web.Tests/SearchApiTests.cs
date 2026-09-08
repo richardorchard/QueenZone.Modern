@@ -98,6 +98,66 @@ public sealed class SearchApiTests : IClassFixture<QueenZoneWebApplicationFactor
     }
 
     [Fact]
+    public async Task Search_type_biography_returns_chapter_mentioning_bohemian_rhapsody()
+    {
+        using var client = factory.CreateAnonymousClient();
+
+        using var response = await client.GetAsync($"{SearchApiEndpoints.Path}?q=Bohemian%20Rhapsody&type=biography");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<ApiPagedResponse<SearchResultDto>>();
+        Assert.NotNull(payload);
+        Assert.NotEmpty(payload!.Items);
+        Assert.All(payload.Items, item => Assert.Equal(SiteSearchContentType.Biography, item.ContentType));
+        Assert.Contains(
+            payload.Items,
+            item => item.Title == "1975"
+                && item.SourceKey == "biography:3"
+                && item.Url.Contains("/biography/", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Search_type_discography_returns_album_for_bohemian_rhapsody()
+    {
+        using var client = factory.CreateAnonymousClient();
+
+        using var response = await client.GetAsync($"{SearchApiEndpoints.Path}?q=Bohemian%20Rhapsody&type=discography");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<ApiPagedResponse<SearchResultDto>>();
+        Assert.NotNull(payload);
+        Assert.NotEmpty(payload!.Items);
+        Assert.All(payload.Items, item => Assert.Equal(SiteSearchContentType.Discography, item.ContentType));
+        Assert.Contains(
+            payload.Items,
+            item => item.Title == "A Night at the Opera"
+                && item.SourceKey == "discography:4"
+                && item.Url == "/discography/albums/4/a-night-at-the-opera");
+    }
+
+    [Fact]
+    public async Task Search_type_article_is_not_aliased_to_legacy_article()
+    {
+        using var client = factory.CreateAnonymousClient();
+
+        using var articleResponse = await client.GetAsync($"{SearchApiEndpoints.Path}?q=Bohemian%20Rhapsody&type=article");
+        using var legacyResponse = await client.GetAsync($"{SearchApiEndpoints.Path}?q=Bohemian%20Rhapsody&type=legacy-article");
+
+        Assert.Equal(HttpStatusCode.OK, articleResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, legacyResponse.StatusCode);
+        var articles = await articleResponse.Content.ReadFromJsonAsync<ApiPagedResponse<SearchResultDto>>();
+        var legacy = await legacyResponse.Content.ReadFromJsonAsync<ApiPagedResponse<SearchResultDto>>();
+        Assert.NotNull(articles);
+        Assert.NotNull(legacy);
+        Assert.All(articles!.Items, item => Assert.Equal(SiteSearchContentType.Article, item.ContentType));
+        Assert.DoesNotContain(articles.Items, item => item.ContentType == SiteSearchContentType.LegacyArticle);
+        Assert.Contains(
+            legacy!.Items,
+            item => item.ContentType == SiteSearchContentType.LegacyArticle
+                && item.Title == "Inside the Making of Bohemian Rhapsody");
+    }
+
+    [Fact]
     public async Task Search_type_news_hides_forum_paths()
     {
         using var client = factory.CreateAnonymousClient();
