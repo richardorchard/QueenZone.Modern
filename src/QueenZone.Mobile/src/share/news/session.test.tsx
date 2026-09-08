@@ -317,6 +317,26 @@ describe('news share session', () => {
     expect(await createNewsShareStore(storage).read()).toBeNull();
   });
 
+  it('does not reopen a replayed choose fingerprint after cancel', async () => {
+    const { session, store } = controller();
+    const text = 'https://example.com/a https://example.com/b';
+    await session.capture({ text, hasFiles: false });
+    expect(session.view().kind).toBe('choose');
+    await session.capture({ text, hasFiles: false });
+    expect(session.view().kind).toBe('choose');
+
+    const choose = session.view();
+    if (choose.kind === 'choose') {
+      choose.cancel();
+    }
+    await session.flush();
+    expect(session.view().kind).toBe('idle');
+
+    await session.capture({ text, hasFiles: false });
+    expect(session.view().kind).toBe('idle');
+    expect(await store.read()).toBeNull();
+  });
+
   it('still opens a new URL after the previous share was cleared', async () => {
     const { session } = controller();
     await session.capture({ webUrl: httpsUrl, hasFiles: false });
