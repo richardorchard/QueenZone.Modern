@@ -14,6 +14,7 @@ system_image="${ANDROID_RELEASE_SYSTEM_IMAGE:-system-images;android-36;google_ap
 results_dir="src/QueenZone.Mobile/maestro-results"
 rm -rf "$results_dir"
 mkdir -p "$results_dir"
+printf 'avd=%s\nserial=%s\n' "$avd_name" "$serial" > "$results_dir/harness.log"
 
 emulator_bin="$(command -v emulator || true)"
 if [ -z "$emulator_bin" ] && [ -n "${ANDROID_HOME:-}" ]; then

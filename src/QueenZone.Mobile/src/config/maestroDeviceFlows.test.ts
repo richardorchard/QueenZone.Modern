@@ -228,6 +228,7 @@ describe('device-smoke harness (#1281)', () => {
     assert.match(runner, /ANDROID_RELEASE_EMULATOR_PORT:-5556/);
     assert.match(runner, /Another Android emulator is active/);
     assert.match(runner, /rm -rf "\$results_dir"/);
+    assert.match(runner, /> "\$results_dir\/harness\.log"/);
     assert.match(runner, /avdmanager.*create avd/);
     assert.match(runner, /-gpu host/);
     assert.match(runner, /MAESTRO_TARGET_DEVICE="\$serial"/);
