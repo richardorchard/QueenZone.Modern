@@ -7,16 +7,15 @@
 }
 
 <div class="admin-shell">
+  <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
   <div class="admin-form-panel">
     <h1>Edit photo #@photo.PicId</h1>
-    <p>
-      <a href="/admin/photos">Back to photos</a>
-      @if (photo.IsVisible)
-      {
-        <text> · </text>
+    @if (photo.IsVisible)
+    {
+      <p>
         <a href="/photography/@photo.CategorySlug/@photo.PicId" target="_blank" rel="noopener">View public page</a>
-      }
-    </p>
+      </p>
+    }
 
     @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
     {

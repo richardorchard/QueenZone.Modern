@@ -14,6 +14,8 @@ public sealed class PreviewModel(
 
     public NewsDiscoveryProvenance? DiscoveryProvenance { get; private set; }
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
+
     public async Task<IActionResult> OnGetAsync(int id, CancellationToken cancellationToken)
     {
         Article = await adminNewsRepository.GetByIdAsync(id, cancellationToken);
@@ -36,6 +38,7 @@ public sealed class PreviewModel(
 
         Item = ToNewsDetailItem(Article);
         ViewData["Title"] = $"Preview: {Article.Title}";
+        Breadcrumbs = AdminBreadcrumbs.Page("News articles", "/admin/news", "Preview");
         ViewData["CanonicalPath"] = NewsArticleContent.GetDetailCanonicalPath(
             Item.Id,
             Item.Title,

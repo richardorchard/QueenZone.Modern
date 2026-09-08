@@ -55,6 +55,7 @@ public sealed class IndexModel(
         if (errors.Count > 0)
         {
             ViewData["Title"] = "Create news article";
+            Breadcrumbs = AdminBreadcrumbs.Page("News articles", "/admin/news", "Create news article");
             CreateForm = NewModel.BuildForm(
                 draft,
                 errors,

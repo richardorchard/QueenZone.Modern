@@ -12,6 +12,8 @@ public sealed class EditPostModel(
 
     public HomePollAdminDetail? Poll { get; private set; }
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
+
     public async Task<IActionResult> OnPostAsync(
         Guid id,
         [FromForm] AdminPollForm form,
@@ -33,6 +35,7 @@ public sealed class EditPostModel(
         if (errors.Count > 0)
         {
             ViewData["Title"] = "Edit poll";
+            Breadcrumbs = AdminBreadcrumbs.Page("Home polls", "/admin/polls", "Edit poll");
             Poll = existing;
             Form = EditModel.BuildForm(existing, draft, errors);
             return Page();
@@ -45,6 +48,7 @@ public sealed class EditPostModel(
         catch (HomePollException ex)
         {
             ViewData["Title"] = "Edit poll";
+            Breadcrumbs = AdminBreadcrumbs.Page("Home polls", "/admin/polls", "Edit poll");
             Poll = existing;
             Form = EditModel.BuildForm(existing, draft, [ex.Message]);
             return Page();

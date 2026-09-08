@@ -8,9 +8,12 @@ public sealed class NewModel : AdminNewsPageModel
         new AdminNewsDraft(string.Empty, null, string.Empty, string.Empty, DateTime.UtcNow.Date, null),
         null);
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
+
     public void OnGet()
     {
         ViewData["Title"] = "Create news article";
+        Breadcrumbs = AdminBreadcrumbs.Page("News articles", "/admin/news", "Create news article");
     }
 
     public static ArticleFormViewModel BuildForm(

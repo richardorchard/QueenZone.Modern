@@ -11,6 +11,7 @@
 <div class="admin-shell" id="search-index-admin"
      data-phase="@jobPhase"
      data-running="@(Model.IsRunning ? "true" : "false")">
+  <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
   <h1>Search index</h1>
 
   @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))

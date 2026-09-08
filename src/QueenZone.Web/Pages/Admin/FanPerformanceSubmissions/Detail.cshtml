@@ -11,8 +11,8 @@
 }
 
 <div class="admin-shell">
+  <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
   <h1>Review fan performance submission</h1>
-  <p><a href="/admin/fan-performance-submissions">Back to queue</a></p>
 
   @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
   {

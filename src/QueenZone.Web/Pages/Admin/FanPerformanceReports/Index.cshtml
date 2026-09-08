@@ -3,10 +3,8 @@
 @using QueenZone.Data
 
 <div class="admin-shell">
+  <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
   <h1>Fan performance reports</h1>
-  <p>
-    <a href="/admin">Back to admin</a>
-  </p>
   <p>
     Listener reports of published fan performances. Hide unpublishes the row (<code>DISPLAY = 0</code>)
     without deleting the audio blob. This queue is separate from the submission review queue.

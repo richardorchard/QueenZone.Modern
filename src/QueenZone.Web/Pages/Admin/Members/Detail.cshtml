@@ -6,10 +6,9 @@
 }
 
 <div class="admin-shell">
+  <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
   <h1>@Model.Member!.DisplayName</h1>
   <p>
-    <a href="/admin/members">Back to members</a>
-    &middot;
     <a href="/members/@Model.Member.Id">View public profile</a>
   </p>
 

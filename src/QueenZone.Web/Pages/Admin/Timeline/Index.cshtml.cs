@@ -28,12 +28,15 @@ public sealed class IndexModel(
 
     public string? StatusMessageKind { get; private set; }
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
+
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
         Events = await historyRepository.GetPageAsync(BuildFilter(), PageNumber, PageSize, cancellationToken);
         StatusMessage = TempData[MessageKey] as string;
         StatusMessageKind = TempData[MessageKindKey] as string;
         ViewData["Title"] = "Timeline";
+        Breadcrumbs = AdminBreadcrumbs.Section("Timeline", "/admin/timeline");
     }
 
     public async Task<IActionResult> OnPostAsync(

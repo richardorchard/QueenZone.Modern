@@ -10,6 +10,8 @@ public sealed class EditPostModel(
 {
     public TriviaFormViewModel? Form { get; private set; }
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = AdminBreadcrumbs.Page("Trivia", "/admin/trivia", "Edit trivia fact");
+
     public async Task<IActionResult> OnPostAsync(
         int id,
         [FromForm] AdminTriviaForm form,

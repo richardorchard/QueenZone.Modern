@@ -8,9 +8,12 @@ public sealed class NewModel : AdminQuotePageModel
         new AdminQuoteDraft(string.Empty, string.Empty, true, null),
         null);
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
+
     public void OnGet()
     {
         ViewData["Title"] = "Add quote";
+        Breadcrumbs = AdminBreadcrumbs.Page("Quotes", "/admin/quotes", "New quote");
     }
 
     public static QuoteFormViewModel BuildForm(AdminQuoteDraft draft, IReadOnlyList<string>? errors) =>

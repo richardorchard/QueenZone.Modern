@@ -24,6 +24,8 @@ public abstract class AdminNewsListPageModel(IAdminNewsRepository adminNewsRepos
 
     public ArchivePaginationViewModel? Pagination { get; private set; }
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; protected set; } = [];
+
     protected async Task<IActionResult> LoadListPageAsync(int page, CancellationToken cancellationToken)
     {
         if (page < 1)
@@ -48,6 +50,7 @@ public abstract class AdminNewsListPageModel(IAdminNewsRepository adminNewsRepos
         StatusMessage = TempData[AdminNewsMessages.MessageKey] as string;
         StatusMessageKind = TempData[AdminNewsMessages.MessageKindKey] as string;
         ViewData["Title"] = CurrentPage <= 1 ? "Admin news" : $"Admin news – Page {CurrentPage}";
+        Breadcrumbs = AdminBreadcrumbs.Section("News articles", "/admin/news");
         return Page();
     }
 }

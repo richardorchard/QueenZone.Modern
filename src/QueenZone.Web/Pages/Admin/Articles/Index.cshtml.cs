@@ -8,11 +8,14 @@ public sealed class IndexModel(IArticleSubmissionRepository articleSubmissionRep
     public IReadOnlyList<EditorialArticle> EditorialArticles { get; private set; } = [];
     public IReadOnlyList<ArticleItem> LegacyArticles { get; private set; } = [];
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
+
     public async Task OnGetAsync(int page = 1, CancellationToken cancellationToken = default)
     {
         Submissions = await articleSubmissionRepository.GetPendingAsync(Math.Max(1, page), 50, cancellationToken);
         EditorialArticles = await editorialArticles.GetAllAsync(cancellationToken);
         LegacyArticles = await LoadAllLegacyArchiveAsync(legacyArticles, cancellationToken);
         ViewData["Title"] = "Articles";
+        Breadcrumbs = AdminBreadcrumbs.Section("Articles", "/admin/articles");
     }
 }
