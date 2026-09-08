@@ -1,4 +1,4 @@
-import { act, screen, userEvent, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, screen, userEvent, waitFor } from '@testing-library/react-native';
 import { Platform } from 'react-native';
 import { fetchPhotoDetail } from '../../api';
 import { ApiError } from '../../api/client';
@@ -495,15 +495,14 @@ describe('PhotoViewerScreen Android wallpaper', () => {
 
   it('opens a Home / Lock / Both sheet and sets the chosen target', async () => {
     await loadPhoto();
-    const user = userEvent.setup();
-    await user.press(screen.getByTestId(testIds.photoViewerWallpaper));
+    fireEvent.press(screen.getByTestId(testIds.photoViewerWallpaper));
     expect(screen.getByTestId(testIds.photoViewerWallpaperSheet)).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: wallpaperCopy.home })).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: wallpaperCopy.lock })).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: wallpaperCopy.both })).toBeOnTheScreen();
     expect(savePhoto).not.toHaveBeenCalled();
 
-    await user.press(screen.getByTestId(testIds.photoViewerWallpaperHome));
+    fireEvent.press(screen.getByTestId(testIds.photoViewerWallpaperHome));
     await waitFor(() =>
       expect(setWallpaper).toHaveBeenCalledWith(
         'https://cdn.queenzone.org/brian-may/img-101.jpg',
@@ -516,9 +515,8 @@ describe('PhotoViewerScreen Android wallpaper', () => {
 
   it('sets lock and both from the sheet', async () => {
     await loadPhoto();
-    const user = userEvent.setup();
-    await user.press(screen.getByTestId(testIds.photoViewerWallpaper));
-    await user.press(screen.getByTestId(testIds.photoViewerWallpaperLock));
+    fireEvent.press(screen.getByTestId(testIds.photoViewerWallpaper));
+    fireEvent.press(screen.getByTestId(testIds.photoViewerWallpaperLock));
     await waitFor(() =>
       expect(setWallpaper).toHaveBeenCalledWith(
         'https://cdn.queenzone.org/brian-may/img-101.jpg',
@@ -526,8 +524,8 @@ describe('PhotoViewerScreen Android wallpaper', () => {
       ),
     );
 
-    await user.press(screen.getByTestId(testIds.photoViewerWallpaper));
-    await user.press(screen.getByTestId(testIds.photoViewerWallpaperBoth));
+    fireEvent.press(screen.getByTestId(testIds.photoViewerWallpaper));
+    fireEvent.press(screen.getByTestId(testIds.photoViewerWallpaperBoth));
     await waitFor(() =>
       expect(setWallpaper).toHaveBeenCalledWith(
         'https://cdn.queenzone.org/brian-may/img-101.jpg',
@@ -539,18 +537,16 @@ describe('PhotoViewerScreen Android wallpaper', () => {
   it('shows a lock-target error instead of a silent no-op', async () => {
     setWallpaper.mockRejectedValueOnce(new Error(wallpaperCopy.lockFailed));
     await loadPhoto();
-    const user = userEvent.setup();
-    await user.press(screen.getByTestId(testIds.photoViewerWallpaper));
-    await user.press(screen.getByTestId(testIds.photoViewerWallpaperLock));
+    fireEvent.press(screen.getByTestId(testIds.photoViewerWallpaper));
+    fireEvent.press(screen.getByTestId(testIds.photoViewerWallpaperLock));
     await waitFor(() => expect(screen.getByText(wallpaperCopy.lockFailed)).toBeOnTheScreen());
     expect(screen.queryByText(wallpaperCopy.androidSet)).toBeNull();
   });
 
   it('cancels the sheet without setting wallpaper', async () => {
     await loadPhoto();
-    const user = userEvent.setup();
-    await user.press(screen.getByTestId(testIds.photoViewerWallpaper));
-    await user.press(screen.getByTestId(testIds.photoViewerWallpaperCancel));
+    fireEvent.press(screen.getByTestId(testIds.photoViewerWallpaper));
+    fireEvent.press(screen.getByTestId(testIds.photoViewerWallpaperCancel));
     expect(screen.queryByTestId(testIds.photoViewerWallpaperSheet)).toBeNull();
     expect(setWallpaper).not.toHaveBeenCalled();
     expect(savePhoto).not.toHaveBeenCalled();
