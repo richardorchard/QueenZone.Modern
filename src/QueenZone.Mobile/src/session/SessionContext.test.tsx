@@ -639,6 +639,22 @@ describe('SessionProvider', () => {
     expect(screen.getByText('no-token')).toBeOnTheScreen();
   });
 
+  it('fail-opens a hung development restore so Profile is not stuck restoring', async () => {
+    jest.useFakeTimers();
+    try {
+      readStored.mockReturnValue(new Promise(() => {}));
+      renderSession();
+      expect(screen.getByText('restoring')).toBeOnTheScreen();
+      await act(async () => {
+        jest.advanceTimersByTime(5_000);
+      });
+      expect(screen.getByText('signed-out')).toBeOnTheScreen();
+      expect(clearStored).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('does not sign out when a locked keychain blocks restore, and retries on active', async () => {
     const locked = Object.assign(new Error('User interaction is not allowed'), {
       name: 'KeyChainException',

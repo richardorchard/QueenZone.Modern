@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 import { createRequire } from 'node:module';
+import { resolveSmokeEmbedFlag } from './smokeEmbedFlag.ts';
 
 type EnvBag = Record<string, string | undefined>;
 
@@ -125,5 +126,17 @@ describe('app.config smoke embed wiring', () => {
     assert.match(appConfigSource, /QUEENZONE_MOBILE_SMOKE_EMBED|smokeEmbed/);
     assert.match(appConfigSource, /'\.\/plugins\/smokeEmbed\.cjs'/);
     assert.match(appConfigSource, /smokeEmbed: smokeEmbed \|\| undefined/);
+    assert.match(appConfigSource, /EXPO_PUBLIC_SMOKE_EMBED/);
+  });
+});
+
+describe('resolveSmokeEmbedFlag', () => {
+  it('accepts baked extra or a Metro-inlined EXPO_PUBLIC_SMOKE_EMBED token', () => {
+    assert.equal(resolveSmokeEmbedFlag({}, {}), false);
+    assert.equal(resolveSmokeEmbedFlag({ smokeEmbed: true }, {}), true);
+    assert.equal(resolveSmokeEmbedFlag({ smokeEmbed: 'true' }, {}), true);
+    assert.equal(resolveSmokeEmbedFlag({}, { EXPO_PUBLIC_SMOKE_EMBED: '1' }), true);
+    assert.equal(resolveSmokeEmbedFlag({}, { EXPO_PUBLIC_SMOKE_EMBED: 'true' }), true);
+    assert.equal(resolveSmokeEmbedFlag({}, { EXPO_PUBLIC_SMOKE_EMBED: '0' }), false);
   });
 });

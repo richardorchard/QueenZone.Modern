@@ -98,13 +98,12 @@ describe('RootNavigator', () => {
     expect(ref.getCurrentRoute()?.name).toBe('ArchiveHub');
   });
 
-  it('keeps News, Photos, and Forum reselect behind the focused-tab guard', () => {
+  it('keeps News and Photos reselect behind the focused-tab guard', () => {
     const navigate = jest.fn();
     const preventDefault = jest.fn();
     for (const [tab, screen] of [
       ['NewsTab', 'NewsIndex'],
       ['PhotosTab', 'PhotoIndex'],
-      ['ForumTab', 'ForumIndex'],
     ] as const) {
       const listeners = reselectRoot(tab, screen)({
         navigation: { isFocused: () => false, navigate },
@@ -119,8 +118,38 @@ describe('RootNavigator', () => {
       navigation: { isFocused: () => true, navigate },
     });
     newsFocused.tabPress({ preventDefault });
-    expect(navigate).toHaveBeenCalledWith('NewsTab', { screen: 'NewsIndex' });
-    expect(preventDefault).not.toHaveBeenCalled();
+    expect(navigate).toHaveBeenCalledWith('NewsTab', { screen: 'NewsIndex', initial: false });
+    expect(preventDefault).toHaveBeenCalledTimes(1);
+  });
+
+  it('always pops Forum to ForumIndex, including a leftover Category stack', () => {
+    const navigate = jest.fn();
+    const preventDefault = jest.fn();
+    const listeners = reselectRoot('ForumTab', 'ForumIndex', { always: true })({
+      navigation: { isFocused: () => false, navigate },
+    });
+    listeners.tabPress({ preventDefault });
+    expect(preventDefault).toHaveBeenCalledTimes(1);
+    expect(navigate).toHaveBeenCalledWith('ForumTab', { screen: 'ForumIndex', initial: false });
+  });
+
+  it('pressing Forum after a board visit lands on ForumIndex, not leftover Category', () => {
+    const ref = createNavigationContainerRef();
+    renderWithProviders(
+      <NavigationContainer ref={ref}>
+        <ForumTabRaceTabs />
+      </NavigationContainer>,
+      { navigation: false },
+    );
+
+    fireEvent.press(screen.getByRole('button', { name: 'Open board' }));
+    expect(ref.getCurrentRoute()?.name).toBe('Category');
+
+    fireEvent.press(screen.getByLabelText('Home'));
+    expect(ref.getCurrentRoute()?.name).toBe('HomeTab');
+
+    fireEvent.press(screen.getByLabelText('Forum'));
+    expect(ref.getCurrentRoute()?.name).toBe('ForumIndex');
   });
 });
 
@@ -198,4 +227,65 @@ function TimelineRaceScreen() {
 
 function TimelineEventRaceScreen() {
   return <Text>Timeline event</Text>;
+}
+
+const Forum = createNativeStackNavigator();
+
+function ForumTabRaceTabs() {
+  return (
+    <Tab.Navigator>
+      <Tab.Screen
+        name="HomeTab"
+        component={ForumHomeTabRaceScreen}
+        options={{ title: 'Home', tabBarAccessibilityLabel: 'Home' }}
+      />
+      <Tab.Screen
+        name="ForumTab"
+        component={ForumTabRaceStack}
+        options={{ title: 'Forum', tabBarAccessibilityLabel: 'Forum' }}
+        listeners={reselectRoot('ForumTab', 'ForumIndex', { always: true })}
+      />
+    </Tab.Navigator>
+  );
+}
+
+function ForumHomeTabRaceScreen({
+  navigation,
+}: {
+  navigation: {
+    navigate: (
+      name: 'ForumTab',
+      params: ReturnType<typeof nestedTabParams<'Category', { id: number }>>,
+    ) => void;
+  };
+}) {
+  return (
+    <>
+      <Text>Home screen</Text>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Open board"
+        onPress={() => navigation.navigate('ForumTab', nestedTabParams('Category', { id: 1 }))}
+      >
+        <Text>Open board</Text>
+      </Pressable>
+    </>
+  );
+}
+
+function ForumTabRaceStack() {
+  return (
+    <Forum.Navigator>
+      <Forum.Screen name="ForumIndex" component={ForumIndexRaceScreen} />
+      <Forum.Screen name="Category" component={ForumCategoryRaceScreen} />
+    </Forum.Navigator>
+  );
+}
+
+function ForumIndexRaceScreen() {
+  return <Text>Forum boards</Text>;
+}
+
+function ForumCategoryRaceScreen() {
+  return <Text>The Music</Text>;
 }

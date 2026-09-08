@@ -41,6 +41,12 @@ import {
   flushOfflineQueue,
 } from '../offlineQueue';
 import {
+  developmentSessionRestoreTimeoutMs,
+  isSessionRestoreTimeoutError,
+  sessionRestoreTimeoutLabel,
+  withTimeout,
+} from './restoreTimeout';
+import {
   clearStoredSession,
   isKeychainLockedError,
   readStoredSession,
@@ -329,8 +335,22 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       try {
         let stored: StoredSession | null;
         try {
-          stored = await readStoredSession();
+          stored =
+            getAppConfig().appEnv === 'development'
+              ? await withTimeout(
+                  readStoredSession(),
+                  developmentSessionRestoreTimeoutMs,
+                  sessionRestoreTimeoutLabel,
+                )
+              : await readStoredSession();
         } catch (error) {
+          if (isSessionRestoreTimeoutError(error)) {
+            // Simulator SecureStore can hang instead of resolving. Fail open so
+            // Profile is not stuck on "Restoring your session…" (#1387).
+            lockedPending = false;
+            setSession({ ...signedOut, isRestoring: false });
+            return;
+          }
           if (isKeychainLockedError(error)) {
             // Keep isRestoring. A locked read is not sign-out and must not unhandled-reject.
             lockedPending = true;

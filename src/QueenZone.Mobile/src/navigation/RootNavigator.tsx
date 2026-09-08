@@ -74,7 +74,10 @@ function hideTabBarIfDetail(
   };
 }
 
-/** Archive uses `{ always: true }` so a later tab press lands on ArchiveHub, not leftover Timeline. */
+/** Archive and Forum use `{ always: true }` so a later tab press lands on the
+ * index, not a leftover Category / Timeline. `initial: false` is required so
+ * Android's native stack pops to the existing root instead of no-opping
+ * `navigate({ screen })` on an already-mounted tab (#1387). */
 export function reselectRoot(
   tabName: keyof RootTabParamList,
   screen: string,
@@ -85,17 +88,21 @@ export function reselectRoot(
   }: {
     navigation: {
       isFocused: () => boolean;
-      navigate: (name: keyof RootTabParamList, params: { screen: string }) => void;
+      navigate: (
+        name: keyof RootTabParamList,
+        params: { screen: string; initial: false },
+      ) => void;
     };
   }) => ({
     tabPress: (e: { preventDefault: () => void }) => {
       if (options?.always) {
         e.preventDefault();
-        navigation.navigate(tabName, { screen });
+        navigation.navigate(tabName, { screen, initial: false });
         return;
       }
       if (navigation.isFocused()) {
-        navigation.navigate(tabName, { screen });
+        e.preventDefault();
+        navigation.navigate(tabName, { screen, initial: false });
       }
     },
   });
@@ -189,7 +196,7 @@ function MainTabs() {
           tabBarIcon: tabIcon(MessageSquare),
           ...hideTabBarIfDetail(visibleTabBarStyle, route, 'ForumIndex'),
         })}
-        listeners={reselectRoot('ForumTab', 'ForumIndex')}
+        listeners={reselectRoot('ForumTab', 'ForumIndex', { always: true })}
       />
     </Tab.Navigator>
   );

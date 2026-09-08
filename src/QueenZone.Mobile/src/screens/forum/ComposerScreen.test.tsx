@@ -217,6 +217,14 @@ describe('ComposerScreen', () => {
     expect(DocumentPicker.getDocumentAsync).not.toHaveBeenCalled();
   });
 
+  it('shows the smoke inject control without waiting for Files in a development embed', async () => {
+    mockAppConfig.appEnv = 'development';
+    renderComposer({ threadId: 1002, threadTitle: 'Ranking every studio album' });
+    await waitFor(() => expect(screen.getByTestId(testIds.forumComposerAttachInject)).toBeOnTheScreen());
+    expect(screen.getByTestId(testIds.forumComposerBody)).toBeOnTheScreen();
+    expect(DocumentPicker.getDocumentAsync).not.toHaveBeenCalled();
+  });
+
   it('injects attach.txt after Files without opening the OEM picker in Debug', async () => {
     mockAppConfig.appEnv = 'development';
     renderComposer({ threadId: 1002, threadTitle: 'Ranking every studio album' });

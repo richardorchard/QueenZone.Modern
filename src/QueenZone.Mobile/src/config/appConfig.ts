@@ -10,6 +10,7 @@ import {
   rewriteLoopbackForAndroid,
   type AppEnvironment,
 } from './environments';
+import { resolveSmokeEmbedFlag } from './smokeEmbedFlag';
 
 export type AppConfig = {
   appEnv: AppEnvironment;
@@ -35,7 +36,7 @@ type ExpoExtra = {
   buildTimestampUtc?: string;
   buildRevision?: string;
   sentryDsn?: string;
-  smokeEmbed?: boolean;
+  smokeEmbed?: boolean | string;
 };
 
 function readExtra(): ExpoExtra {
@@ -52,7 +53,9 @@ function readSentryDsn(extra: ExpoExtra): string | undefined {
 /**
  * Resolved environment + API origin for the running build.
  * Prefer this over reading process.env in UI code — Metro inlines EXPO_PUBLIC_*
- * at bundle time, but `extra` is the single committed contract from app.config.
+ * at bundle time. `extra` is the committed contract from app.config; smokeEmbed
+ * also accepts `EXPO_PUBLIC_SMOKE_EMBED` so a Release embed does not wait on
+ * Constants.expoConfig being populated (#1387).
  */
 export function getAppConfig(): AppConfig {
   const extra = readExtra();
@@ -72,7 +75,7 @@ export function getAppConfig(): AppConfig {
     buildTimestampUtc: extra.buildTimestampUtc,
     buildRevision: extra.buildRevision,
     sentryDsn: readSentryDsn(extra),
-    smokeEmbed: extra.smokeEmbed === true,
+    smokeEmbed: resolveSmokeEmbedFlag(extra) || undefined,
   };
 }
 

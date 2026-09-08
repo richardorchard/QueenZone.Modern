@@ -4,6 +4,13 @@ appId: org.queenzone.mobile
     id: tab-home
 - tapOn:
     id: home-profile
+# Session restore can still be finishing when Profile mounts. Wait it out
+# before asserting signed-out — a hang is a product bug (#1387), a short
+# restore is not.
+- extendedWaitUntil:
+    notVisible:
+      id: profile-restoring
+    timeout: 20000
 - extendedWaitUntil:
     visible:
       id: profile-signed-out

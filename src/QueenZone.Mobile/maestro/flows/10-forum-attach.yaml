@@ -48,8 +48,9 @@ appId: org.queenzone.mobile
       id: forum-composer-attach-files
     timeout: 20000
 - tapOn:
-    text: Write a reply
+    id: forum-composer-body
 - inputText: Journey attach reply
+- hideKeyboard
 - tapOn:
     id: forum-composer-attach-files
 - extendedWaitUntil:

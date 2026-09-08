@@ -90,7 +90,6 @@ function ComposerForm({ navigation, route }: Props) {
   const [attachment, setAttachment] = useState<ComposerAttachment | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [awaitingInject, setAwaitingInject] = useState(false);
   const awaitingInjectRef = useRef(false);
 
   useLayoutEffect(() => {
@@ -135,7 +134,6 @@ function ComposerForm({ navigation, route }: Props) {
     }
     setAttachment(mapped);
     awaitingInjectRef.current = false;
-    setAwaitingInject(false);
   }, []);
 
   useEffect(() => {
@@ -194,7 +192,6 @@ function ComposerForm({ navigation, route }: Props) {
         return;
       }
       awaitingInjectRef.current = true;
-      setAwaitingInject(true);
       return;
     }
 
@@ -391,6 +388,7 @@ function ComposerForm({ navigation, route }: Props) {
           placeholder={mode === 'reply' ? 'Write a reply' : 'Write the first post'}
           placeholderTextColor={c.textMuted}
           accessibilityLabel={mode === 'reply' ? 'Reply body' : 'Topic body'}
+          testID={testIds.forumComposerBody}
           multiline
           textAlignVertical="top"
           style={[
@@ -434,7 +432,7 @@ function ComposerForm({ navigation, route }: Props) {
                   void pickFromFiles();
                 }}
               />
-              {smokeAttachAllowed() && awaitingInject ? (
+              {smokeAttachAllowed() && !attachment ? (
                 <Button
                   label={`Inject ${smokeAttachFileName}`}
                   size="sm"

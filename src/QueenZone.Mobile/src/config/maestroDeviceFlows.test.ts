@@ -31,6 +31,10 @@ describe('Maestro device flows (#1281)', () => {
     const authIdx = attach.indexOf('runFlow: open-smoke-auth.yaml');
     assert.ok(homeIdx >= 0 && authIdx > homeIdx);
     assert.match(attach, /id: tab-forum/);
+    assert.match(attach, /id: forum-composer-body/);
+    assert.doesNotMatch(attach, /text: Write a reply/);
+    assert.match(attach, /hideKeyboard/);
+    assert.match(attach, /id: forum-composer-attach-inject/);
   });
 
   it('leaves the archive search story before the forum flow switches tabs', () => {
@@ -64,6 +68,11 @@ describe('Maestro device flows (#1281)', () => {
     assert.match(
       authenticated,
       /id: home-profile[\s\S]*platform: iOS[\s\S]*visible:[\s\S]*id: profile-signed-out[\s\S]*openLink: \$\{SMOKE_AUTH_URL\}[\s\S]*id: profile-signed-in/,
+    );
+    const profile = readMaestro('flows/08-profile-signed-out.yaml');
+    assert.match(
+      profile,
+      /id: home-profile[\s\S]*id: profile-restoring[\s\S]*id: profile-signed-out/,
     );
     assert.match(authenticated, /id: profile-messages/);
     assert.match(readMaestro('flows/12-masthead-unread.yaml'), /open-smoke-auth\.yaml/);
@@ -132,6 +141,7 @@ describe('device-smoke Release embed (#1322)', () => {
     assert.match(workflow, /-configuration Release/);
     assert.match(workflow, /Products\/Release-iphonesimulator/);
     assert.match(workflow, /QUEENZONE_MOBILE_SMOKE_EMBED/);
+    assert.match(workflow, /EXPO_PUBLIC_SMOKE_EMBED/);
     assert.match(workflow, /SENTRY_DISABLE_AUTO_UPLOAD/);
     assert.doesNotMatch(workflow, /\.\/gradlew assembleDebug/);
     assert.doesNotMatch(workflow, /apk\/debug\/app-debug\.apk/);
@@ -144,6 +154,7 @@ describe('device-smoke Release embed (#1322)', () => {
     assert.match(script, /-configuration Release/);
     assert.match(script, /Release-iphonesimulator/);
     assert.match(script, /QUEENZONE_MOBILE_SMOKE_EMBED=1/);
+    assert.match(script, /EXPO_PUBLIC_SMOKE_EMBED=1/);
     assert.doesNotMatch(script, /\.\/gradlew assembleDebug/);
     assert.doesNotMatch(script, /apk\/debug\/app-debug\.apk/);
     assert.doesNotMatch(script, /-configuration Debug/);
