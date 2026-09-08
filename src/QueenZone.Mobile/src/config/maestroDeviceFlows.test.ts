@@ -141,6 +141,15 @@ describe('Maestro device flows (#1281)', () => {
     assert.match(newsStory, /text: '\^Try again\$'/);
     assert.match(newsStory, /id: news-story-screen/);
   });
+
+  it('locks Set as wallpaper in photo viewer chrome beside Save (#1409)', () => {
+    const photos = readMaestro('flows/05-photography.yaml');
+    assert.match(
+      photos,
+      /id: photo-viewer-screen[\s\S]*id: photo-viewer-wallpaper[\s\S]*id: photo-viewer-save[\s\S]*id: photo-viewer-close/,
+    );
+    assert.doesNotMatch(photos, /id: photo-viewer-wallpaper[\s\S]*tapOn:[\s\S]*photo-viewer-wallpaper/);
+  });
 });
 
 describe('device-smoke harness (#1281)', () => {

@@ -49,6 +49,12 @@ export const testIds = {
   photoViewerScreen: 'photo-viewer-screen',
   photoViewerClose: 'photo-viewer-close',
   photoViewerSave: 'photo-viewer-save',
+  photoViewerWallpaper: 'photo-viewer-wallpaper',
+  photoViewerWallpaperSheet: 'photo-viewer-wallpaper-sheet',
+  photoViewerWallpaperHome: 'photo-viewer-wallpaper-home',
+  photoViewerWallpaperLock: 'photo-viewer-wallpaper-lock',
+  photoViewerWallpaperBoth: 'photo-viewer-wallpaper-both',
+  photoViewerWallpaperCancel: 'photo-viewer-wallpaper-cancel',
 
   archiveHubScreen: 'archive-hub-screen',
   articleStoryScreen: 'article-story-screen',

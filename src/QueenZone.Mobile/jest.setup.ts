@@ -111,6 +111,10 @@ jest.mock('expo-media-library/legacy', () => ({
   saveToLibraryAsync: jest.fn(async () => {}),
 }));
 
+jest.mock('./modules/queenzone-wallpaper', () => ({
+  setWallpaper: jest.fn(async () => {}),
+}));
+
 jest.mock('expo-sharing', () => ({
   isAvailableAsync: jest.fn(async () => true),
   shareAsync: jest.fn(async () => {}),
