@@ -43,6 +43,8 @@ describe('Play publish workflow', () => {
     assert.match(verifyBeforeUpload, /base\/assets\/app\.config/);
     assert.match(verifyBeforeUpload, /AAB API target=/);
     assert.match(verifyBeforeUpload, /expected_api_base_url/);
+    assert.match(verifyBeforeUpload, /EXPO_PUBLIC_TELEMETRYDECK_APP_ID/);
+    assert.match(verifyBeforeUpload, /extra\.telemetryDeckAppId/);
   });
 });
 
@@ -59,5 +61,7 @@ describe('TestFlight publish workflow', () => {
     assert.match(testflight, /marketingVersionPrefix/);
     assert.match(testflight, /IPA API target=/);
     assert.match(testflight, /expected_api_base_url/);
+    assert.match(testflight, /EXPO_PUBLIC_TELEMETRYDECK_APP_ID/);
+    assert.match(testflight, /extra\.telemetryDeckAppId/);
   });
 });

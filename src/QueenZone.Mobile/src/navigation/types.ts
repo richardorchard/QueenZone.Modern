@@ -23,6 +23,7 @@ export type HomeStackParamList = {
   Quote: { id: number };
   Profile: undefined;
   Settings: undefined;
+  AnalyticsSettings: undefined;
   Contact: undefined;
   Inbox: undefined;
   Archived: undefined;

@@ -22,6 +22,8 @@ export type AppConfig = {
   buildRevision?: string;
   /** Public Sentry DSN baked at prebuild; unset keeps `initSentry()` a no-op. */
   sentryDsn?: string;
+  /** Public TelemetryDeck App ID; unset keeps product analytics disabled. */
+  telemetryDeckAppId?: string;
   /**
    * True when CI/local smoke prebuild set QUEENZONE_MOBILE_SMOKE_EMBED.
    * Lets Release-embedded Testing binaries accept queenzone://smoke-auth.
@@ -36,6 +38,7 @@ type ExpoExtra = {
   buildTimestampUtc?: string;
   buildRevision?: string;
   sentryDsn?: string;
+  telemetryDeckAppId?: string;
   smokeEmbed?: boolean | string;
 };
 
@@ -47,6 +50,13 @@ function readExtra(): ExpoExtra {
 function readSentryDsn(extra: ExpoExtra): string | undefined {
   const fromExtra = typeof extra.sentryDsn === 'string' ? extra.sentryDsn.trim() : '';
   const fromEnv = (process.env.EXPO_PUBLIC_SENTRY_DSN ?? '').trim();
+  return fromExtra || fromEnv || undefined;
+}
+
+function readTelemetryDeckAppId(extra: ExpoExtra): string | undefined {
+  const fromExtra =
+    typeof extra.telemetryDeckAppId === 'string' ? extra.telemetryDeckAppId.trim() : '';
+  const fromEnv = (process.env.EXPO_PUBLIC_TELEMETRYDECK_APP_ID ?? '').trim();
   return fromExtra || fromEnv || undefined;
 }
 
@@ -75,6 +85,7 @@ export function getAppConfig(): AppConfig {
     buildTimestampUtc: extra.buildTimestampUtc,
     buildRevision: extra.buildRevision,
     sentryDsn: readSentryDsn(extra),
+    telemetryDeckAppId: readTelemetryDeckAppId(extra),
     smokeEmbed: resolveSmokeEmbedFlag(extra) || undefined,
   };
 }
