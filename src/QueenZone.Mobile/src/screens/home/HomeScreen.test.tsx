@@ -22,7 +22,7 @@ import { testIds } from '../../test/testIds';
 import { HomeScreen } from './HomeScreen';
 
 const mockAppConfig = {
-  appEnv: 'development' as const,
+  appEnv: 'development' as 'development' | 'staging' | 'production',
   apiBaseUrl: 'http://qz.test',
   version: '0.1.0',
   buildTimestampUtc: undefined as string | undefined,
@@ -108,6 +108,8 @@ describe('HomeScreen', () => {
     mockSession.accessToken = null;
     mockAppConfig.version = '0.1.0';
     mockAppConfig.buildTimestampUtc = undefined;
+    mockAppConfig.appEnv = 'development';
+    mockAppConfig.apiBaseUrl = 'http://qz.test';
     fetchNews.mockResolvedValue(
       pagedResponse(
         [
@@ -559,6 +561,28 @@ describe('HomeScreen', () => {
     expect(footer).toBeOnTheScreen();
     expect(footer).toHaveTextContent('0.1.0');
     expect(within(screen.getByTestId(testIds.tabMasthead)).queryByTestId(testIds.homeVersion)).toBeNull();
+    await flushVirtualizedList();
+  });
+
+  it('shows the selected API target outside production', async () => {
+    mockAppConfig.appEnv = 'staging';
+    mockAppConfig.apiBaseUrl = 'https://dev.queenzone.org';
+    renderHome();
+
+    await waitFor(() => expect(screen.getByTestId(testIds.homeEnvironment)).toBeOnTheScreen());
+    expect(screen.getByTestId(testIds.homeEnvironment)).toHaveTextContent(
+      'STAGING · https://dev.queenzone.org',
+    );
+    await flushVirtualizedList();
+  });
+
+  it('does not show an environment banner for production', async () => {
+    mockAppConfig.appEnv = 'production';
+    mockAppConfig.apiBaseUrl = 'https://www.queenzone.org';
+    renderHome();
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Live Aid remembered' })).toBeOnTheScreen());
+    expect(screen.queryByTestId(testIds.homeEnvironment)).toBeNull();
     await flushVirtualizedList();
   });
 
