@@ -31,3 +31,11 @@ appId: org.queenzone.mobile
 - assertNotVisible:
     id: news-story-screen
 - assertNotVisible: Write a reply
+# Discussion switches to the Forum stack and hides the tab bar. Its back
+# control returns to the Forum root, ready for the following journey.
+- tapOn:
+    id: forum-thread-back
+- extendedWaitUntil:
+    visible:
+      id: forum-screen
+    timeout: 15000

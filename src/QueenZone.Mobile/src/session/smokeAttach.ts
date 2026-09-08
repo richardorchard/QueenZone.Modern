@@ -16,7 +16,7 @@ export const smokeAttachHost = 'smoke-attach';
 export const smokeAttachFileName = 'attach.txt';
 export const smokeAttachMimeType = 'text/plain';
 export const smokeAttachDefaultAndroidUri =
-  'file:///sdcard/Android/data/org.queenzone.mobile/files/attach.txt';
+  'file:///data/user/0/org.queenzone.mobile/cache/attach.txt';
 
 export type SmokeAttachAsset = {
   uri: string;

@@ -265,12 +265,11 @@ push_attach_fixture() {
   fi
 
   if [ "$platform" = "android" ]; then
-    adb shell mkdir -p /sdcard/Download
-    adb push "$src" /sdcard/Download/attach.txt >/dev/null
-    adb shell mkdir -p /sdcard/Android/data/org.queenzone.mobile/files
-    adb push "$src" /sdcard/Android/data/org.queenzone.mobile/files/attach.txt >/dev/null
+    # The smoke-only Inject action writes the fixture into the app cache.
+    # Android 16 denies Release apps access to shell-owned ADB-pushed files,
+    # including files placed under their external app-specific directory.
     SMOKE_ATTACH_URL="$(
-      node -e 'process.stdout.write("queenzone://smoke-attach?uri=" + encodeURIComponent("file:///sdcard/Android/data/org.queenzone.mobile/files/attach.txt") + "&name=attach.txt&type=text/plain")'
+      node -e 'process.stdout.write("queenzone://smoke-attach?uri=" + encodeURIComponent("file:///data/user/0/org.queenzone.mobile/cache/attach.txt") + "&name=attach.txt&type=text/plain")'
     )"
   else
     local data
@@ -403,12 +402,22 @@ if [ "$platform" = "android" ]; then
   echo "Installing $apk"
   adb wait-for-device
   adb install -r "$apk"
+  if [ "$suite" = "journeys" ]; then
+    # Clear before push_attach_fixture. Clearing from launchApp afterwards
+    # deletes the app-private attachment URI while leaving its UI metadata.
+    adb shell pm clear org.queenzone.mobile >/dev/null
+  fi
 else
   if [ -z "$app" ] || [ ! -d "$app" ]; then
     echo "iOS Simulator .app not found at '${app:-<empty>}'." >&2
     exit 1
   fi
   echo "Installing $app"
+  if [ "$suite" = "journeys" ]; then
+    # A Simulator install preserves an existing data container. Remove the
+    # prior install so journeys start clean before their fixture is copied.
+    xcrun simctl uninstall booted org.queenzone.mobile >/dev/null 2>&1 || true
+  fi
   xcrun simctl install booted "$app"
 fi
 

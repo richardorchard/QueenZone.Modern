@@ -6,6 +6,8 @@ appId: org.queenzone.mobile
 - runFlow:
     when:
       platform: iOS
+      visible:
+        text: '^Open$'
     commands:
       - tapOn:
           text: '^Open$'
