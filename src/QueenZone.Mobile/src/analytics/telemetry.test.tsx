@@ -5,7 +5,9 @@ import {
   resetAnalyticsForTests,
   trackDailyActive,
   trackSectionViewed,
+  updateAnalyticsConsent,
 } from './telemetry';
+import { resetAnalyticsConsentForTests } from './consent';
 
 const mockSignal = jest.fn(async () => new Response());
 const productionConfig = {
@@ -28,6 +30,8 @@ jest.mock('expo-crypto', () => ({
 describe('TelemetryDeck product analytics', () => {
   beforeEach(async () => {
     await AsyncStorage.clear();
+    resetAnalyticsConsentForTests();
+    await updateAnalyticsConsent(true);
     resetAnalyticsForTests(productionConfig);
     mockSignal.mockClear();
     (createTelemetryDeck as jest.Mock).mockClear();
@@ -99,6 +103,31 @@ describe('TelemetryDeck product analytics', () => {
     expect(createTelemetryDeck).not.toHaveBeenCalled();
     expect(Crypto.randomUUID).not.toHaveBeenCalled();
     expect(mockSignal).not.toHaveBeenCalled();
+  });
+
+  it('does not create an identity or send before consent', async () => {
+    await AsyncStorage.clear();
+    resetAnalyticsConsentForTests();
+    resetAnalyticsForTests(productionConfig);
+
+    await trackDailyActive(new Date('2026-09-08T01:00:00Z'));
+    await trackSectionViewed('home');
+
+    expect(createTelemetryDeck).not.toHaveBeenCalled();
+    expect(Crypto.randomUUID).not.toHaveBeenCalled();
+    expect(mockSignal).not.toHaveBeenCalled();
+  });
+
+  it('withdraws consent and removes the analytics-only device state', async () => {
+    await trackDailyActive(new Date('2026-09-08T01:00:00Z'));
+    expect(await AsyncStorage.getItem('queenzone.mobile.analyticsInstallationId')).not.toBeNull();
+
+    await updateAnalyticsConsent(false);
+    await trackSectionViewed('news');
+
+    expect(await AsyncStorage.getItem('queenzone.mobile.analyticsInstallationId')).toBeNull();
+    expect(await AsyncStorage.getItem('queenzone.mobile.analyticsLastActiveDay')).toBeNull();
+    expect(mockSignal).toHaveBeenCalledTimes(1);
   });
 
   it('marks configured non-production builds as test data', async () => {

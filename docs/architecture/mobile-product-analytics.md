@@ -30,6 +30,11 @@ be incomplete; no user-facing feature depends on delivery.
   derive country-level origin during ingestion. QueenZone requests no location
   permission and collects no precise location.
 - TelemetryDeck failures are swallowed locally and are not sent to Sentry.
+- No client or signal is created until the user selects **Allow anonymous
+  analytics**. Refusal is stored and does not trigger repeat prompts.
+- The public Profile screen exposes **Analytics preferences** to signed-in and
+  signed-out users. Withdrawal stops future signals and deletes the local
+  analytics installation ID and daily-active marker.
 - Normal development, tests, and smoke builds do not send events because the
   App ID is unset. Configured non-production builds use TelemetryDeck test mode.
 
@@ -43,3 +48,9 @@ is absent.
 The TelemetryDeck account must remain owned by Richard with no payment method
 or paid subscription. The free plan is dashboard-only for this feature; API
 reporting and automated exports are out of scope.
+
+Previously delivered events are anonymous and cannot be selected for
+per-person deletion. TelemetryDeck currently publishes no guaranteed
+cold-storage deletion schedule and says it expects to delete events after
+7–10 years. This retention position must be rechecked before each store
+submission.

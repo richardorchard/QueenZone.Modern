@@ -9,6 +9,7 @@ import {
   sectionFromNavigationState,
   type AnalyticsSection,
 } from './catalog';
+import { isAnalyticsConsentGranted, persistAnalyticsConsent } from './consent';
 
 const installationIdKey = 'queenzone.mobile.analyticsInstallationId';
 const lastActiveDayKey = 'queenzone.mobile.analyticsLastActiveDay';
@@ -56,7 +57,7 @@ async function getOrCreateInstallationId(): Promise<string> {
 
 async function createClient(): Promise<TelemetryDeckClient | null> {
   const config = appConfig();
-  if (!config.telemetryDeckAppId) {
+  if (!config.telemetryDeckAppId || !(await isAnalyticsConsentGranted())) {
     return null;
   }
 
@@ -100,6 +101,9 @@ function basePayload(): Record<string, string> {
 }
 
 async function signal(type: 'app.active' | 'section.viewed', payload = {}): Promise<void> {
+  if (!(await isAnalyticsConsentGranted())) {
+    return;
+  }
   const client = await getClient();
   if (!client) {
     return;
@@ -141,7 +145,7 @@ export function trackDailyActive(now = new Date()): Promise<void> {
 }
 
 export async function trackSectionViewed(section: AnalyticsSection | null): Promise<void> {
-  if (!section || section === lastSection) {
+  if (!section || section === lastSection || !(await isAnalyticsConsentGranted())) {
     return;
   }
   lastSection = section;
@@ -150,6 +154,18 @@ export async function trackSectionViewed(section: AnalyticsSection | null): Prom
 
 export function trackNavigationState(state: NavigationStateLike): Promise<void> {
   return trackSectionViewed(sectionFromNavigationState(state));
+}
+
+/** Persist consent, stop future delivery immediately, and forget local analytics identity on withdrawal. */
+export async function updateAnalyticsConsent(granted: boolean): Promise<void> {
+  await persistAnalyticsConsent(granted);
+  clientPromise = null;
+  lastSection = null;
+  dailyActiveQueue = Promise.resolve();
+
+  if (!granted) {
+    await AsyncStorage.multiRemove([installationIdKey, lastActiveDayKey]);
+  }
 }
 
 /** Test isolation only. */

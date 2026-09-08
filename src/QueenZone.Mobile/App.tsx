@@ -6,7 +6,7 @@ import {
 } from '@react-navigation/native';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useReducer } from 'react';
+import { useCallback, useEffect, useReducer } from 'react';
 import { AppState } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -25,6 +25,8 @@ import {
 } from './src/splash/bootSplashMachine';
 import { ThemeProvider, dark, useQueenzoneFonts, useTheme } from './src/theme';
 import { trackDailyActive, trackNavigationState } from './src/analytics/telemetry';
+import { useAnalyticsConsent } from './src/analytics/consent';
+import { AnalyticsConsentPrompt } from './src/analytics/AnalyticsConsentPrompt';
 
 SplashScreen.preventAutoHideAsync().catch(() => {
   /* already prevented or unavailable in tests */
@@ -32,7 +34,7 @@ SplashScreen.preventAutoHideAsync().catch(() => {
 
 configureForegroundNotificationHandler();
 
-function AppNavigation() {
+function AppNavigation({ analyticsEnabled }: { analyticsEnabled: boolean }) {
   const { c, mode } = useTheme();
   const base = mode === 'light' ? DefaultTheme : DarkTheme;
 
@@ -51,9 +53,18 @@ function AppNavigation() {
 
   const navigationRef = useNavigationContainerRef();
 
-  const reportSection = () => {
+  const reportSection = useCallback(() => {
+    if (!analyticsEnabled) {
+      return;
+    }
     void trackNavigationState(navigationRef.getRootState());
-  };
+  }, [analyticsEnabled, navigationRef]);
+
+  useEffect(() => {
+    if (navigationRef.isReady()) {
+      reportSection();
+    }
+  }, [navigationRef, reportSection]);
 
   return (
     <NavigationContainer
@@ -75,8 +86,13 @@ export default function App() {
   const [fontsLoaded, fontError] = useQueenzoneFonts();
   const appReady = fontsLoaded || fontError;
   const [splash, dispatch] = useReducer(bootSplashReducer, initialBootSplashState);
+  const analyticsConsent = useAnalyticsConsent();
+  const analyticsEnabled = analyticsConsent === 'granted';
 
   useEffect(() => {
+    if (!analyticsEnabled) {
+      return undefined;
+    }
     void trackDailyActive();
     const subscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') {
@@ -84,7 +100,7 @@ export default function App() {
       }
     });
     return () => subscription.remove();
-  }, []);
+  }, [analyticsEnabled]);
 
   useEffect(() => {
     if (appReady) {
@@ -125,7 +141,8 @@ export default function App() {
         <ThemeProvider preference="dark">
           <SessionProvider>
             <FanPerformancePlayerProvider>
-              <AppNavigation />
+              <AppNavigation analyticsEnabled={analyticsEnabled} />
+              <AnalyticsConsentPrompt />
             </FanPerformancePlayerProvider>
           </SessionProvider>
         </ThemeProvider>

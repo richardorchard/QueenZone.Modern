@@ -252,6 +252,12 @@ and never derived from a QueenZone account, push token, email, or member ID.
 Events contain no route parameters, URLs, content IDs, search text, messages,
 or other user content. Delivery is best-effort and never blocks the app.
 
+The app asks before creating the analytics identity or sending its first
+event. A refusal is remembered. Signed-in and signed-out users can later grant
+or withdraw consent under **Profile → Analytics preferences**. Withdrawal
+stops future signals and deletes the analytics-only local identifier; earlier
+anonymous events cannot be matched back to that installation for deletion.
+
 Set the public `EXPO_PUBLIC_TELEMETRYDECK_APP_ID` at build time to enable the
 client. `app.config.ts` bakes it into `extra.telemetryDeckAppId`. It remains
 disabled when unset; non-production builds mark configured signals as test

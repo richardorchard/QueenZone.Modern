@@ -35,6 +35,7 @@ This is a conservative source-level draft, not a legal conclusion. Reconcile it 
 - Private-message bodies, authentication tokens, email addresses and uploaded image bytes must not be recorded in Sentry breadcrumbs or telemetry.
 - Confirm whether Sentry captures route names, IP addresses, device identifiers or user identity in the final configuration.
 - Confirm the final TelemetryDeck payload contains only the analytics installation ID, coarse device/app metadata, and allowlisted section value documented in `docs/architecture/mobile-product-analytics.md`.
+- Confirm no TelemetryDeck request is made before first-run consent and that the public Profile → Analytics preferences control stops future signals.
 - Confirm account deletion covers mobile sessions, push subscriptions and uploaded avatar references as documented.
 
 ## Form decisions requiring product-owner confirmation

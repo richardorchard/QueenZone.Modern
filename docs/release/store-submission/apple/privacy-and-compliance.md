@@ -37,6 +37,13 @@ Items selected by a user from their camera or photo library and uploaded to Quee
   used for Analytics, not linked, and not used for tracking. The app as a whole
   also links its separate push device identifier to a member for App
   Functionality, so reconcile the combined answer in App Store Connect.
+- The app presents a first-run TelemetryDeck consent choice before creating an
+  analytics identifier or sending signals. Signed-in and signed-out users can
+  withdraw under Profile → Analytics preferences. Confirm both paths in the
+  archived release build.
+- Review **Coarse Location** conservatively in App Store Connect because
+  TelemetryDeck derives country from the request origin. If declared, use
+  Analytics purpose, not linked, and not used for tracking.
 
 ## Age rating
 

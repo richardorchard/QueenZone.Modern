@@ -7,6 +7,7 @@ import { QuoteScreen } from '../screens/home/QuoteScreen';
 
 import { ProfileScreen } from '../screens/account/ProfileScreen';
 import { SettingsScreen } from '../screens/account/SettingsScreen';
+import { AnalyticsSettingsScreen } from '../screens/account/AnalyticsSettingsScreen';
 import { ContactScreen } from '../screens/account/ContactScreen';
 import { DeleteAccountScreen } from '../screens/account/DeleteAccountScreen';
 import { SavedListScreen } from '../screens/account/SavedListScreen';
@@ -115,6 +116,11 @@ export function HomeStack() {
         })}
       />
       <Home.Screen name="Settings" component={SettingsScreen} />
+      <Home.Screen
+        name="AnalyticsSettings"
+        component={AnalyticsSettingsScreen}
+        options={{ title: 'Analytics preferences' }}
+      />
       <Home.Screen name="Contact" component={ContactScreen} options={{ title: 'Contact' }} />
       <Home.Screen name="DeleteAccount" component={DeleteAccountScreen} options={{ title: 'Delete account' }} />
       <Home.Screen name="Inbox" component={InboxScreen} options={{ title: 'Messages' }} />
