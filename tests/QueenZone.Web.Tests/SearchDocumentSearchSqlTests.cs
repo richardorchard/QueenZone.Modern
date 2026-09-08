@@ -15,17 +15,47 @@ public sealed class SearchDocumentSearchSqlTests
     }
 
     [Fact]
-    public void Source_of_truth_runs_one_capped_freetext_pass()
+    public void Untyped_all_keeps_the_global_freetext_rank_cap()
     {
-        var sql = ReadSqlSourceOfTruth();
-        var freetextCount = CountOccurrences(sql, "FREETEXTTABLE(dbo.SearchDocument, (Title, Body), @Query, @MatchLimit)");
+        var untypedBranch = ReadUntypedMatchInsert();
 
-        Assert.Equal(1, freetextCount);
-        Assert.Contains("CREATE TABLE #Matches", sql, StringComparison.Ordinal);
-        Assert.DoesNotContain(
-            "FREETEXTTABLE(dbo.SearchDocument, (Title, Body), @Query)",
-            sql,
+        Assert.Contains(
+            "FREETEXTTABLE(dbo.SearchDocument, (Title, Body), @Query, @MatchLimit)",
+            untypedBranch,
             StringComparison.Ordinal);
+        Assert.DoesNotContain("SELECT TOP (@MatchLimit)", untypedBranch, StringComparison.Ordinal);
+        Assert.DoesNotContain("d.ContentType = @ContentType", untypedBranch, StringComparison.Ordinal);
+        Assert.Equal(
+            1,
+            CountOccurrences(
+                ReadSqlSourceOfTruth(),
+                "FREETEXTTABLE(dbo.SearchDocument, (Title, Body), @Query, @MatchLimit)"));
+    }
+
+    [Fact]
+    public void Typed_search_applies_rank_cap_after_content_type_filter()
+    {
+        var typedBranch = ReadTypedMatchInsert();
+        var joinIndex = typedBranch.IndexOf(
+            "INNER JOIN dbo.SearchDocument d ON d.Id = ft.[KEY]",
+            StringComparison.Ordinal);
+        var filterIndex = typedBranch.IndexOf("WHERE  d.ContentType = @ContentType", StringComparison.Ordinal);
+        var orderIndex = typedBranch.IndexOf("ORDER BY ft.[RANK] DESC", StringComparison.Ordinal);
+
+        Assert.Contains("SELECT TOP (@MatchLimit)", typedBranch, StringComparison.Ordinal);
+        Assert.Contains(
+            "FREETEXTTABLE(dbo.SearchDocument, (Title, Body), @Query)",
+            typedBranch,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "FREETEXTTABLE(dbo.SearchDocument, (Title, Body), @Query, @MatchLimit)",
+            typedBranch,
+            StringComparison.Ordinal);
+        Assert.True(joinIndex >= 0, "Typed search must join SearchDocument before capping.");
+        Assert.True(filterIndex > joinIndex, "Typed search must filter ContentType after the join.");
+        Assert.True(orderIndex > filterIndex, "Typed search must apply TOP after the ContentType filter.");
+        Assert.DoesNotContain("[RANK] *", typedBranch, StringComparison.Ordinal);
+        Assert.DoesNotContain("CONTAINSTABLE", typedBranch, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -65,7 +95,7 @@ public sealed class SearchDocumentSearchSqlTests
     }
 
     [Fact]
-    public void Migration_embeds_the_capped_procedure()
+    public void Historical_cap_migration_embeds_the_global_rank_cap()
     {
         var migration = ReadRepoFile(
             Path.Combine("src", "QueenZone.Data", "Migrations", "20260827143000_CapSearchDocumentSearchMatches.cs"));
@@ -80,8 +110,53 @@ public sealed class SearchDocumentSearchSqlTests
             Path.Combine("src", "QueenZone.Data", "Repositories", "EfSiteSearchService.cs")));
     }
 
+    [Fact]
+    public void Migration_embeds_typed_cap_after_content_type_filter()
+    {
+        var migration = ReadRepoFile(
+            Path.Combine("src", "QueenZone.Data", "Migrations", "20260908140000_CapTypedSearchAfterContentTypeFilter.cs"));
+        var sql = ReadSqlSourceOfTruth();
+
+        Assert.Contains("IF @ContentType IS NULL", migration, StringComparison.Ordinal);
+        Assert.Contains("SELECT TOP (@MatchLimit)", migration, StringComparison.Ordinal);
+        Assert.Contains("WHERE  d.ContentType = @ContentType", migration, StringComparison.Ordinal);
+        Assert.Contains(
+            "FREETEXTTABLE(dbo.SearchDocument, (Title, Body), @Query, @MatchLimit)",
+            migration,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "FREETEXTTABLE(dbo.SearchDocument, (Title, Body), @Query)",
+            migration,
+            StringComparison.Ordinal);
+        Assert.Contains("IF @ContentType IS NULL", sql, StringComparison.Ordinal);
+        Assert.Contains("SELECT TOP (@MatchLimit)", sql, StringComparison.Ordinal);
+        Assert.DoesNotContain("ReplaceContentTypeAsync", migration, StringComparison.Ordinal);
+        Assert.DoesNotContain("START FULL POPULATION", migration, StringComparison.Ordinal);
+    }
+
     private static string ReadSqlSourceOfTruth() =>
         ReadRepoFile(Path.Combine("docs", "sql", "010-search-document-full-text-search.sql"));
+
+    private static string ReadUntypedMatchInsert()
+    {
+        var sql = ReadSqlSourceOfTruth();
+        var start = sql.IndexOf("IF @ContentType IS NULL", StringComparison.Ordinal);
+        var end = sql.IndexOf("ELSE", start, StringComparison.Ordinal);
+        Assert.True(start >= 0 && end > start, "Expected an untyped IF @ContentType IS NULL branch.");
+        return sql[start..end];
+    }
+
+    private static string ReadTypedMatchInsert()
+    {
+        var sql = ReadSqlSourceOfTruth();
+        var ifIndex = sql.IndexOf("IF @ContentType IS NULL", StringComparison.Ordinal);
+        var elseIndex = sql.IndexOf("ELSE", ifIndex, StringComparison.Ordinal);
+        var beginIndex = sql.IndexOf("BEGIN", elseIndex, StringComparison.Ordinal);
+        var endIndex = sql.IndexOf("END", beginIndex, StringComparison.Ordinal);
+        Assert.True(elseIndex >= 0 && beginIndex > elseIndex && endIndex > beginIndex,
+            "Expected a typed ELSE BEGIN/END match-insert branch.");
+        return sql[elseIndex..endIndex];
+    }
 
     private static string ReadRepoFile(string relativePath)
     {
