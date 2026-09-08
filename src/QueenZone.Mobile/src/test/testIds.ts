@@ -15,6 +15,7 @@ export const testIds = {
   quoteBack: 'quote-back',
   quoteContext: 'quote-context',
   homeHero: 'home-hero',
+  homeEnvironment: 'home-environment',
   homeVersion: 'home-version',
   homeSearch: 'home-search',
   homeMessages: 'home-messages',

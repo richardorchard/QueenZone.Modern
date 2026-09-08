@@ -2,6 +2,15 @@ name: Publish iOS to TestFlight
 
 on:
   workflow_dispatch:
+    inputs:
+      app_environment:
+        description: API environment to embed in the TestFlight build
+        required: true
+        type: choice
+        options:
+          - production
+          - staging
+        default: production
 
 permissions:
   contents: read
@@ -59,7 +68,7 @@ jobs:
       # App Store / TestFlight profiles only include aps-environment=production.
       # Expo prebuild emits development; Xcode replaces it during the signed archive.
       IOS_APS_ENVIRONMENT: production
-      EXPO_PUBLIC_APP_ENV: staging
+      EXPO_PUBLIC_APP_ENV: ${{ inputs.app_environment }}
       EXPO_PUBLIC_SENTRY_DSN: ${{ vars.SENTRY_DSN }}
     steps:
       - name: Checkout
@@ -425,7 +434,7 @@ jobs:
       - name: Archive signed iOS app
         working-directory: src/QueenZone.Mobile/ios
         env:
-          EXPO_PUBLIC_APP_ENV: staging
+          EXPO_PUBLIC_APP_ENV: ${{ inputs.app_environment }}
           # The "Bundle React Native code and images" Xcode build phase runs
           # inside this step, not the earlier "Generate iOS project" step, so
           # EXPO_PUBLIC_SENTRY_DSN must be set here too or it inlines as
@@ -609,6 +618,18 @@ jobs:
           fi
 
           constants_config="$app_path/EXConstants.bundle/app.config"
+          expected_api_base_url=$(node -e "const { resolveApiBaseUrl } = require('./apiEnvironments.cjs'); process.stdout.write(resolveApiBaseUrl({ appEnv: process.env.EXPO_PUBLIC_APP_ENV }));")
+          baked_app_environment=$(jq -r '.extra.appEnv // .exp.extra.appEnv // empty' "$constants_config")
+          baked_api_base_url=$(jq -r '.extra.apiBaseUrl // .exp.extra.apiBaseUrl // empty' "$constants_config")
+          echo "IPA API target=${baked_app_environment} (${baked_api_base_url})"
+          if [ "$baked_app_environment" != "$EXPO_PUBLIC_APP_ENV" ]; then
+            echo "::error::Exported IPA app environment is ${baked_app_environment:-<missing>}, expected ${EXPO_PUBLIC_APP_ENV}."
+            exit 1
+          fi
+          if [ "$baked_api_base_url" != "$expected_api_base_url" ]; then
+            echo "::error::Exported IPA API base URL is ${baked_api_base_url:-<missing>}, expected ${expected_api_base_url}."
+            exit 1
+          fi
           if ! grep -Fq "$BUILD_TIMESTAMP_UTC" "$constants_config"; then
             echo "::error::Exported IPA is missing build timestamp ${BUILD_TIMESTAMP_UTC}."
             exit 1

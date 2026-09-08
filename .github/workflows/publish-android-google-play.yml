@@ -8,6 +8,14 @@ on:
         required: true
         type: boolean
         default: true
+      app_environment:
+        description: API environment to embed in the Google Play build
+        required: true
+        type: choice
+        options:
+          - production
+          - staging
+        default: production
 
 permissions:
   contents: read
@@ -57,7 +65,7 @@ jobs:
         working-directory: src/QueenZone.Mobile
     env:
       ANDROID_VERSION_CODE: ${{ github.run_number }}
-      EXPO_PUBLIC_APP_ENV: staging
+      EXPO_PUBLIC_APP_ENV: ${{ inputs.app_environment }}
       EXPO_PUBLIC_SENTRY_DSN: ${{ vars.SENTRY_DSN }}
     steps:
       - name: Checkout
@@ -179,7 +187,7 @@ jobs:
       - name: Build signed Android App Bundle
         working-directory: src/QueenZone.Mobile/android
         env:
-          EXPO_PUBLIC_APP_ENV: staging
+          EXPO_PUBLIC_APP_ENV: ${{ inputs.app_environment }}
           # This step (not "Generate Android project") is what runs the JS
           # bundling Gradle task, so EXPO_PUBLIC_SENTRY_DSN must be set here
           # too or it inlines as undefined and Sentry.init() silently no-ops.
@@ -222,6 +230,21 @@ jobs:
             echo "::error::AAB versionCode is ${version_code}, expected ${expected_code}."
             echo "Play Console rejects reused versionCode values."
             echo "Ensure app.config.ts maps GITHUB_RUN_NUMBER to android.versionCode before prebuild."
+            exit 1
+          fi
+
+          constants_config="$RUNNER_TEMP/queenzone-aab-app.config"
+          unzip -p "$bundle" base/assets/app.config > "$constants_config"
+          expected_api_base_url=$(node -e "const { resolveApiBaseUrl } = require('./apiEnvironments.cjs'); process.stdout.write(resolveApiBaseUrl({ appEnv: process.env.EXPO_PUBLIC_APP_ENV }));")
+          baked_app_environment=$(jq -r '.extra.appEnv // .exp.extra.appEnv // empty' "$constants_config")
+          baked_api_base_url=$(jq -r '.extra.apiBaseUrl // .exp.extra.apiBaseUrl // empty' "$constants_config")
+          echo "AAB API target=${baked_app_environment} (${baked_api_base_url})"
+          if [ "$baked_app_environment" != "$EXPO_PUBLIC_APP_ENV" ]; then
+            echo "::error::AAB app environment is ${baked_app_environment:-<missing>}, expected ${EXPO_PUBLIC_APP_ENV}."
+            exit 1
+          fi
+          if [ "$baked_api_base_url" != "$expected_api_base_url" ]; then
+            echo "::error::AAB API base URL is ${baked_api_base_url:-<missing>}, expected ${expected_api_base_url}."
             exit 1
           fi
 
