@@ -26,8 +26,21 @@ appId: org.queenzone.mobile
       id: forum-thread-screen
     timeout: 20000
 - assertVisible: QueenZone modernisation begins
+- scrollUntilVisible:
+    element:
+      id: forum-thread-reply
+    direction: DOWN
+    timeout: 20000
 - assertVisible:
     id: forum-thread-reply
 - assertNotVisible:
     id: news-story-screen
 - assertNotVisible: Write a reply
+# Discussion switches to the Forum stack and hides the tab bar. Its back
+# control returns to the Forum root, ready for the following journey.
+- tapOn:
+    id: forum-thread-back
+- extendedWaitUntil:
+    visible:
+      id: forum-screen
+    timeout: 15000

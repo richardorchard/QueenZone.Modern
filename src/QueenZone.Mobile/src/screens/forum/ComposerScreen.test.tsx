@@ -1,5 +1,7 @@
-import { screen, userEvent, waitFor } from '@testing-library/react-native';
+import { fireEvent, screen, userEvent, waitFor } from '@testing-library/react-native';
+import { Platform } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
+import { writeAsStringAsync } from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
 import { ApiError, createForumReply, createForumTopic, fetchForumCategories } from '../../api';
 import { enqueueForumReply } from '../../offlineQueue';
@@ -101,6 +103,7 @@ describe('ComposerScreen', () => {
     (ImagePicker.requestMediaLibraryPermissionsAsync as jest.Mock).mockReset();
     (ImagePicker.launchImageLibraryAsync as jest.Mock).mockReset();
     (DocumentPicker.getDocumentAsync as jest.Mock).mockReset();
+    (writeAsStringAsync as jest.Mock).mockReset();
     fetchForumCategoriesMock.mockResolvedValue(
       pagedResponse([
         {
@@ -225,18 +228,81 @@ describe('ComposerScreen', () => {
   });
 
   it('injects attach.txt after Files without opening the OEM picker in Debug', async () => {
+    const originalOs = Platform.OS;
+    Object.defineProperty(Platform, 'OS', { configurable: true, value: 'android' });
+    mockAppConfig.appEnv = 'development';
+    try {
+      renderComposer({ threadId: 1002, threadTitle: 'Ranking every studio album' });
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Files' })).toBeOnTheScreen());
+
+      fireEvent.press(screen.getByTestId(testIds.forumComposerAttachFiles));
+      expect(DocumentPicker.getDocumentAsync).not.toHaveBeenCalled();
+      expect(ImagePicker.requestMediaLibraryPermissionsAsync).not.toHaveBeenCalled();
+      expect(ImagePicker.launchImageLibraryAsync).not.toHaveBeenCalled();
+      fireEvent.press(screen.getByTestId(testIds.forumComposerAttachInject));
+      await waitFor(() => expect(screen.getByTestId(testIds.forumComposerAttachment)).toBeOnTheScreen());
+      expect(writeAsStringAsync).toHaveBeenCalledWith(
+        'file:///cache/attach.txt',
+        'QueenZone Maestro attach fixture\n',
+      );
+      expect(screen.getByText('attach.txt')).toBeOnTheScreen();
+    } finally {
+      Object.defineProperty(Platform, 'OS', { configurable: true, value: originalOs });
+    }
+  });
+
+  it('uses a pending smoke attachment when Inject is pressed', async () => {
     mockAppConfig.appEnv = 'development';
     renderComposer({ threadId: 1002, threadTitle: 'Ranking every studio album' });
     await waitFor(() => expect(screen.getByRole('button', { name: 'Files' })).toBeOnTheScreen());
 
-    const user = userEvent.setup();
-    await user.press(screen.getByTestId(testIds.forumComposerAttachFiles));
-    expect(DocumentPicker.getDocumentAsync).not.toHaveBeenCalled();
-    expect(ImagePicker.requestMediaLibraryPermissionsAsync).not.toHaveBeenCalled();
-    expect(ImagePicker.launchImageLibraryAsync).not.toHaveBeenCalled();
-    await user.press(screen.getByTestId(testIds.forumComposerAttachInject));
-    await waitFor(() => expect(screen.getByTestId(testIds.forumComposerAttachment)).toBeOnTheScreen());
-    expect(screen.getByText('attach.txt')).toBeOnTheScreen();
+    fireEvent.press(screen.getByTestId(testIds.forumComposerAttachFiles));
+    stashSmokeAttachAsset({
+      uri: 'file:///tmp/pending.txt',
+      name: 'pending.txt',
+      mimeType: 'text/plain',
+    });
+    fireEvent.press(screen.getByTestId(testIds.forumComposerAttachInject));
+
+    await waitFor(() => expect(screen.getByText('pending.txt')).toBeOnTheScreen());
+    expect(writeAsStringAsync).not.toHaveBeenCalled();
+  });
+
+  it('shows an attachment error when Android cannot create the smoke fixture', async () => {
+    const originalOs = Platform.OS;
+    Object.defineProperty(Platform, 'OS', { configurable: true, value: 'android' });
+    mockAppConfig.appEnv = 'development';
+    (writeAsStringAsync as jest.Mock).mockRejectedValue(new Error('cache unavailable'));
+    try {
+      renderComposer({ threadId: 1002, threadTitle: 'Ranking every studio album' });
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Files' })).toBeOnTheScreen());
+
+      fireEvent.press(screen.getByTestId(testIds.forumComposerAttachFiles));
+      fireEvent.press(screen.getByTestId(testIds.forumComposerAttachInject));
+
+      await waitFor(() => expect(screen.getByText('Could not open the file picker.')).toBeOnTheScreen());
+      expect(screen.queryByTestId(testIds.forumComposerAttachment)).toBeNull();
+    } finally {
+      Object.defineProperty(Platform, 'OS', { configurable: true, value: originalOs });
+    }
+  });
+
+  it('uses the copied Documents fixture when Inject is pressed on iOS', async () => {
+    const originalOs = Platform.OS;
+    Object.defineProperty(Platform, 'OS', { configurable: true, value: 'ios' });
+    mockAppConfig.appEnv = 'development';
+    try {
+      renderComposer({ threadId: 1002, threadTitle: 'Ranking every studio album' });
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Files' })).toBeOnTheScreen());
+
+      fireEvent.press(screen.getByTestId(testIds.forumComposerAttachFiles));
+      fireEvent.press(screen.getByTestId(testIds.forumComposerAttachInject));
+
+      await waitFor(() => expect(screen.getByText('attach.txt')).toBeOnTheScreen());
+      expect(writeAsStringAsync).not.toHaveBeenCalled();
+    } finally {
+      Object.defineProperty(Platform, 'OS', { configurable: true, value: originalOs });
+    }
   });
 
   it('consumes a pending smoke-attach file when Files is tapped in Debug', async () => {
