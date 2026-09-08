@@ -587,8 +587,11 @@ The one-time Apple setup for `org.queenzone.mobile` consists of:
 - a Developer-role App Store Connect API key dedicated to GitHub uploads.
 
 Run **Publish iOS to TestFlight** from the repository's **Actions** tab and
-select `main`. The workflow intentionally rejects other branches and targets
-the self-hosted Mac runner through `[self-hosted, macOS, ARM64, ios-signing]`.
+select `main`. Leave **API environment** set to `production` for normal
+TestFlight and App Store candidates; choose `staging` only for a build that is
+deliberately testing `https://dev.queenzone.org`. The workflow intentionally
+rejects other branches and targets the self-hosted Mac runner through
+`[self-hosted, macOS, ARM64, ios-signing]`.
 The runner service does not load an interactive shell profile, so the workflow
 puts Homebrew (`/opt/homebrew/bin` or `/usr/local/bin`) on `PATH`, installs
 CocoaPods if `pod` is missing, runs `expo prebuild --no-install` with
@@ -600,8 +603,9 @@ HTTPS; this prevents each TestFlight build pausing for the same export-complianc
 questionnaire. Expo SDK 57 stamps `aps-environment=development` during prebuild;
 Xcode changes it to `production` when archiving with the App Store distribution
 profile. The workflow verifies both stages and rejects an exported IPA that does
-not carry the production entitlement, even when the binary still talks to the
-staging API. Expo's own CocoaPods auto-install is skipped
+not carry the production entitlement. It also reads the packaged Expo config
+back from the exported IPA and rejects an environment or API-origin mismatch
+before upload. Expo's own CocoaPods auto-install is skipped
 because a missing CLI is only a warning and otherwise continues without an
 `.xcworkspace`. It then imports signing material into a temporary Keychain,
 produces and verifies a signed `.ipa`, retains that IPA as a seven-day
@@ -651,9 +655,12 @@ text.
 
 Google Play's equivalent of TestFlight is the **internal testing track**. Run
 **Publish Android to Google Play** from the repository's **Actions** tab and
-select `main`. The workflow runs mobile preflight, builds a signed Android App
-Bundle (`.aab`) against the staging API, verifies it, retains it as a seven-day
-artifact, and uploads it to the `internal` track for opted-in testers.
+select `main`. Leave **API environment** set to `production` for normal Play
+candidates; choose `staging` only for a deliberate `https://dev.queenzone.org`
+test build. The workflow runs mobile preflight, builds a signed Android App
+Bundle (`.aab`), verifies its packaged environment and API origin, retains it
+as a seven-day artifact, and uploads it to the `internal` track for opted-in
+testers.
 
 The one-time Play Console setup for `org.queenzone.mobile` is:
 

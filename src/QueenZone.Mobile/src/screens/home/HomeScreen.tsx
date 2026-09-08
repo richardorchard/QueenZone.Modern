@@ -37,7 +37,8 @@ export function HomeScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
   const { isSignedIn, accessToken } = useSession();
-  const apiBaseUrl = getAppConfig().apiBaseUrl;
+  const appConfig = getAppConfig();
+  const { apiBaseUrl, appEnv } = appConfig;
   const [filter, setFilter] = useState<HomeFilterKey>('all');
   const visibleSections = useMemo(() => visibleSectionsForFilter(filter), [filter]);
 
@@ -86,6 +87,19 @@ export function HomeScreen({ navigation }: Props) {
             onMessagesPress={() => navigation.navigate('Inbox')}
             onProfilePress={() => navigation.navigate('Profile')}
           />
+
+          {appEnv !== 'production' ? (
+            <View
+              testID={testIds.homeEnvironment}
+              style={[styles.environmentStrip, { backgroundColor: c.accentTintWeak }]}
+            >
+              <Text
+                style={[styles.environmentLabel, { color: c.accentPrimary }]}
+              >
+                {appEnv.toUpperCase()} · {apiBaseUrl}
+              </Text>
+            </View>
+          ) : null}
 
           {data.liveActivity.view.kind === 'content' &&
           liveStripIsVisible(data.liveActivity.view.data.newForumRepliesToday) ? (
@@ -184,7 +198,7 @@ export function HomeScreen({ navigation }: Props) {
 
           <ArchiveFooter />
           <Text testID={testIds.homeVersion} style={[type.caption, styles.footer, { color: c.textMuted }]}>
-            {formatHomeFooter(getAppConfig())}
+            {formatHomeFooter(appConfig)}
           </Text>
         </>
       }
@@ -204,6 +218,16 @@ const styles = StyleSheet.create({
   },
   liveStripDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#B89A4A' },
   liveStripLabel: { fontFamily: fonts.body, fontSize: 12, color: 'rgba(255,255,255,0.72)' },
+  environmentStrip: {
+    paddingVertical: 8,
+    paddingHorizontal: space.xl,
+    alignItems: 'center',
+  },
+  environmentLabel: {
+    fontFamily: fonts.bodySemi,
+    fontSize: 11,
+    letterSpacing: 0.8,
+  },
   filters: {
     paddingHorizontal: space.xl,
     paddingTop: space.md,
