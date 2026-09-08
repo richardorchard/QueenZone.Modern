@@ -490,7 +490,6 @@ set -e
 if [ "$platform" = "android" ] \
   && [ "$maestro_status" -ne 0 ] \
   && [ -d "$results_dir/debug" ] \
-  && grep -Eq 'DeviceServerDiedException|Device server died|device offline' "$results_dir/junit.xml" \
   && grep -ERq 'DeviceServerDiedException|Device server died|device offline' "$results_dir/debug"; then
   echo "Maestro lost the Android device transport; recovering ADB and retrying once."
   if [ -d "$results_dir/debug" ]; then
