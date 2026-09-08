@@ -8,16 +8,6 @@ appId: org.queenzone.mobile
     id: tab-home
 - tapOn:
     id: home-profile
-- runFlow:
-    when:
-      platform: iOS
-      visible:
-        id: profile-signed-out
-    commands:
-      # iOS can accept the system Open prompt without delivering the first
-      # foreground URL event. The scheme is trusted after that first prompt,
-      # so retry the URL directly without expecting a second Open dialog.
-      - openLink: ${SMOKE_AUTH_URL}
 - extendedWaitUntil:
     visible:
       id: profile-signed-in

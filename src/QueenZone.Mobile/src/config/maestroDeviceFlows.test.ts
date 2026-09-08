@@ -118,11 +118,12 @@ describe('Maestro device flows (#1281)', () => {
 
     const authenticated = readMaestro('flows/09-authenticated.yaml');
     assert.equal(authenticated.match(/open-smoke-auth\.yaml/g)?.length, 1);
-    assert.equal(authenticated.match(/openLink: \$\{SMOKE_AUTH_URL\}/g)?.length, 1);
+    assert.doesNotMatch(authenticated, /openLink: \$\{SMOKE_AUTH_URL\}/);
     assert.match(
-      authenticated,
-      /id: home-profile[\s\S]*platform: iOS[\s\S]*visible:[\s\S]*id: profile-signed-out[\s\S]*openLink: \$\{SMOKE_AUTH_URL\}[\s\S]*id: profile-signed-in/,
+      openAuth,
+      /accept-ios-open-link\.yaml[\s\S]*platform: iOS[\s\S]*notVisible:[\s\S]*id: home-messages[\s\S]*openLink: \$\{SMOKE_AUTH_URL\}[\s\S]*visible:[\s\S]*id: home-messages/,
     );
+    assert.match(authenticated, /id: home-profile[\s\S]*id: profile-signed-in/);
     assert.match(authenticated, /id: profile-messages/);
     assert.match(readMaestro('flows/12-masthead-unread.yaml'), /open-smoke-auth\.yaml/);
     assert.match(readMaestro('flows/10-forum-attach.yaml'), /accept-ios-open-link\.yaml/);
