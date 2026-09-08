@@ -2,7 +2,7 @@
 
 This is a conservative draft based on the source tree and production configuration. Re-audit it against the exact release build immediately before submission.
 
-**Confirmed 2026-08-30:** the app is ad-free, includes no Google Analytics or other analytics SDK, and Sentry is the only third-party data-processing SDK present. No Advertising or Tracking data types apply; App Tracking Transparency is not required. This aligns with the data types table below as drafted.
+**Updated 2026-09-08:** the app is ad-free and includes Sentry plus TelemetryDeck. TelemetryDeck receives an SDK-hashed, random installation identifier, coarse device/app metadata, and allowlisted product interactions. No Advertising or Tracking purpose applies; App Tracking Transparency is not required. Reconfirm this against the final binary.
 
 ## App privacy label
 
@@ -18,7 +18,7 @@ Likely collected data types:
 | Device ID / push token | Yes | No | Push registration and notification delivery |
 | Photos or videos | Yes when submitted | No | Avatar and moderated photo submissions |
 | Other user content | Yes | No | Forum posts, private messages, news suggestions, contact messages |
-| Product interaction | Possibly | No | Sentry navigation/performance traces; confirm final Sentry event fields |
+| Product interaction | Yes | No | TelemetryDeck top-level section views; Sentry navigation/performance traces when enabled |
 | Crash data | Possibly | No | Sentry crash/error reporting when enabled |
 | Performance data | Possibly | No | Sentry performance tracing when enabled |
 
@@ -33,6 +33,17 @@ Items selected by a user from their camera or photo library and uploaded to Quee
 - Notifications: request after contextual explanation; settings remain available in-app.
 - No microphone/recording permission is configured.
 - Confirm all included SDK privacy manifests and required-reason API declarations in the archived build.
+- TelemetryDeck's published disclosure is Device ID and Product Interaction,
+  used for Analytics, not linked, and not used for tracking. The app as a whole
+  also links its separate push device identifier to a member for App
+  Functionality, so reconcile the combined answer in App Store Connect.
+- The app presents a first-run TelemetryDeck consent choice before creating an
+  analytics identifier or sending signals. Signed-in and signed-out users can
+  withdraw under Profile → Analytics preferences. Confirm both paths in the
+  archived release build.
+- Review **Coarse Location** conservatively in App Store Connect because
+  TelemetryDeck derives country from the request origin. If declared, use
+  Analytics purpose, not linked, and not used for tracking.
 
 ## Age rating
 
