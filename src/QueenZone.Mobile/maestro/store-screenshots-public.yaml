@@ -6,6 +6,11 @@ appId: org.queenzone.mobile
     visible:
       id: home-screen
     timeout: 30000
+- extendedWaitUntil:
+    visible:
+      id: home-hero
+    timeout: 30000
+- waitForAnimationToEnd
 - takeScreenshot: 01-home
 - tapOn:
     id: tab-news
