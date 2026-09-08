@@ -139,4 +139,25 @@ describe('resolveSmokeEmbedFlag', () => {
     assert.equal(resolveSmokeEmbedFlag({}, { EXPO_PUBLIC_SMOKE_EMBED: 'true' }), true);
     assert.equal(resolveSmokeEmbedFlag({}, { EXPO_PUBLIC_SMOKE_EMBED: '0' }), false);
   });
+
+  it('reads process.env.EXPO_PUBLIC_SMOKE_EMBED when no env bag is passed', () => {
+    const previous = process.env.EXPO_PUBLIC_SMOKE_EMBED;
+    try {
+      process.env.EXPO_PUBLIC_SMOKE_EMBED = '1';
+      assert.equal(resolveSmokeEmbedFlag({}), true);
+      process.env.EXPO_PUBLIC_SMOKE_EMBED = '0';
+      assert.equal(resolveSmokeEmbedFlag({}), false);
+    } finally {
+      if (previous === undefined) {
+        delete process.env.EXPO_PUBLIC_SMOKE_EMBED;
+      } else {
+        process.env.EXPO_PUBLIC_SMOKE_EMBED = previous;
+      }
+    }
+  });
+
+  it('keeps a static process.env.EXPO_PUBLIC_SMOKE_EMBED member for Metro inline', () => {
+    const flagSource = readFileSync(new URL('./smokeEmbedFlag.ts', import.meta.url), 'utf8');
+    assert.match(flagSource, /isTruthySmokeEmbedToken\(process\.env\.EXPO_PUBLIC_SMOKE_EMBED\)/);
+  });
 });
