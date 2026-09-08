@@ -136,6 +136,26 @@ public sealed class SearchApiTests : IClassFixture<QueenZoneWebApplicationFactor
     }
 
     [Fact]
+    public async Task Search_type_discography_returns_album_for_album_name()
+    {
+        using var client = factory.CreateAnonymousClient();
+
+        using var response = await client.GetAsync(
+            $"{SearchApiEndpoints.Path}?q=A%20Night%20at%20the%20Opera&type=discography");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<ApiPagedResponse<SearchResultDto>>();
+        Assert.NotNull(payload);
+        Assert.NotEmpty(payload!.Items);
+        Assert.All(payload.Items, item => Assert.Equal(SiteSearchContentType.Discography, item.ContentType));
+        Assert.Contains(
+            payload.Items,
+            item => item.Title == "A Night at the Opera"
+                && item.SourceKey == "discography:4"
+                && item.Url == "/discography/albums/4/a-night-at-the-opera");
+    }
+
+    [Fact]
     public async Task Search_type_article_is_not_aliased_to_legacy_article()
     {
         using var client = factory.CreateAnonymousClient();

@@ -10,6 +10,7 @@ type Props = {
   onPress?: () => void;
   switchValue?: boolean;
   onSwitch?: (value: boolean) => void;
+  disabled?: boolean;
   accessibilityLabel?: string;
   testID?: string;
 };
@@ -21,6 +22,7 @@ export function SettingsRow({
   onPress,
   switchValue,
   onSwitch,
+  disabled,
   accessibilityLabel,
   testID,
 }: Props) {
@@ -47,7 +49,9 @@ export function SettingsRow({
         <Switch
           value={switchValue}
           onValueChange={onSwitch}
+          disabled={disabled}
           accessibilityLabel={accessibilityLabel ?? title}
+          accessibilityState={{ disabled: !!disabled }}
           testID={testID}
           trackColor={{ true: c.accentPrimary, false: c.border }}
           thumbColor={c.textPrimary}

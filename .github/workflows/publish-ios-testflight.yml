@@ -70,6 +70,7 @@ jobs:
       IOS_APS_ENVIRONMENT: production
       EXPO_PUBLIC_APP_ENV: ${{ inputs.app_environment }}
       EXPO_PUBLIC_SENTRY_DSN: ${{ vars.SENTRY_DSN }}
+      EXPO_PUBLIC_TELEMETRYDECK_APP_ID: ${{ vars.TELEMETRYDECK_APP_ID }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -127,7 +128,7 @@ jobs:
         run: |
           set -euo pipefail
           missing=0
-          for name in SENTRY_DSN EXPO_PUBLIC_SENTRY_DSN SENTRY_ORG SENTRY_PROJECT SENTRY_AUTH_TOKEN; do
+          for name in SENTRY_DSN EXPO_PUBLIC_SENTRY_DSN EXPO_PUBLIC_TELEMETRYDECK_APP_ID SENTRY_ORG SENTRY_PROJECT SENTRY_AUTH_TOKEN; do
             eval "value=\${$name-}"
             if [ -z "$value" ]; then
               echo "::error::$name is not set (Settings → Secrets and variables → Actions)."
@@ -238,6 +239,16 @@ jobs:
             exit 1
           fi
           echo "extra.sentryDsn is set (length ${#dsn})"
+
+      - name: Confirm TelemetryDeck App ID is baked into Expo extra
+        run: |
+          set -euo pipefail
+          app_id=$(npx expo config --json | jq -r '.extra.telemetryDeckAppId // .exp.extra.telemetryDeckAppId // empty')
+          if [ -z "$app_id" ]; then
+            echo "::error::app.config extra.telemetryDeckAppId is empty; product analytics will be disabled."
+            exit 1
+          fi
+          echo "extra.telemetryDeckAppId is set (length ${#app_id})"
 
       - name: Cache CocoaPods
         uses: actions/cache@v4
@@ -640,6 +651,14 @@ jobs:
           fi
           if ! grep -Fq "$EXPO_PUBLIC_SENTRY_DSN" "$constants_config"; then
             echo "::error::Exported IPA is missing extra.sentryDsn; Sentry will not initialize."
+            exit 1
+          fi
+          if [ -z "${EXPO_PUBLIC_TELEMETRYDECK_APP_ID:-}" ]; then
+            echo "::error::EXPO_PUBLIC_TELEMETRYDECK_APP_ID is not set; product analytics will be disabled."
+            exit 1
+          fi
+          if ! grep -Fq "$EXPO_PUBLIC_TELEMETRYDECK_APP_ID" "$constants_config"; then
+            echo "::error::Exported IPA is missing extra.telemetryDeckAppId; product analytics will be disabled."
             exit 1
           fi
           if ! grep -Fq "$BUILD_REVISION" "$constants_config"; then
