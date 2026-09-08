@@ -210,7 +210,7 @@ describe('device-smoke harness (#1281)', () => {
     assert.equal((workflow.match(/\.\/gradlew --stop/g) ?? []).length, 2);
     assert.equal((workflow.match(/api-level: 35/g) ?? []).length, 2);
     assert.equal((workflow.match(/emulator-build: 15261927/g) ?? []).length, 2);
-    assert.equal((workflow.match(/-gpu software/g) ?? []).length, 2);
+    assert.equal((workflow.match(/-gpu swiftshader/g) ?? []).length, 2);
     assert.doesNotMatch(workflow, /-gpu swiftshader_indirect/);
   });
 
