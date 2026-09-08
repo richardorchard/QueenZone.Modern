@@ -171,6 +171,9 @@ jobs:
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
+          # Emulator 37.1.11 exits when Maestro 2.10 starts its Android driver
+          # on hosted Linux. Pin the last pre-regression stable build (#1411).
+          emulator-build: 14472402
           target: google_apis
           arch: x86_64
           force-avd-creation: false
@@ -462,6 +465,8 @@ jobs:
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
+          # Keep smoke and extended suites on the same known-stable emulator.
+          emulator-build: 14472402
           target: google_apis
           arch: x86_64
           force-avd-creation: false
