@@ -1,6 +1,7 @@
 import type { NewsSuggestionCreated, NewsSuggestionWrite } from '../../api/newsSuggestions';
 import type { NewsShareStore, NewsSuggestDraft, PersistedNewsShare } from './draftStore';
 import { normalizeShareUrl, parseShare, type ShareIntake, type ShareRaw, type ShareRejectReason } from './parseShare';
+import { isPersistedShareFresh, shareIntakeFingerprint, shareSlotFingerprint } from './sharePolicy';
 
 type StatusError = {
   status: number;
@@ -44,6 +45,10 @@ export type NewsShareSubmit = (
   accessToken: string,
 ) => Promise<NewsSuggestionCreated>;
 
+export type NewsShareControllerOptions = {
+  now?: () => Date;
+};
+
 export type NewsShareController = {
   hydrate(): Promise<void>;
   capture(raw: ShareRaw): Promise<void>;
@@ -59,6 +64,7 @@ type SessionState = {
   inFlight: boolean;
   lastCreated: NewsSuggestionCreated | null;
   lastError: SuggestSubmitError | null;
+  lastConsumed: string | null;
 };
 
 const notHttpsReject: Extract<ShareIntake, { kind: 'rejected' }> = {
@@ -70,7 +76,9 @@ const notHttpsReject: Extract<ShareIntake, { kind: 'rejected' }> = {
 export function createNewsShareController(
   store: NewsShareStore,
   submitSuggestion: NewsShareSubmit,
+  options?: NewsShareControllerOptions,
 ): NewsShareController {
+  const now = options?.now ?? (() => new Date());
   const listeners = new Set<() => void>();
   const state: SessionState = {
     persisted: null,
@@ -78,8 +86,10 @@ export function createNewsShareController(
     inFlight: false,
     lastCreated: null,
     lastError: null,
+    lastConsumed: null,
   };
   let writeTail: Promise<void> = Promise.resolve();
+  let hydrated = false;
 
   function emit(): void {
     for (const listener of listeners) {
@@ -92,6 +102,10 @@ export function createNewsShareController(
     return writeTail;
   }
 
+  function nowIso(): string {
+    return now().toISOString();
+  }
+
   function setPersisted(value: PersistedNewsShare | null): void {
     state.persisted = value;
     if (value) {
@@ -101,8 +115,17 @@ export function createNewsShareController(
     }
   }
 
+  function rememberConsumed(fingerprint: string): void {
+    state.lastConsumed = fingerprint;
+    scheduleWrite(() => store.writeLastConsumed(fingerprint));
+  }
+
   async function persistNow(value: PersistedNewsShare | null): Promise<void> {
-    setPersisted(value);
+    if (value) {
+      setPersisted({ ...value, savedAt: nowIso() });
+    } else {
+      setPersisted(null);
+    }
     await writeTail;
   }
 
@@ -114,11 +137,16 @@ export function createNewsShareController(
       v: 1,
       kind: 'form',
       draft: { ...state.persisted.draft, ...partial },
+      savedAt: nowIso(),
     });
     emit();
   }
 
   function cancel(): void {
+    const fingerprint = state.persisted ? shareSlotFingerprint(state.persisted) : null;
+    if (fingerprint) {
+      rememberConsumed(fingerprint);
+    }
     state.ephemeralReject = null;
     state.lastCreated = null;
     state.lastError = null;
@@ -169,6 +197,10 @@ export function createNewsShareController(
         },
         accessToken,
       );
+      const fingerprint = normalizeShareUrl(current.draft.url);
+      if (fingerprint) {
+        rememberConsumed(fingerprint);
+      }
       await persistNow(null);
       state.lastCreated = created;
     } catch (error) {
@@ -231,30 +263,68 @@ export function createNewsShareController(
     return { kind: 'idle' };
   }
 
+  async function discardStaleSlot(slot: PersistedNewsShare): Promise<void> {
+    const fingerprint = shareSlotFingerprint(slot);
+    if (fingerprint) {
+      state.lastConsumed = fingerprint;
+      await store.writeLastConsumed(fingerprint);
+    }
+    await store.clear();
+    state.persisted = null;
+  }
+
+  async function hydrateFromStore(): Promise<void> {
+    await scheduleWrite(async () => {
+      state.lastConsumed = await store.readLastConsumed();
+      const slot = await store.read();
+      if (slot && !isPersistedShareFresh(slot.savedAt, now().getTime())) {
+        await discardStaleSlot(slot);
+      } else {
+        state.persisted = slot;
+      }
+      state.ephemeralReject = null;
+      state.inFlight = false;
+      state.lastCreated = null;
+      state.lastError = null;
+      hydrated = true;
+      emit();
+    });
+  }
+
+  async function ensureHydrated(): Promise<void> {
+    if (!hydrated) {
+      await hydrateFromStore();
+    }
+  }
+
   return {
     async hydrate() {
-      await scheduleWrite(async () => {
-        state.persisted = await store.read();
-        state.ephemeralReject = null;
-        state.inFlight = false;
-        state.lastCreated = null;
-        state.lastError = null;
-        emit();
-      });
+      await hydrateFromStore();
     },
     async capture(raw) {
       const intake = parseShare(raw);
       switch (intake.kind) {
         case 'accepted': {
+          await ensureHydrated();
+          const fingerprint = shareIntakeFingerprint(intake);
           const current = state.persisted;
           if (
             current?.kind === 'form' &&
             current.draft.url &&
-            normalizeShareUrl(current.draft.url) === normalizeShareUrl(intake.url)
+            fingerprint &&
+            normalizeShareUrl(current.draft.url) === fingerprint
           ) {
             state.ephemeralReject = null;
             emit();
             break;
+          }
+          if (!current && fingerprint && state.lastConsumed === fingerprint) {
+            state.ephemeralReject = null;
+            emit();
+            break;
+          }
+          if (fingerprint) {
+            rememberConsumed(fingerprint);
           }
           await persistNow({
             v: 1,
@@ -272,13 +342,30 @@ export function createNewsShareController(
           emit();
           break;
         }
-        case 'choose':
+        case 'choose': {
+          await ensureHydrated();
+          const fingerprint = shareIntakeFingerprint(intake);
+          const current = state.persisted;
+          if (current?.kind === 'choose' && fingerprint && shareSlotFingerprint(current) === fingerprint) {
+            state.ephemeralReject = null;
+            emit();
+            break;
+          }
+          if (!current && fingerprint && state.lastConsumed === fingerprint) {
+            state.ephemeralReject = null;
+            emit();
+            break;
+          }
+          if (fingerprint) {
+            rememberConsumed(fingerprint);
+          }
           await persistNow({ v: 1, kind: 'choose', candidates: intake.candidates });
           state.ephemeralReject = null;
           state.lastCreated = null;
           state.lastError = null;
           emit();
           break;
+        }
         case 'rejected':
           await persistNow(null);
           state.ephemeralReject = intake;
