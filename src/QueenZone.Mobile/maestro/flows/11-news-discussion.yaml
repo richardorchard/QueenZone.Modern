@@ -26,6 +26,11 @@ appId: org.queenzone.mobile
       id: forum-thread-screen
     timeout: 20000
 - assertVisible: QueenZone modernisation begins
+- scrollUntilVisible:
+    element:
+      id: forum-thread-reply
+    direction: DOWN
+    timeout: 20000
 - assertVisible:
     id: forum-thread-reply
 - assertNotVisible:

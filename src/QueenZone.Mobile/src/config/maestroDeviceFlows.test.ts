@@ -80,6 +80,14 @@ describe('Maestro device flows (#1281)', () => {
     );
   });
 
+  it('scrolls the discussion reply action into view on compact emulators', () => {
+    const discussion = readMaestro('flows/11-news-discussion.yaml');
+    assert.match(
+      discussion,
+      /id: forum-thread-screen[\s\S]*scrollUntilVisible:[\s\S]*id: forum-thread-reply[\s\S]*assertVisible:[\s\S]*id: forum-thread-reply/,
+    );
+  });
+
   it('waits out profile-restoring before asserting signed-out profile', () => {
     const profile = readMaestro('flows/08-profile-signed-out.yaml');
     assert.match(
