@@ -171,13 +171,13 @@ jobs:
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
-          # Emulator 37.1.11 exits when Maestro 2.10 starts its Android driver
-          # on hosted Linux. Pin the last pre-regression stable build (#1411).
-          emulator-build: 14472402
+          # Pin a pre-June-regression stable build and use the supported
+          # software renderer; swiftshader_indirect is deprecated (#1411).
+          emulator-build: 15261927
           target: google_apis
           arch: x86_64
           force-avd-creation: false
-          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          emulator-options: -no-snapshot-save -no-window -gpu software -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           script: ./scripts/run-mobile-device-smoke.sh --platform android --skip-build --no-build --apk src/QueenZone.Mobile/android/app/build/outputs/apk/release/app-release.apk $PROVE_FAILURE_ARGS
 
@@ -466,11 +466,11 @@ jobs:
         with:
           api-level: 35
           # Keep smoke and extended suites on the same known-stable emulator.
-          emulator-build: 14472402
+          emulator-build: 15261927
           target: google_apis
           arch: x86_64
           force-avd-creation: false
-          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          emulator-options: -no-snapshot-save -no-window -gpu software -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           script: ./scripts/run-mobile-device-smoke.sh --platform android $DEVICE_SUITE_ARGS --skip-build --no-build --apk src/QueenZone.Mobile/android/app/build/outputs/apk/release/app-release.apk
 
