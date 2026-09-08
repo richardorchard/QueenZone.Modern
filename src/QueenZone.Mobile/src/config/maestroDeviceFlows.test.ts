@@ -206,6 +206,7 @@ describe('device-smoke Release embed (#1322)', () => {
     assert.match(workflow, /-configuration Release/);
     assert.match(workflow, /Products\/Release-iphonesimulator/);
     assert.match(workflow, /QUEENZONE_MOBILE_SMOKE_EMBED/);
+    assert.match(workflow, /EXPO_PUBLIC_SMOKE_EMBED/);
     assert.match(workflow, /SENTRY_DISABLE_AUTO_UPLOAD/);
     assert.doesNotMatch(workflow, /\.\/gradlew assembleDebug/);
     assert.doesNotMatch(workflow, /apk\/debug\/app-debug\.apk/);
@@ -218,6 +219,7 @@ describe('device-smoke Release embed (#1322)', () => {
     assert.match(script, /-configuration Release/);
     assert.match(script, /Release-iphonesimulator/);
     assert.match(script, /QUEENZONE_MOBILE_SMOKE_EMBED=1/);
+    assert.match(script, /EXPO_PUBLIC_SMOKE_EMBED=1/);
     assert.doesNotMatch(script, /\.\/gradlew assembleDebug/);
     assert.doesNotMatch(script, /apk\/debug\/app-debug\.apk/);
     assert.doesNotMatch(script, /-configuration Debug/);

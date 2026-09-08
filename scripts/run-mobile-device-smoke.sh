@@ -322,6 +322,7 @@ build_android() {
     cd src/QueenZone.Mobile
     export EXPO_PUBLIC_APP_ENV=development
     export EXPO_PUBLIC_API_BASE_URL="http://10.0.2.2:${port}"
+    export EXPO_PUBLIC_SMOKE_EMBED=1
     export SENTRY_DISABLE_AUTO_UPLOAD=true
     export QUEENZONE_MOBILE_SMOKE_EMBED=1
     export FORCE_BUNDLING=1
@@ -340,6 +341,7 @@ build_ios() {
     cd src/QueenZone.Mobile
     export EXPO_PUBLIC_APP_ENV=development
     export EXPO_PUBLIC_API_BASE_URL="http://127.0.0.1:${port}"
+    export EXPO_PUBLIC_SMOKE_EMBED=1
     export SENTRY_DISABLE_AUTO_UPLOAD=true
     export QUEENZONE_MOBILE_SMOKE_EMBED=1
     export FORCE_BUNDLING=1

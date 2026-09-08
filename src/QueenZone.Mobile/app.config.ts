@@ -65,6 +65,11 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     runNumber: process.env.GITHUB_RUN_NUMBER,
   });
   const smokeEmbed = isSmokeEmbedEnabled(process.env);
+  // Metro inlines EXPO_PUBLIC_* at bundle time. Constants.expoConfig.extra can
+  // still be empty on the first JS tick of an iOS Release embed (#1387).
+  if (smokeEmbed && !process.env.EXPO_PUBLIC_SMOKE_EMBED) {
+    process.env.EXPO_PUBLIC_SMOKE_EMBED = '1';
+  }
   return {
     ...config,
     name: config.name ?? 'QueenZone',
