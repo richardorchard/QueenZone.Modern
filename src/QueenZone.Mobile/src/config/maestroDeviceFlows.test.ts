@@ -190,4 +190,18 @@ describe('device-smoke Release embed (#1322)', () => {
     assert.match(readMaestro('flows/10-forum-attach.yaml'), /id: home-screen/);
     assert.match(readMaestro('journeys.yaml'), /flows\/10-forum-attach\.yaml/);
   });
+
+  it('asserts the reserved env-banner without replacing home-screen or home-profile', () => {
+    const launch = readMaestro('flows/01-launch.yaml');
+    assert.match(launch, /id: home-screen/);
+    assert.match(launch, /id: home-hero/);
+    assert.match(launch, /id: env-banner/);
+    const homeIdx = launch.indexOf('id: home-screen');
+    const bannerIdx = launch.indexOf('id: env-banner');
+    assert.ok(homeIdx >= 0 && bannerIdx > homeIdx);
+
+    const profile = readMaestro('flows/08-profile-signed-out.yaml');
+    assert.match(profile, /id: home-profile/);
+    assert.doesNotMatch(profile, /id: env-banner[\s\S]*tapOn:/);
+  });
 });

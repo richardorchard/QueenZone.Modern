@@ -29,6 +29,10 @@ public sealed partial class LayoutSkipLinkTests : IClassFixture<QueenZoneWebAppl
             skipLink.Index < headerIndex,
             "Skip link must be the first focusable control, before the site header.");
 
+        var bannerIndex = html.IndexOf("qz-env-banner", StringComparison.Ordinal);
+        Assert.True(bannerIndex > skipLink.Index, "Local Testing host must reserve the env banner after the skip link.");
+        Assert.True(bannerIndex < headerIndex, "Env banner must sit in document flow before the site header.");
+
         Assert.Matches(@"<main\b[^>]*\bid=""main-content""", html);
         Assert.Matches(@"<main\b[^>]*\btabindex=""-1""", html);
     }
