@@ -6,6 +6,7 @@ module.exports = defineConfig([
   globalIgnores([
     'ios/**',
     'android/**',
+    'modules/**/android/**',
     'node_modules/**',
     'coverage/**',
     '.expo/**',
