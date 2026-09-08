@@ -238,6 +238,27 @@ sufficient), then update the `SENTRY_AUTH_TOKEN` secret in Bitwarden and
 GitHub, and the `SENTRY_DSN`/`SENTRY_ORG`/`SENTRY_PROJECT` repo variables if
 the org/project changed.
 
+## Anonymous product analytics
+
+[TelemetryDeck](https://telemetrydeck.com) records two low-volume events:
+one `app.active` event per installation per UTC day and `section.viewed` when
+the user changes among Home, News, Photography, Archive, and Forum. This gives
+anonymous active-installation counts and section popularity. TelemetryDeck can
+also report country-level origin and the app sends the device's two-letter
+region preference; neither requires location permission or precise location.
+
+The analytics installation ID is random, stored separately in AsyncStorage,
+and never derived from a QueenZone account, push token, email, or member ID.
+Events contain no route parameters, URLs, content IDs, search text, messages,
+or other user content. Delivery is best-effort and never blocks the app.
+
+Set the public `EXPO_PUBLIC_TELEMETRYDECK_APP_ID` at build time to enable the
+client. `app.config.ts` bakes it into `extra.telemetryDeckAppId`. It remains
+disabled when unset; non-production builds mark configured signals as test
+data. Store publish environments use the `TELEMETRYDECK_APP_ID` GitHub Actions
+variable. Do not add a payment method or paid subscription to the TelemetryDeck
+account without a separate product decision.
+
 ## Navigation shell
 
 React Navigation provides the app shell ([ADR 0012](../../docs/decisions/0012-react-navigation-app-shell.md)).

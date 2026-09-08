@@ -7,6 +7,7 @@ import {
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useReducer } from 'react';
+import { AppState } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { RootNavigator } from './src/navigation/RootNavigator';
@@ -23,6 +24,7 @@ import {
   initialBootSplashState,
 } from './src/splash/bootSplashMachine';
 import { ThemeProvider, dark, useQueenzoneFonts, useTheme } from './src/theme';
+import { trackDailyActive, trackNavigationState } from './src/analytics/telemetry';
 
 SplashScreen.preventAutoHideAsync().catch(() => {
   /* already prevented or unavailable in tests */
@@ -49,11 +51,19 @@ function AppNavigation() {
 
   const navigationRef = useNavigationContainerRef();
 
+  const reportSection = () => {
+    void trackNavigationState(navigationRef.getRootState());
+  };
+
   return (
     <NavigationContainer
       ref={navigationRef}
       theme={navigationTheme}
-      onReady={() => navigationIntegration.registerNavigationContainer(navigationRef)}
+      onReady={() => {
+        navigationIntegration.registerNavigationContainer(navigationRef);
+        reportSection();
+      }}
+      onStateChange={reportSection}
     >
       <StatusBar style={mode === 'light' ? 'dark' : 'light'} />
       <RootNavigator />
@@ -65,6 +75,16 @@ export default function App() {
   const [fontsLoaded, fontError] = useQueenzoneFonts();
   const appReady = fontsLoaded || fontError;
   const [splash, dispatch] = useReducer(bootSplashReducer, initialBootSplashState);
+
+  useEffect(() => {
+    void trackDailyActive();
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        void trackDailyActive();
+      }
+    });
+    return () => subscription.remove();
+  }, []);
 
   useEffect(() => {
     if (appReady) {

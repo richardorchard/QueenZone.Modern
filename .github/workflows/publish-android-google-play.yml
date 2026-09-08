@@ -67,6 +67,7 @@ jobs:
       ANDROID_VERSION_CODE: ${{ github.run_number }}
       EXPO_PUBLIC_APP_ENV: ${{ inputs.app_environment }}
       EXPO_PUBLIC_SENTRY_DSN: ${{ vars.SENTRY_DSN }}
+      EXPO_PUBLIC_TELEMETRYDECK_APP_ID: ${{ vars.TELEMETRYDECK_APP_ID }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -116,6 +117,16 @@ jobs:
           fi
           echo "extra.sentryDsn is set (length ${#dsn})"
 
+      - name: Confirm TelemetryDeck App ID is baked into Expo extra
+        run: |
+          set -euo pipefail
+          app_id=$(npx expo config --json | jq -r '.extra.telemetryDeckAppId // .exp.extra.telemetryDeckAppId // empty')
+          if [ -z "$app_id" ]; then
+            echo "::error::app.config extra.telemetryDeckAppId is empty; product analytics will be disabled."
+            exit 1
+          fi
+          echo "extra.telemetryDeckAppId is set (length ${#app_id})"
+
       - name: Cache Gradle
         uses: actions/cache@v4
         with:
@@ -151,6 +162,7 @@ jobs:
             ANDROID_TEST_KEYSTORE_PASSWORD \
             ANDROID_TEST_KEY_PASSWORD \
             EXPO_PUBLIC_SENTRY_DSN \
+            EXPO_PUBLIC_TELEMETRYDECK_APP_ID \
             SENTRY_AUTH_TOKEN \
             SENTRY_ORG \
             SENTRY_PROJECT; do
@@ -245,6 +257,14 @@ jobs:
           fi
           if [ "$baked_api_base_url" != "$expected_api_base_url" ]; then
             echo "::error::AAB API base URL is ${baked_api_base_url:-<missing>}, expected ${expected_api_base_url}."
+            exit 1
+          fi
+          if [ -z "${EXPO_PUBLIC_TELEMETRYDECK_APP_ID:-}" ]; then
+            echo "::error::EXPO_PUBLIC_TELEMETRYDECK_APP_ID is not set; product analytics will be disabled."
+            exit 1
+          fi
+          if ! grep -Fq "$EXPO_PUBLIC_TELEMETRYDECK_APP_ID" "$constants_config"; then
+            echo "::error::AAB is missing extra.telemetryDeckAppId; product analytics will be disabled."
             exit 1
           fi
 

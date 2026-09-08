@@ -7,7 +7,7 @@ This is a conservative source-level draft, not a legal conclusion. Reconcile it 
 - **Does the app collect or share required user-data types?** Yes.
 - **Is all transmitted user data encrypted in transit?** Yes, for production HTTPS/API and provider traffic; verify the final network-security configuration.
 - **Can users request deletion?** Yes, in-app and through `https://www.queenzone.org/data-deletion`.
-- **Tracking / advertising use:** None identified in the native app. The website's analytics/advertising disclosures must not be copied to the native form unless the native build actually includes them.
+- **Tracking / advertising use:** None. TelemetryDeck product analytics is not used for advertising or cross-app tracking. The website's analytics/advertising disclosures must not be copied to the native form.
 - **Sale of data:** No.
 
 ## Likely declarations
@@ -19,7 +19,7 @@ This is a conservative source-level draft, not a legal conclusion. Reconcile it 
 | User IDs | Yes | With service providers operating the app | Required when signed in | Account management, app functionality, security |
 | Photos | Yes when submitted | With hosting/storage providers | Optional | Avatar, forum and moderated photo submission |
 | Other user-generated content | Yes | With hosting/service providers; forum content becomes public by user action | Optional | Forum posts, messages, suggestions, contact requests |
-| App interactions | Possibly | Sentry when enabled | Automatic if production tracing is enabled | Analytics and app functionality |
+| App interactions | Yes | TelemetryDeck and Sentry as service providers | Automatic when configured | Analytics and app functionality |
 | Crash logs | Possibly | Sentry when enabled | Automatic if production reporting is enabled | Diagnostics |
 | Diagnostics / performance | Possibly | Sentry when enabled | Automatic if production tracing is enabled | Diagnostics and analytics |
 | Device or other IDs | Yes | FCM and hosting/service providers | Automatic for opted-in push | Notifications, security, app functionality |
@@ -34,6 +34,7 @@ This is a conservative source-level draft, not a legal conclusion. Reconcile it 
 - User-selected photos leave the device only after an explicit submission action.
 - Private-message bodies, authentication tokens, email addresses and uploaded image bytes must not be recorded in Sentry breadcrumbs or telemetry.
 - Confirm whether Sentry captures route names, IP addresses, device identifiers or user identity in the final configuration.
+- Confirm the final TelemetryDeck payload contains only the analytics installation ID, coarse device/app metadata, and allowlisted section value documented in `docs/architecture/mobile-product-analytics.md`.
 - Confirm account deletion covers mobile sessions, push subscriptions and uploaded avatar references as documented.
 
 ## Form decisions requiring product-owner confirmation

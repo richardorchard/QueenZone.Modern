@@ -26,6 +26,13 @@ describe('app.config Sentry Expo plugin', () => {
   });
 });
 
+describe('app.config TelemetryDeck setting', () => {
+  it('bakes the public App ID into Expo extra without a committed value', () => {
+    assert.match(source, /process\.env\.EXPO_PUBLIC_TELEMETRYDECK_APP_ID/);
+    assert.match(source, /telemetryDeckAppId:/);
+  });
+});
+
 describe('app.config android versionCode', () => {
   it('bakes android.versionCode from GITHUB_RUN_NUMBER at prebuild', () => {
     assert.match(
