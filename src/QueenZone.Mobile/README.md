@@ -567,7 +567,10 @@ names to branch protection until soak. `smoke.yaml` stays exactly the
 The manual P0 release suite (`maestro/release.yaml`, #1411) is a third,
 independent layer. Dispatch `suite=release` against a fresh Testing host. It
 runs on Android and iOS (`platform=both`, the default), or one selected platform
-for focused diagnostics. Its three isolated flows authenticate with the
+for focused diagnostics. Android P0 acceptance uses the repository's ARM64
+self-hosted Mac and a dedicated hardware-rendered emulator on port 5556; repeated
+GitHub-hosted Linux emulator-process exits made that environment unsuitable for
+this longer release suite. Its three isolated flows authenticate with the
 Testing-only token and verify private-message compose/reply/archive/unarchive,
 forum topic creation and reply, and a news suggestion appearing under My
 submissions. It does not exercise real OAuth, SecureStore restoration, signed

@@ -198,19 +198,34 @@ describe('device-smoke harness (#1281)', () => {
     assert.match(script, /maestro\/release\.yaml/);
     assert.match(workflow, /- release/);
     assert.equal(workflow.match(/github\.event\.inputs\.suite == 'release'/g)?.length, 2);
-    assert.match(workflow, /DEVICE_SUITE_ARGS=--suite release/);
+    assert.match(workflow, /mobile-android-release:[\s\S]*run-mobile-android-release-self-hosted\.sh/);
     assert.match(workflow, /SUITE="release"/);
     assert.match(workflow, /platform:[\s\S]*- both[\s\S]*- android[\s\S]*- ios/);
-    assert.equal(workflow.match(/github\.event\.inputs\.platform == 'android'/g)?.length, 2);
+    assert.equal(workflow.match(/github\.event\.inputs\.platform == 'android'/g)?.length, 3);
     assert.equal(workflow.match(/github\.event\.inputs\.platform == 'ios'/g)?.length, 2);
   });
 
-  it('releases Gradle memory before either hosted Android emulator starts', () => {
+  it('releases Gradle memory and isolates hosted from P0 Android runners', () => {
     const workflow = readRepo('mobile-device-smoke.yml', workflowsDir);
-    assert.equal((workflow.match(/\.\/gradlew --stop/g) ?? []).length, 2);
-    assert.equal((workflow.match(/api-level: 35/g) ?? []).length, 2);
-    assert.equal((workflow.match(/emulator-build: 13610412/g) ?? []).length, 2);
+    assert.equal((workflow.match(/\.\/gradlew --stop/g) ?? []).length, 3);
+    assert.equal((workflow.match(/api-level: 36/g) ?? []).length, 2);
     assert.equal((workflow.match(/-gpu swiftshader_indirect/g) ?? []).length, 2);
+    assert.match(workflow, /mobile-android-release:[\s\S]*runs-on: \[self-hosted, macOS, ARM64, queenzone\]/);
+    assert.match(workflow, /mobile-android-release:[\s\S]*github\.event\.inputs\.suite == 'release'/);
+  });
+
+  it('boots and targets a dedicated hardware-rendered Android release emulator', () => {
+    const runner = readRepo('run-mobile-android-release-self-hosted.sh', scriptsDir);
+    const script = readRepo('run-mobile-device-smoke.sh', scriptsDir);
+    assert.match(runner, /ANDROID_RELEASE_AVD:-QueenZone_CI_API_36/);
+    assert.match(runner, /ANDROID_RELEASE_EMULATOR_PORT:-5556/);
+    assert.match(runner, /Another Android emulator is active/);
+    assert.match(runner, /rm -rf "\$results_dir"/);
+    assert.match(runner, /avdmanager.*create avd/);
+    assert.match(runner, /-gpu host/);
+    assert.match(runner, /MAESTRO_TARGET_DEVICE="\$serial"/);
+    assert.match(runner, /--suite release/);
+    assert.match(script, /--device "\$MAESTRO_TARGET_DEVICE"/);
   });
 
   it('prepends the Maestro install dir before probing PATH', () => {

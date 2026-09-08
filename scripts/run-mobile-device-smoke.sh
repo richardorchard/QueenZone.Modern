@@ -456,7 +456,11 @@ elif [ "$suite" = "release" ]; then
 fi
 
 echo "Running Maestro ($flow). Selector and assertion failures are not retried."
-maestro_args=(
+maestro_args=()
+if [ -n "${MAESTRO_TARGET_DEVICE:-}" ]; then
+  maestro_args+=(--device "$MAESTRO_TARGET_DEVICE")
+fi
+maestro_args+=(
   test "$flow"
   --format junit
   --output "$results_dir/junit.xml"

@@ -170,10 +170,7 @@ jobs:
       - name: Run Android device smoke
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 35
-          # Pin the last stable 35.x emulator; Emulator 36.x repeatedly exits
-          # when Maestro starts its Android driver on hosted Linux (#1411).
-          emulator-build: 13610412
+          api-level: 36
           target: google_apis
           arch: x86_64
           force-avd-creation: false
@@ -352,9 +349,7 @@ jobs:
     if: >-
       (github.event_name == 'schedule' && github.event.schedule == '0 16 * * 1-5')
       || (github.event_name == 'workflow_dispatch'
-        && (github.event.inputs.suite == 'journeys'
-          || github.event.inputs.suite == 'release'
-          || github.event.inputs.suite == 'both')
+        && (github.event.inputs.suite == 'journeys' || github.event.inputs.suite == 'both')
         && (github.event.inputs.platform == 'android' || github.event.inputs.platform == 'both'))
     runs-on: ubuntu-latest
     timeout-minutes: 90
@@ -455,18 +450,12 @@ jobs:
             echo "job=mobile-android-journeys"
             echo "prepared_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           } > src/QueenZone.Mobile/maestro-results/harness.log
-          if [ "${{ github.event.inputs.suite }}" = "release" ]; then
-            echo "DEVICE_SUITE_ARGS=--suite release" >> "$GITHUB_ENV"
-          else
-            echo "DEVICE_SUITE_ARGS=--suite journeys" >> "$GITHUB_ENV"
-          fi
+          echo "DEVICE_SUITE_ARGS=--suite journeys" >> "$GITHUB_ENV"
 
       - name: Run Android device journeys
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 35
-          # Keep smoke and extended suites on the same known-stable emulator.
-          emulator-build: 13610412
+          api-level: 36
           target: google_apis
           arch: x86_64
           force-avd-creation: false
@@ -494,6 +483,109 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: mobile-android-journeys-${{ github.run_id }}
+          path: |
+            src/QueenZone.Mobile/maestro-results/
+          if-no-files-found: error
+          retention-days: 7
+
+  mobile-android-release:
+    name: Mobile Android P0 release suite
+    if: >-
+      github.event_name == 'workflow_dispatch'
+      && github.event.inputs.suite == 'release'
+      && (github.event.inputs.platform == 'android' || github.event.inputs.platform == 'both')
+    runs-on: [self-hosted, macOS, ARM64, queenzone]
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: src/QueenZone.Mobile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+          cache: true
+          cache-dependency-path: |
+            **/*.csproj
+            .config/dotnet-tools.json
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: src/QueenZone.Mobile/package-lock.json
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install mobile JS
+        run: npm ci
+
+      - name: Build Testing web host
+        working-directory: .
+        run: |
+          unset ConnectionStrings__QueenZoneLegacy || true
+          unset ConnectionStrings__BlobStorage || true
+          unset ConnectionStrings__SqlServerTest || true
+          dotnet build src/QueenZone.Web/QueenZone.Web.csproj --configuration Release
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-release-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('src/QueenZone.Mobile/package-lock.json') }}
+          restore-keys: |
+            gradle-release-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Preinstall Android NDK 27.1.12297006
+        working-directory: .
+        run: ./scripts/preinstall-android-ndk.sh
+
+      - name: Assemble Android Release smoke APK
+        env:
+          EXPO_PUBLIC_APP_ENV: development
+          EXPO_PUBLIC_API_BASE_URL: http://10.0.2.2:5098
+          EXPO_PUBLIC_SMOKE_EMBED: "1"
+          SENTRY_DISABLE_AUTO_UPLOAD: "true"
+          QUEENZONE_MOBILE_SMOKE_EMBED: "1"
+          FORCE_BUNDLING: "1"
+        run: |
+          npx expo prebuild --platform android
+          cd android
+          ./gradlew assembleRelease
+          ./gradlew --stop
+
+      - name: Install Maestro
+        working-directory: .
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/.maestro/bin:$PATH"
+          maestro --version
+
+      - name: Run Android P0 release suite
+        working-directory: .
+        run: |
+          unset ConnectionStrings__QueenZoneLegacy || true
+          unset ConnectionStrings__BlobStorage || true
+          unset ConnectionStrings__SqlServerTest || true
+          ./scripts/run-mobile-android-release-self-hosted.sh \
+            src/QueenZone.Mobile/android/app/build/outputs/apk/release/app-release.apk
+
+      - name: Upload Android release diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: mobile-android-release-${{ github.run_id }}
           path: |
             src/QueenZone.Mobile/maestro-results/
           if-no-files-found: error
