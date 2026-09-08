@@ -42,6 +42,7 @@ export const testIds = {
   suggestNewsRetry: 'suggest-news-retry',
   suggestNewsChooser: 'suggest-news-chooser',
   suggestNewsSuccess: 'suggest-news-success',
+  suggestNewsViewSubmissions: 'suggest-news-view-submissions',
 
   searchTypeFilters: 'search-type-filters',
 
@@ -81,6 +82,7 @@ export const testIds = {
   pendingMessage: 'pending-message',
   pendingForumPost: 'pending-forum-post',
   forumNewThread: 'forum-new-thread',
+  forumComposerTitle: 'forum-composer-title',
   forumComposerBody: 'forum-composer-body',
   forumComposerAttachPhotos: 'forum-composer-attach-photos',
   forumComposerAttachFiles: 'forum-composer-attach-files',
@@ -92,6 +94,7 @@ export const testIds = {
   profileSignedIn: 'profile-signed-in',
   profileDisplayName: 'profile-display-name',
   profileMessages: 'profile-messages',
+  profileMySubmissions: 'profile-my-submissions',
   profileBack: 'profile-back',
   profileRestoring: 'profile-restoring',
   fanPerformanceSessionRestoring: 'fan-performance-session-restoring',
@@ -121,8 +124,21 @@ export const testIds = {
 
   memberGate: 'member-gate',
   inboxScreen: 'inbox-screen',
+  inboxCompose: 'inbox-compose',
+  inboxArchived: 'inbox-archived',
   archivedScreen: 'archived-screen',
+  composeMessageRecipient: 'compose-message-recipient',
+  composeMessageRecipientPrefix: 'compose-message-recipient-',
+  composeMessageBody: 'compose-message-body',
+  composeMessageSubmit: 'compose-message-submit',
+  conversationScreen: 'conversation-screen',
   conversationComposer: 'conversation-composer',
+  conversationReply: 'conversation-reply',
+  conversationReplySubmit: 'conversation-reply-submit',
+  conversationArchive: 'conversation-archive',
+
+  mySubmissionsScreen: 'my-submissions-screen',
+  mySubmissionsTabPrefix: 'my-submissions-tab-',
 
   notificationBanner: 'notification-banner',
   envBanner: 'env-banner',

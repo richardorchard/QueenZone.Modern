@@ -225,8 +225,17 @@ function InboxList({ navigation }: Pick<Props, 'navigation'>) {
         subtitle="Private conversations with other members."
       />
       <View style={{ paddingHorizontal: space.xl, paddingBottom: space.lg, flexDirection: 'row', gap: space.sm }}>
-        <Button label="New message" onPress={() => navigation.navigate('ComposeMessage')} />
-        <Button label="Archived" variant="ghost" onPress={() => navigation.navigate('Archived')} />
+        <Button
+          label="New message"
+          testID={testIds.inboxCompose}
+          onPress={() => navigation.navigate('ComposeMessage')}
+        />
+        <Button
+          label="Archived"
+          variant="ghost"
+          testID={testIds.inboxArchived}
+          onPress={() => navigation.navigate('Archived')}
+        />
       </View>
       {actionError ? (
         <View style={{ paddingHorizontal: space.xl, paddingBottom: space.md }}>

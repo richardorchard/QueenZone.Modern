@@ -145,7 +145,11 @@ export function ProfileScreen({ navigation }: Props) {
         testID={testIds.profileMessages}
         onPress={() => navigation.navigate('Inbox')}
       />
-      <SettingsRow title="My submissions" onPress={() => navigation.navigate('MySubmissions')} />
+      <SettingsRow
+        title="My submissions"
+        testID={testIds.profileMySubmissions}
+        onPress={() => navigation.navigate('MySubmissions')}
+      />
       <SettingsRow
         title="Downloaded performances"
         onPress={() => navigation.navigate('SavedList', { kind: 'offline' })}

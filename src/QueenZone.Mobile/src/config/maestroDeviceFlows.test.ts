@@ -27,6 +27,43 @@ describe('Maestro device flows (#1281)', () => {
     assert.doesNotMatch(smoke, /10-forum-attach|11-news-discussion|12-masthead-unread/);
   });
 
+  it('keeps the P0 release suite separate and independently resets each write journey', () => {
+    const release = readMaestro('release.yaml');
+    assert.match(release, /flows\/13-messages-lifecycle\.yaml/);
+    assert.match(release, /flows\/14-forum-create-reply\.yaml/);
+    assert.match(release, /flows\/15-news-suggestion\.yaml/);
+
+    for (const flow of [
+      'flows/13-messages-lifecycle.yaml',
+      'flows/14-forum-create-reply.yaml',
+      'flows/15-news-suggestion.yaml',
+    ]) {
+      const content = readMaestro(flow);
+      assert.match(content, /launchApp:[\s\S]*clearState: true[\s\S]*clearKeychain: true/);
+      assert.match(content, /id: home-screen[\s\S]*runFlow: open-smoke-auth\.yaml/);
+      assert.doesNotMatch(content, /retry:/);
+    }
+  });
+
+  it('covers message, forum, and submission outcomes through stable selectors', () => {
+    const messages = readMaestro('flows/13-messages-lifecycle.yaml');
+    assert.match(messages, /id: compose-message-recipient/);
+    assert.match(messages, /id: conversation-reply-submit/);
+    assert.match(messages, /id: conversation-archive/);
+    assert.match(messages, /text: '\^Unarchive\$'/);
+
+    const forum = readMaestro('flows/14-forum-create-reply.yaml');
+    assert.match(forum, /id: forum-composer-title/);
+    assert.match(forum, /id: forum-composer-submit/);
+    assert.match(forum, /text: Release forum reply/);
+
+    const suggestion = readMaestro('flows/15-news-suggestion.yaml');
+    assert.match(suggestion, /id: suggest-news-success/);
+    assert.match(suggestion, /id: suggest-news-view-submissions/);
+    assert.match(suggestion, /id: my-submissions-tab-news/);
+    assert.match(suggestion, /visible: Release news suggestion/);
+  });
+
   it('keeps the #1247 journeys shape and waits for chrome before smoke-auth', () => {
     const attach = readMaestro('flows/10-forum-attach.yaml');
     assert.match(attach, /launchApp:/);
@@ -144,6 +181,17 @@ describe('Maestro device flows (#1281)', () => {
 });
 
 describe('device-smoke harness (#1281)', () => {
+  it('routes suite=release through the harness and both device jobs', () => {
+    const script = readRepo('run-mobile-device-smoke.sh', scriptsDir);
+    const workflow = readRepo('mobile-device-smoke.yml', workflowsDir);
+    assert.match(script, /smoke\|journeys\|release/);
+    assert.match(script, /maestro\/release\.yaml/);
+    assert.match(workflow, /- release/);
+    assert.equal(workflow.match(/github\.event\.inputs\.suite == 'release'/g)?.length, 2);
+    assert.match(workflow, /DEVICE_SUITE_ARGS=--suite release/);
+    assert.match(workflow, /SUITE="release"/);
+  });
+
   it('prepends the Maestro install dir before probing PATH', () => {
     const script = readRepo('run-mobile-device-smoke.sh', scriptsDir);
     assert.match(script, /HOME\}\/\.maestro\/bin/);

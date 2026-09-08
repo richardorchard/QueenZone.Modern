@@ -17,6 +17,7 @@ on:
         options:
           - smoke
           - journeys
+          - release
           - both
         default: smoke
       prove_failure:
@@ -332,11 +333,13 @@ jobs:
           retention-days: 7
 
   mobile-android-journeys:
-    name: Mobile Android device journeys
+    name: Mobile Android extended device suite
     if: >-
       (github.event_name == 'schedule' && github.event.schedule == '0 16 * * 1-5')
       || (github.event_name == 'workflow_dispatch'
-        && (github.event.inputs.suite == 'journeys' || github.event.inputs.suite == 'both'))
+        && (github.event.inputs.suite == 'journeys'
+          || github.event.inputs.suite == 'release'
+          || github.event.inputs.suite == 'both'))
     runs-on: ubuntu-latest
     timeout-minutes: 90
     defaults:
@@ -435,6 +438,11 @@ jobs:
             echo "job=mobile-android-journeys"
             echo "prepared_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           } > src/QueenZone.Mobile/maestro-results/harness.log
+          if [ "${{ github.event.inputs.suite }}" = "release" ]; then
+            echo "DEVICE_SUITE_ARGS=--suite release" >> "$GITHUB_ENV"
+          else
+            echo "DEVICE_SUITE_ARGS=--suite journeys" >> "$GITHUB_ENV"
+          fi
 
       - name: Run Android device journeys
         uses: reactivecircus/android-emulator-runner@v2
@@ -445,7 +453,7 @@ jobs:
           force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
-          script: ./scripts/run-mobile-device-smoke.sh --platform android --suite journeys --skip-build --no-build --apk src/QueenZone.Mobile/android/app/build/outputs/apk/release/app-release.apk
+          script: ./scripts/run-mobile-device-smoke.sh --platform android $DEVICE_SUITE_ARGS --skip-build --no-build --apk src/QueenZone.Mobile/android/app/build/outputs/apk/release/app-release.apk
 
       - name: Collect leftover Android journeys logs
         if: failure()
@@ -473,11 +481,13 @@ jobs:
           retention-days: 7
 
   mobile-ios-journeys:
-    name: Mobile iOS device journeys
+    name: Mobile iOS extended device suite
     if: >-
       (github.event_name == 'schedule' && github.event.schedule == '0 16 * * 1-5')
       || (github.event_name == 'workflow_dispatch'
-        && (github.event.inputs.suite == 'journeys' || github.event.inputs.suite == 'both'))
+        && (github.event.inputs.suite == 'journeys'
+          || github.event.inputs.suite == 'release'
+          || github.event.inputs.suite == 'both'))
     runs-on: macos-26
     timeout-minutes: 90
     defaults:
@@ -591,9 +601,13 @@ jobs:
           unset ConnectionStrings__BlobStorage || true
           unset ConnectionStrings__SqlServerTest || true
           APP=$(ls -d src/QueenZone.Mobile/ios/build/Build/Products/Release-iphonesimulator/*.app | head -n 1)
+          SUITE="journeys"
+          if [ "${{ github.event.inputs.suite }}" = "release" ]; then
+            SUITE="release"
+          fi
           ./scripts/run-mobile-device-smoke.sh \
             --platform ios \
-            --suite journeys \
+            --suite "$SUITE" \
             --skip-build \
             --no-build \
             --app "$APP"
