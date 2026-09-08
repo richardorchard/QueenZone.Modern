@@ -182,6 +182,47 @@ public sealed class SearchReindexBuilderTests
     }
 
     [Fact]
+    public async Task ReindexBiographyAsync_IncludesChapterBodyText()
+    {
+        var (builder, store) = CreateBuilder();
+
+        await builder.ReindexBiographyAsync();
+
+        var chapter = Assert.Single(store.GetAll(), doc => doc.Title == "1975");
+        Assert.Equal(SiteSearchContentType.Biography, chapter.ContentType);
+        Assert.Contains("Bohemian Rhapsody", chapter.Body, StringComparison.Ordinal);
+        Assert.DoesNotContain("<p>", chapter.Body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ReindexBiographyAsync_HydratesBodyWhenListProjectionOmitsIt()
+    {
+        var store = new SharedSearchIndexStore();
+        var innerBiography = new InMemoryBiographyRepository(SampleBiographyData.CreateSeedChapters());
+        var builder = new SearchReindexBuilder(
+            new InMemorySearchIndexService(store),
+            new InMemoryNewsRepository(new SharedNewsStore(SampleNewsData.CreateSeedArticles())),
+            new InMemoryForumRepository(
+                SampleForumData.CreateSeedCategories(),
+                SampleForumData.CreateSeedStats(),
+                new InMemoryForumWriteRepository(),
+                new InMemoryForumAttachmentRepository()),
+            new InMemoryArticleRepository(new InMemoryArticleSubmissionRepository()),
+            new InMemoryArticlesRepository(SampleArticlesData.CreateSeedArticles()),
+            new ListOmitsBodyBiographyRepository(innerBiography),
+            new InMemoryDiscographyRepository(SampleDiscographyData.CreateSeedAlbums()),
+            new InMemoryQueenHistoryRepository(SampleQueenHistoryData.CreateSeedEvents()),
+            new InMemoryFanPerformanceRepository(SampleFanPerformanceData.CreateSeedPerformances()));
+
+        await builder.ReindexBiographyAsync();
+
+        var listed = await innerBiography.GetChaptersAsync();
+        Assert.Contains(listed, chapter => chapter.Title == "1975" && chapter.Body.Contains("Bohemian Rhapsody", StringComparison.Ordinal));
+        var chapter = Assert.Single(store.GetAll(), doc => doc.Title == "1975");
+        Assert.Contains("Bohemian Rhapsody", chapter.Body, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task ReindexDiscographyAsync_IndexesAllAlbums()
     {
         var (builder, store) = CreateBuilder();
@@ -191,6 +232,83 @@ public sealed class SearchReindexBuilderTests
         var documents = store.GetAll().Where(d => d.ContentType == SiteSearchContentType.Discography).ToList();
         Assert.Equal(SampleDiscographyData.CreateSeedAlbums().Count, documents.Count);
         Assert.Contains(documents, doc => doc.Title == "A Night at the Opera");
+    }
+
+    [Fact]
+    public async Task ReindexDiscographyAsync_IncludesTrackTitlesInAlbumBody()
+    {
+        var (builder, store) = CreateBuilder();
+
+        await builder.ReindexDiscographyAsync();
+
+        var documents = store.GetAll().Where(d => d.ContentType == SiteSearchContentType.Discography).ToList();
+        var opera = Assert.Single(documents, doc => doc.Title == "A Night at the Opera");
+        Assert.Equal("A Night at the Opera", opera.Title);
+        Assert.Equal("A Night at the Opera", opera.Summary);
+        Assert.Equal("/discography/albums/4/a-night-at-the-opera", opera.Url);
+        Assert.Contains("Bohemian Rhapsody", opera.Body, StringComparison.Ordinal);
+        Assert.Contains("You're My Best Friend", opera.Body, StringComparison.Ordinal);
+        Assert.Equal(1, documents.Count(doc => doc.SourceKey == "discography:4"));
+    }
+
+    [Fact]
+    public async Task ReindexArticlesAsync_DoesNotAliasArticleTypeToLegacyArticle()
+    {
+        var store = new SharedSearchIndexStore();
+        var indexService = new InMemorySearchIndexService(store);
+        var authorId = Guid.NewGuid();
+        var articleSubmissionRepository = new InMemoryArticleSubmissionRepository();
+        var published = await articleSubmissionRepository.UpsertDraftAsync(new ArticleSubmissionDraft(
+            null, authorId, "Community feature about studio work", "Excerpt text", "Body about the album sessions.", null, null));
+        await articleSubmissionRepository.SubmitForReviewAsync(published.Id, authorId);
+        await articleSubmissionRepository.UpdateStatusAsync(
+            published.Id, ArticleSubmissionStatus.ApprovedForPublishing, "reviewer@queenzone.test", null, null);
+        await articleSubmissionRepository.UpdateStatusAsync(
+            published.Id, ArticleSubmissionStatus.Published, "reviewer@queenzone.test", null, null);
+
+        var builder = new SearchReindexBuilder(
+            indexService,
+            new InMemoryNewsRepository(new SharedNewsStore(SampleNewsData.CreateSeedArticles())),
+            new InMemoryForumRepository(
+                SampleForumData.CreateSeedCategories(),
+                SampleForumData.CreateSeedStats(),
+                new InMemoryForumWriteRepository(),
+                new InMemoryForumAttachmentRepository()),
+            new InMemoryArticleRepository(articleSubmissionRepository),
+            new InMemoryArticlesRepository(SampleArticlesData.CreateSeedArticles()),
+            new InMemoryBiographyRepository(SampleBiographyData.CreateSeedChapters()),
+            new InMemoryDiscographyRepository(SampleDiscographyData.CreateSeedAlbums()),
+            new InMemoryQueenHistoryRepository(SampleQueenHistoryData.CreateSeedEvents()),
+            new InMemoryFanPerformanceRepository(SampleFanPerformanceData.CreateSeedPerformances()));
+
+        await builder.ReindexArticlesAsync();
+
+        var articleDocuments = store.GetAll().Where(d => d.ContentType == SiteSearchContentType.Article).ToList();
+        Assert.NotEmpty(articleDocuments);
+        Assert.All(articleDocuments, doc => Assert.Equal(SiteSearchContentType.Article, doc.ContentType));
+        Assert.DoesNotContain(store.GetAll(), doc => doc.ContentType == SiteSearchContentType.LegacyArticle);
+        Assert.All(articleDocuments, doc => Assert.StartsWith("article:", doc.SourceKey));
+        Assert.DoesNotContain(articleDocuments, doc => doc.SourceKey.StartsWith("legacy-article:", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void MapArticle_UsesArticleType_NotLegacyArticle()
+    {
+        var document = SearchReindexBuilder.MapArticle(new PublishedArticleSubmission(
+            Guid.NewGuid(),
+            "Community title",
+            "community-slug",
+            "Excerpt",
+            "Body",
+            null,
+            null,
+            DateTimeOffset.UtcNow,
+            "Author",
+            1));
+
+        Assert.Equal(SiteSearchContentType.Article, document.ContentType);
+        Assert.NotEqual(SiteSearchContentType.LegacyArticle, document.ContentType);
+        Assert.Equal("article:community-slug", document.SourceKey);
     }
 
     [Fact]
@@ -248,5 +366,29 @@ public sealed class SearchReindexBuilderTests
         var secondRunCount = store.GetAll().Count(d => d.ContentType == SiteSearchContentType.Forum);
 
         Assert.Equal(firstRunCount, secondRunCount);
+    }
+
+    /// <summary>
+    /// Mirrors <c>EfBiographyRepository.GetChaptersAsync</c>, which maps list rows with an empty Body.
+    /// </summary>
+    private sealed class ListOmitsBodyBiographyRepository(IBiographyRepository inner) : IBiographyRepository
+    {
+        public async Task<IReadOnlyList<BiographyChapterItem>> GetChaptersAsync(CancellationToken cancellationToken = default)
+        {
+            var chapters = await inner.GetChaptersAsync(cancellationToken);
+            return chapters.Select(chapter => chapter with { Body = string.Empty }).ToList();
+        }
+
+        public Task<BiographyChapterItem?> GetByIdAsync(int id, CancellationToken cancellationToken = default) =>
+            inner.GetByIdAsync(id, cancellationToken);
+
+        public Task<BiographyChapterNav> GetAdjacentChaptersAsync(int id, CancellationToken cancellationToken = default) =>
+            inner.GetAdjacentChaptersAsync(id, cancellationToken);
+
+        public Task<int> CreateAsync(AdminBiographyDraft draft, CancellationToken cancellationToken = default) =>
+            inner.CreateAsync(draft, cancellationToken);
+
+        public Task UpdateAsync(int id, AdminBiographyDraft draft, CancellationToken cancellationToken = default) =>
+            inner.UpdateAsync(id, draft, cancellationToken);
     }
 }
