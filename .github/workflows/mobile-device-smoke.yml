@@ -525,8 +525,28 @@ jobs:
           distribution: temurin
           java-version: "17"
 
+      - name: Export installed Android SDK
+        working-directory: .
+        run: |
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Library/Android/sdk}}"
+          if [ ! -d "$SDK_ROOT" ]; then
+            echo "::error::Android SDK not found at $SDK_ROOT."
+            exit 1
+          fi
+          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
+          echo "$SDK_ROOT/emulator" >> "$GITHUB_PATH"
+          echo "$SDK_ROOT/platform-tools" >> "$GITHUB_PATH"
+          echo "$SDK_ROOT/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+
       - name: Install mobile JS
         run: npm ci
+
+      - name: Prepare Android release diagnostics
+        working-directory: .
+        run: |
+          mkdir -p src/QueenZone.Mobile/maestro-results
+          echo "job=mobile-android-release" > src/QueenZone.Mobile/maestro-results/harness.log
 
       - name: Build Testing web host
         working-directory: .

@@ -212,6 +212,8 @@ describe('device-smoke harness (#1281)', () => {
     assert.equal((workflow.match(/-gpu swiftshader_indirect/g) ?? []).length, 2);
     assert.match(workflow, /mobile-android-release:[\s\S]*runs-on: \[self-hosted, macOS, ARM64, queenzone\]/);
     assert.match(workflow, /mobile-android-release:[\s\S]*github\.event\.inputs\.suite == 'release'/);
+    assert.match(workflow, /mobile-android-release:[\s\S]*Export installed Android SDK/);
+    assert.match(workflow, /ANDROID_HOME=\$SDK_ROOT/);
   });
 
   it('boots and targets a dedicated hardware-rendered Android release emulator', () => {
