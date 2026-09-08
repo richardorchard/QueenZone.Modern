@@ -160,7 +160,7 @@ jobs:
       - name: Run Android device smoke
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 36
+          api-level: 35
           target: google_apis
           arch: x86_64
           force-avd-creation: false
@@ -449,7 +449,7 @@ jobs:
       - name: Run Android device journeys
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 36
+          api-level: 35
           target: google_apis
           arch: x86_64
           force-avd-creation: false

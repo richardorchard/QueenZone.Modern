@@ -149,7 +149,8 @@ describe('Maestro device flows (#1281)', () => {
     assert.match(openAuth, /openLink: \$\{SMOKE_AUTH_URL\}/);
     assert.match(openAuth, /accept-ios-open-link\.yaml/);
     assert.match(accept, /platform: iOS/);
-    assert.match(accept, /visible:\s+text: '\^Open\$'/);
+    assert.match(accept, /text: '\^Open\$'[\s\S]*optional: true/);
+    assert.doesNotMatch(accept, /visible:\s+text: '\^Open\$'/);
     assert.doesNotMatch(accept, /Open in \.\*QueenZone/);
     assert.match(accept, /\^Open\$/);
 
@@ -204,6 +205,7 @@ describe('device-smoke harness (#1281)', () => {
   it('releases Gradle memory before either hosted Android emulator starts', () => {
     const workflow = readRepo('mobile-device-smoke.yml', workflowsDir);
     assert.equal((workflow.match(/\.\/gradlew --stop/g) ?? []).length, 2);
+    assert.equal((workflow.match(/api-level: 35/g) ?? []).length, 2);
   });
 
   it('prepends the Maestro install dir before probing PATH', () => {
