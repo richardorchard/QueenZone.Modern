@@ -57,6 +57,7 @@ describe('RootNavigator', () => {
     }
     expect(screen.getByTestId(testIds.tabHome)).toBeOnTheScreen();
     expect(screen.getByTestId(testIds.tabForum)).toBeOnTheScreen();
+    expect(screen.getByTestId(testIds.envBanner)).toBeOnTheScreen();
     expect(screen.getByText('Home stack')).toBeOnTheScreen();
   });
 
