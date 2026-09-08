@@ -25,4 +25,6 @@ appId: org.queenzone.mobile
     timeout: 20000
 - assertNotVisible:
     id: member-gate
-- assertVisible: Contract Other
+- assertVisible:
+    # iOS merges the conversation preview and unread count into one AX label.
+    text: '^Contract Other.*'

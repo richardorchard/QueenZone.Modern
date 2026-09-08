@@ -38,6 +38,18 @@ describe('Maestro device flows (#1281)', () => {
     assert.match(attach, /id: tab-forum/);
   });
 
+  it('uses the composer test ID and dismisses the keyboard before attaching a file', () => {
+    const attach = readMaestro('flows/10-forum-attach.yaml');
+    assert.match(
+      attach,
+      /id: forum-composer-body[\s\S]*inputText: Journey attach reply[\s\S]*hideKeyboard[\s\S]*id: forum-composer-attach-files/,
+    );
+    assert.match(attach, /id: forum-composer-attachment/);
+    assert.match(attach, /id: forum-thread-attachment/);
+    assert.doesNotMatch(attach, /tapOn:\s+text: Write a reply/);
+    assert.doesNotMatch(attach, /visible: attach\.txt|text: attach\.txt|tapOn: attach\.txt/);
+  });
+
   it('leaves the archive search story before the forum flow switches tabs', () => {
     const search = readMaestro('flows/06-archive-search.yaml');
     assert.match(
@@ -51,6 +63,28 @@ describe('Maestro device flows (#1281)', () => {
     assert.match(
       forum,
       /id: forum-thread-screen[\s\S]*id: forum-thread-back[\s\S]*id: forum-category-screen[\s\S]*id: tab-forum[\s\S]*id: forum-screen/,
+    );
+  });
+
+  it('returns each on-demand journey to a tab root', () => {
+    const attach = readMaestro('flows/10-forum-attach.yaml');
+    const discussion = readMaestro('flows/11-news-discussion.yaml');
+
+    assert.match(
+      attach,
+      /id: forum-thread-attachment-opened[\s\S]*id: forum-thread-back[\s\S]*id: forum-category-screen[\s\S]*id: tab-forum[\s\S]*id: forum-screen/,
+    );
+    assert.match(
+      discussion,
+      /id: forum-thread-back[\s\S]*id: forum-screen/,
+    );
+  });
+
+  it('scrolls the discussion reply action into view on compact emulators', () => {
+    const discussion = readMaestro('flows/11-news-discussion.yaml');
+    assert.match(
+      discussion,
+      /id: forum-thread-screen[\s\S]*scrollUntilVisible:[\s\S]*id: forum-thread-reply[\s\S]*assertVisible:[\s\S]*id: forum-thread-reply/,
     );
   });
 
@@ -78,16 +112,18 @@ describe('Maestro device flows (#1281)', () => {
     assert.match(openAuth, /openLink: \$\{SMOKE_AUTH_URL\}/);
     assert.match(openAuth, /accept-ios-open-link\.yaml/);
     assert.match(accept, /platform: iOS/);
+    assert.match(accept, /visible:\s+text: '\^Open\$'/);
     assert.doesNotMatch(accept, /Open in \.\*QueenZone/);
     assert.match(accept, /\^Open\$/);
 
     const authenticated = readMaestro('flows/09-authenticated.yaml');
     assert.equal(authenticated.match(/open-smoke-auth\.yaml/g)?.length, 1);
-    assert.equal(authenticated.match(/openLink: \$\{SMOKE_AUTH_URL\}/g)?.length, 1);
+    assert.doesNotMatch(authenticated, /openLink: \$\{SMOKE_AUTH_URL\}/);
     assert.match(
-      authenticated,
-      /id: home-profile[\s\S]*platform: iOS[\s\S]*visible:[\s\S]*id: profile-signed-out[\s\S]*openLink: \$\{SMOKE_AUTH_URL\}[\s\S]*id: profile-signed-in/,
+      openAuth,
+      /accept-ios-open-link\.yaml[\s\S]*platform: iOS[\s\S]*notVisible:[\s\S]*id: home-messages[\s\S]*openLink: \$\{SMOKE_AUTH_URL\}[\s\S]*visible:[\s\S]*id: home-messages/,
     );
+    assert.match(authenticated, /id: home-profile[\s\S]*id: profile-signed-in/);
     assert.match(authenticated, /id: profile-messages/);
     assert.match(readMaestro('flows/12-masthead-unread.yaml'), /open-smoke-auth\.yaml/);
     assert.match(readMaestro('flows/10-forum-attach.yaml'), /accept-ios-open-link\.yaml/);
@@ -96,6 +132,7 @@ describe('Maestro device flows (#1281)', () => {
   it('matches the seeded inbox row when iOS merges its accessibility label', () => {
     const authenticated = readRepo('flows/09-authenticated.yaml', maestroDir);
     assert.match(authenticated, /text: '\^Contract Other\.\*'/);
+    assert.match(readMaestro('flows/12-masthead-unread.yaml'), /text: '\^Contract Other\.\*'/);
   });
 
   it('bounds news story recovery to one retry of the read-only error action', () => {
@@ -143,6 +180,21 @@ describe('device-smoke harness (#1281)', () => {
     assert.match(script, /adb install -r "\$apk"/);
     assert.match(script, /Selector and assertion failures are not retried/);
   });
+
+  it('clears journey state before copying the attachment fixture', () => {
+    const script = readRepo('run-mobile-device-smoke.sh', scriptsDir);
+    const attach = readMaestro('flows/10-forum-attach.yaml');
+    const androidClearIdx = script.indexOf('adb shell pm clear org.queenzone.mobile');
+    const iosClearIdx = script.indexOf('simctl uninstall booted org.queenzone.mobile');
+    const fixtureIdx = script.lastIndexOf('push_attach_fixture');
+
+    assert.ok(androidClearIdx >= 0 && androidClearIdx < fixtureIdx);
+    assert.ok(iosClearIdx >= 0 && iosClearIdx < fixtureIdx);
+    assert.doesNotMatch(script, /adb push/);
+    assert.match(script, /file:\/\/\/data\/user\/0\/org\.queenzone\.mobile\/cache\/attach\.txt/);
+    assert.doesNotMatch(attach, /clearState: true/);
+    assert.match(attach, /clearKeychain: true/);
+  });
 });
 
 describe('device-smoke Release embed (#1322)', () => {
@@ -189,5 +241,19 @@ describe('device-smoke Release embed (#1322)', () => {
     assert.match(readMaestro('smoke.yaml'), /flows\/01-launch\.yaml/);
     assert.match(readMaestro('flows/10-forum-attach.yaml'), /id: home-screen/);
     assert.match(readMaestro('journeys.yaml'), /flows\/10-forum-attach\.yaml/);
+  });
+
+  it('asserts the reserved env-banner without replacing home-screen or home-profile', () => {
+    const launch = readMaestro('flows/01-launch.yaml');
+    assert.match(launch, /id: home-screen/);
+    assert.match(launch, /id: home-hero/);
+    assert.match(launch, /id: env-banner/);
+    const homeIdx = launch.indexOf('id: home-screen');
+    const bannerIdx = launch.indexOf('id: env-banner');
+    assert.ok(homeIdx >= 0 && bannerIdx > homeIdx);
+
+    const profile = readMaestro('flows/08-profile-signed-out.yaml');
+    assert.match(profile, /id: home-profile/);
+    assert.doesNotMatch(profile, /id: env-banner[\s\S]*tapOn:/);
   });
 });

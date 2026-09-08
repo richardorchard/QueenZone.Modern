@@ -1,0 +1,7 @@
+@{
+  var label = EnvironmentBanner.ResolveLabel(Context.Request.Host.Host);
+}
+@if (label is not null)
+{
+  <div class="qz-env-banner" data-testid="env-banner">@label</div>
+}

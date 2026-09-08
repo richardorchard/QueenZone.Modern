@@ -125,6 +125,7 @@ export const testIds = {
   conversationComposer: 'conversation-composer',
 
   notificationBanner: 'notification-banner',
+  envBanner: 'env-banner',
 
   settingsNotifyForumReply: 'settings-notify-forum-reply',
   settingsNotifyPrivateMessage: 'settings-notify-private-message',
