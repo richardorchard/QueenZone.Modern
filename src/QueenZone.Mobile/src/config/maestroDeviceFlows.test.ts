@@ -209,9 +209,8 @@ describe('device-smoke harness (#1281)', () => {
     const workflow = readRepo('mobile-device-smoke.yml', workflowsDir);
     assert.equal((workflow.match(/\.\/gradlew --stop/g) ?? []).length, 2);
     assert.equal((workflow.match(/api-level: 35/g) ?? []).length, 2);
-    assert.equal((workflow.match(/emulator-build: 15261927/g) ?? []).length, 2);
-    assert.equal((workflow.match(/-gpu swiftshader/g) ?? []).length, 2);
-    assert.doesNotMatch(workflow, /-gpu swiftshader_indirect/);
+    assert.equal((workflow.match(/emulator-build: 13610412/g) ?? []).length, 2);
+    assert.equal((workflow.match(/-gpu swiftshader_indirect/g) ?? []).length, 2);
   });
 
   it('prepends the Maestro install dir before probing PATH', () => {
