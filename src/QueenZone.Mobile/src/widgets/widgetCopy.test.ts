@@ -144,4 +144,16 @@ describe('widgetCopy', () => {
     assert.equal(widgetPrimaryFontSize(widgetEmptyText, 'small'), 17);
     assert.ok(widgetGraphemeCount('Get drunk and sing along to Queen.') <= WIDGET_QUOTE_LERP_SHORT);
   });
+
+  it('counts safely when Hermes does not provide Intl.Segmenter', () => {
+    const segmenterDescriptor = Object.getOwnPropertyDescriptor(Intl, 'Segmenter');
+    Object.defineProperty(Intl, 'Segmenter', { configurable: true, value: undefined });
+    try {
+      assert.equal(widgetGraphemeCount('A😀B'), 3);
+      assert.equal(widgetPrimaryFontSize('A😀B', 'small'), WIDGET_QUOTE_MAX_PT_SMALL);
+    } finally {
+      assert.ok(segmenterDescriptor);
+      Object.defineProperty(Intl, 'Segmenter', segmenterDescriptor);
+    }
+  });
 });

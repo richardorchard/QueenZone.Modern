@@ -11,4 +11,5 @@ public sealed record ForumPostItem(
     IReadOnlyList<ForumPostAttachment>? Attachments = null,
     Guid? AuthorMemberId = null,
     DateTimeOffset? EditedAt = null,
-    int EditCount = 0);
+    int EditCount = 0,
+    int? AuthorLegacyUserId = null);

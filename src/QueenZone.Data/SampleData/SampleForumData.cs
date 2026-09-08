@@ -106,7 +106,8 @@ public static class SampleForumData
                     [new ForumPostAttachment(
                         "anoto-setlist-scan.jpg",
                         284_712,
-                        ForumAttachmentPaths.LegacyDownloadPath(1002))]),
+                        ForumAttachmentPaths.LegacyDownloadPath(1002))],
+                    AuthorLegacyUserId: 5001),
                 new(
                     1101,
                     "Top tier for me — side two is basically perfect.",
@@ -139,7 +140,8 @@ public static class SampleForumData
                     "archive_member",
                     null,
                     id % 200,
-                    new DateTime(2010, 5, 1, 0, 0, 0, DateTimeKind.Utc)));
+                    new DateTime(2010, 5, 1, 0, 0, 0, DateTimeKind.Utc),
+                    AuthorLegacyUserId: 5002));
             }
 
             return posts;

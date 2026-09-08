@@ -1,7 +1,7 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { ChevronLeft, ChevronRight, Download, X } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, Download, Wallpaper, X } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ApiError, fetchPhotoDetail, type PhotoDetail } from '../../api';
 import type { PhotosStackParamList } from '../../navigation/types';
@@ -19,6 +19,9 @@ import {
   schedulePhotoGallerySwipe,
 } from './photoGalleryMeta';
 import { saveGalleryPhoto, saveGalleryPhotoCopy } from './saveGalleryPhoto';
+import { setAndroidGalleryWallpaper } from './setGalleryWallpaper';
+import { WallpaperTargetSheet } from './WallpaperTargetSheet';
+import { wallpaperCopy, type WallpaperTarget } from './wallpaperMeta';
 import { ZoomableArchiveImage } from './ZoomableArchiveImage';
 
 type Props = NativeStackScreenProps<PhotosStackParamList, 'PhotoViewer'>;
@@ -32,10 +35,12 @@ export function PhotoViewerScreen({ navigation, route }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [reloadToken, setReloadToken] = useState(0);
-  const [saveError, setSaveError] = useState<string | null>(null);
+  const [chromeMessage, setChromeMessage] = useState<string | null>(null);
+  const [wallpaperSheetVisible, setWallpaperSheetVisible] = useState(false);
   const photoRef = useRef<PhotoDetail | null>(null);
   const swipeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveBusyRef = useRef(false);
+  const wallpaperBusyRef = useRef(false);
   photoRef.current = photo;
 
   useEffect(() => {
@@ -106,8 +111,15 @@ export function PhotoViewerScreen({ navigation, route }: Props) {
   }, []);
 
   useEffect(() => {
-    setSaveError(null);
+    setChromeMessage(null);
+    setWallpaperSheetVisible(false);
   }, [picId]);
+
+  useEffect(() => {
+    if (!chromeVisible) {
+      setWallpaperSheetVisible(false);
+    }
+  }, [chromeVisible]);
 
   const handleSave = useCallback(async () => {
     const current = photoRef.current;
@@ -116,14 +128,64 @@ export function PhotoViewerScreen({ navigation, route }: Props) {
     }
 
     saveBusyRef.current = true;
-    setSaveError(null);
+    setChromeMessage(null);
     try {
       await saveGalleryPhoto(current.imageUrl);
     } catch (err: unknown) {
-      setSaveError(err instanceof Error ? err.message : saveGalleryPhotoCopy.failed);
+      setChromeMessage(err instanceof Error ? err.message : saveGalleryPhotoCopy.failed);
     } finally {
       saveBusyRef.current = false;
     }
+  }, []);
+
+  const handleWallpaper = useCallback(() => {
+    const current = photoRef.current;
+    if (current == null || wallpaperBusyRef.current) {
+      return;
+    }
+
+    if (Platform.OS === 'android') {
+      setWallpaperSheetVisible((open) => !open);
+      return;
+    }
+
+    if (Platform.OS !== 'ios') {
+      return;
+    }
+
+    wallpaperBusyRef.current = true;
+    setChromeMessage(null);
+    void (async () => {
+      try {
+        await saveGalleryPhoto(current.imageUrl);
+        setChromeMessage(wallpaperCopy.iosSaved);
+      } catch (err: unknown) {
+        setChromeMessage(err instanceof Error ? err.message : saveGalleryPhotoCopy.failed);
+      } finally {
+        wallpaperBusyRef.current = false;
+      }
+    })();
+  }, []);
+
+  const handleWallpaperTarget = useCallback((target: WallpaperTarget) => {
+    const current = photoRef.current;
+    setWallpaperSheetVisible(false);
+    if (current == null || wallpaperBusyRef.current) {
+      return;
+    }
+
+    wallpaperBusyRef.current = true;
+    setChromeMessage(null);
+    void (async () => {
+      try {
+        await setAndroidGalleryWallpaper(current.imageUrl, target);
+        setChromeMessage(wallpaperCopy.androidSet);
+      } catch (err: unknown) {
+        setChromeMessage(err instanceof Error ? err.message : wallpaperCopy.bothFailed);
+      } finally {
+        wallpaperBusyRef.current = false;
+      }
+    })();
   }, []);
 
   if (loading && !photo) {
@@ -171,22 +233,39 @@ export function PhotoViewerScreen({ navigation, route }: Props) {
               justifyContent: 'space-between',
             }}
           >
-            <IconButton icon={X} accessibilityLabel="Close" onPress={() => navigation.goBack()} />
+            <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'flex-start' }}>
+              <IconButton
+                icon={X}
+                accessibilityLabel="Close"
+                testID={testIds.photoViewerClose}
+                onPress={() => navigation.goBack()}
+              />
+            </View>
             <Text style={[type.eyebrow, { color: c.textMuted }]}>
               {photoCounterLabel(photo.index, photo.count)}
             </Text>
-            {image ? (
-              <IconButton
-                icon={Download}
-                accessibilityLabel="Save to Photos"
-                testID={testIds.photoViewerSave}
-                onPress={() => {
-                  void handleSave();
-                }}
-              />
-            ) : (
-              <View style={{ width: 44 }} />
-            )}
+            <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'flex-end' }}>
+              {image ? (
+                <>
+                  <IconButton
+                    icon={Wallpaper}
+                    accessibilityLabel={wallpaperCopy.accessibilityLabel}
+                    testID={testIds.photoViewerWallpaper}
+                    onPress={handleWallpaper}
+                  />
+                  <IconButton
+                    icon={Download}
+                    accessibilityLabel="Save to Photos"
+                    testID={testIds.photoViewerSave}
+                    onPress={() => {
+                      void handleSave();
+                    }}
+                  />
+                </>
+              ) : (
+                <View style={{ width: 44 }} />
+              )}
+            </View>
           </View>
           {photo.previous ? (
             <View style={{ position: 'absolute', left: 4, top: '45%' }}>
@@ -217,11 +296,17 @@ export function PhotoViewerScreen({ navigation, route }: Props) {
           >
             <Text style={[type.cardTitle, { color: c.textPrimary }]}>{photo.title}</Text>
             <MetaLine parts={photoDetailMeta(photo)} />
-            {saveError ? (
-              <Text style={[type.caption, { color: c.textMuted }]}>{saveError}</Text>
+            {chromeMessage ? (
+              <Text style={[type.caption, { color: c.textMuted }]}>{chromeMessage}</Text>
             ) : null}
           </View>
         </View>
+      ) : null}
+      {chromeVisible && wallpaperSheetVisible && Platform.OS === 'android' ? (
+        <WallpaperTargetSheet
+          onSelect={handleWallpaperTarget}
+          onCancel={() => setWallpaperSheetVisible(false)}
+        />
       ) : null}
     </View>
   );

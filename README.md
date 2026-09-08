@@ -321,7 +321,7 @@ Feature work should happen on an agent-prefixed branch such as `grok/news-pagina
 
 Every qualifying web merge to `main` deploys automatically to the isolated dev environment through `.github/workflows/deploy-dev.yml`; workflow/docs-only and mobile-only merges skip the web deploy. The production `Deploy` workflow (`.github/workflows/deploy.yml`) runs only for a `v*` tag or a manual dispatch from `main`. Despite its legacy Azure resource name, production is the `queenzone-dev` App Service at `https://www.queenzone.org`.
 
-`.github/workflows/ci.yml` runs the required build, test, coverage, migration consistency, smoke, and Playwright checks on pull requests. The dev and production deploy workflows reuse the exact tested `web-publish` artifact; they do not rebuild or rerun CI.
+`.github/workflows/ci.yml` runs the required build, test, coverage, migration consistency, smoke, and Playwright checks on pull requests. The dev and production deploy workflows reuse the tested `web-publish` artifact when it is still present. If resolve cannot find that zip and a website Deploy is still required, they publish from the checked-out `main`/tag SHA. Manual dispatch and `v*` tags skip when the classified range is mobile-only or otherwise non-web — they do not walk back to an older web tip or rerun CI.
 
 ### Promote a verified dev release to production
 
@@ -336,18 +336,20 @@ git tag vX.Y.Z <verified-commit-sha>
 git push origin vX.Y.Z
 ```
 
-The `v*` tag triggers the production workflow. That workflow resolves the tagged commit back to the PR head SHA and deploys the matching CI artifact, then applies migrations and runs production smoke checks. You can also open **Actions → Deploy → Run workflow**, select `main`, and run the same production deployment without creating a tag.
+The `v*` tag triggers the production workflow. That workflow classifies the previous-tag…this-tag span (skip when the entire span is non-web), resolves the tagged commit back to the PR head SHA, and deploys the matching CI `web-publish` artifact when it is still present. If that zip is gone and the span includes website changes, it publishes from the tagged SHA instead of walking back to an older web tip. You can also open **Actions → Deploy → Run workflow**, select `main`, and run the same production deployment without creating a tag (dispatch classifies tip vs previous `main` commit and skips a mobile-only tip).
 
-Dev currently runs the real application with deterministic sample data. Its isolated `queenzone-dev-db` exists, but it does not yet contain the legacy baseline tables required by the existing EF migrations. `deploy-dev.yml` therefore removes the dev legacy-database connection and skips migrations until that baseline is provisioned. Dev blob storage, authentication, telemetry, artifact deployment, warmup, and public/API smoke checks are active; do not treat a successful dev deployment as proof of legacy SQL behavior yet.
+Dev runs deterministic sample data until the approval-gated [curated snapshot workflow](docs/architecture/dev-curated-snapshot.md) completes. That workflow builds a production-compatible legacy schema, loads a capped sanitised public sample, copies only manifest assets into `queenzonedev`, rebuilds search, and enables the dev-only connection after size, privacy, smoke, and browser checks pass. The dev App Service setting `DevSnapshot__Ready` keeps later `deploy-dev.yml` runs in sample mode until that proof exists.
 
 The planned public canonical domain for the site is `https://www.queenzone.org`. SEO features that emit absolute public URLs, such as sitemaps and robots.txt, should use that host in production configuration.
 
 Set `Site:PublicBaseUrl` in App Service configuration (or `appsettings.Local.json` for local overrides) when the public host differs from the default in `appsettings.json`.
 
-GitHub `dev` environment configuration required:
+Production GitHub Environment configuration (`prod-release` for migrate + zip deploy) required:
 
 - Secret `BITWARDEN_SECRETS_MANAGER_ACCESS_TOKEN`: authorizes the workflow to read the QueenZone Bitwarden Secrets Manager project.
 - Variable `BITWARDEN_APP_SERVICE_DEPLOY_SECRETS`: maps the Bitwarden secret IDs to `AZURE_WEBAPP_PUBLISH_PROFILE` and `QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING`. See `docs/bitwarden-secrets.md` for the mapping and rotation procedure. The migration connection is separate from the App Service runtime connection and should use a principal with permission to create or alter tables.
+
+See [`docs/architecture/github-environments.md`](docs/architecture/github-environments.md) for the full environment map (`prod-release`, `prod-deploy`, `prod-google-play`, `prod-data-read`). Do not put production secrets on legacy `dev` / `deploy`.
 
 App Service configuration required:
 
@@ -370,7 +372,7 @@ ALTER ROLE db_datawriter ADD MEMBER [app_login_name];
 
 Keep read-only environments on `db_datareader` only.
 
-The production `Deploy` workflow applies pending EF Core migrations when required, then deploys the existing CI artifact; it does not rebuild. Pull-request tests have already passed in the separate `CI` workflow and are not rerun here. Configure the Bitwarden access secret and deploy-secret mapping in the GitHub `dev` environment as described above.
+The production `Deploy` workflow applies pending EF Core migrations when required, then deploys the existing CI artifact; it does not rebuild. Pull-request tests have already passed in the separate `CI` workflow and are not rerun here. Pre-merge CI applies migrations to the SQL Express mirror only; production Azure SQL `database update` is this workflow's `migrate` job. Configure the Bitwarden access secret and deploy-secret mapping in the GitHub `prod-release` environment as described above.
 
 For manual bootstrap or recovery, you can still run:
 

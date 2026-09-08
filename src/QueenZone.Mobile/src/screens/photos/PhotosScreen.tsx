@@ -2,7 +2,7 @@ import type { CompositeScreenProps } from '@react-navigation/native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useCallback } from 'react';
-import { FlatList, Pressable, RefreshControl, Text, useWindowDimensions, View } from 'react-native';
+import { FlatList, Pressable, Text, useWindowDimensions, View } from 'react-native';
 import { fetchPhotoCategories, type PhotoCategoryListItem } from '../../api';
 import { usePagedContent } from '../../hooks/usePagedContent';
 import type { PhotosStackParamList, RootTabParamList } from '../../navigation/types';
@@ -13,6 +13,7 @@ import { ArchiveImage } from '../../ui/ArchiveImage';
 import { Button } from '../../ui/Button';
 import { PageTitleBlock } from '../../ui/PageTitleBlock';
 import { EmptyBlock, ErrorBlock, ListFooterLoading, LoadingBlock } from '../../ui/ScreenStates';
+import { ThemedRefreshControl } from '../../ui/ThemedRefreshControl';
 import { testIds } from '../../test/testIds';
 import { photoCdnSource, photoCountLabel } from './photoGalleryMeta';
 
@@ -95,11 +96,7 @@ export function PhotosScreen({ navigation }: Props) {
         </View>
       }
       refreshControl={
-        <RefreshControl
-          refreshing={paged.refreshing}
-          onRefresh={paged.refresh}
-          tintColor={c.accentPrimary}
-        />
+        <ThemedRefreshControl refreshing={paged.refreshing} onRefresh={paged.refresh} />
       }
       onEndReached={paged.loadMore}
       onEndReachedThreshold={0.4}

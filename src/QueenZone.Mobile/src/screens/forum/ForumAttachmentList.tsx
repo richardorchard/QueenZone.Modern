@@ -22,9 +22,11 @@ import { ForumAttachmentAudioPlayer } from './ForumAttachmentAudioPlayer';
 import { attachmentAction, attachmentMeta, imagePreviewUrl } from './forumThreadMeta';
 
 function smokeAttachAllowed(): boolean {
+  const config = getAppConfig();
   return isSmokeAttachEnabled({
     dev: typeof __DEV__ !== 'undefined' ? __DEV__ : false,
-    appEnv: getAppConfig().appEnv,
+    appEnv: config.appEnv,
+    smokeEmbed: config.smokeEmbed,
   });
 }
 

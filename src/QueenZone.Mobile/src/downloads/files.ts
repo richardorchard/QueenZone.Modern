@@ -1,4 +1,6 @@
-import { Directory, File, Paths } from 'expo-file-system';
+import { Directory, File, FileMode, Paths } from 'expo-file-system';
+import type { DownloadAudioExtension } from './audioBytes';
+import { DOWNLOAD_EMPTY_PART_MESSAGE, DOWNLOAD_PART_MISSING_MESSAGE } from './messages';
 import { DOWNLOAD_DIRECTORY_NAME } from './types';
 
 export type DownloadProbe = {
@@ -9,31 +11,35 @@ export type DownloadProbe = {
 export type DownloadFileHost = {
   documentDirectoryUri(): string;
   availableBytes(): number;
-  completedUri(performanceId: string): string;
+  completedUri(performanceId: string, extension: DownloadAudioExtension | null): string;
   partUri(performanceId: string): string;
   exists(uri: string): boolean;
   size(uri: string): number;
   deleteIfExists(uri: string): void;
   listPartUris(): string[];
   listAllUris(): string[];
-  promote(partUri: string, completedUri: string): void;
+  promote(partUri: string, completedUri: string): void | Promise<void>;
   writeBytes(uri: string, bytes: Uint8Array): void;
+  readPrefix(uri: string, maxBytes: number): Promise<Uint8Array | null>;
   download(input: {
     url: string;
     destUri: string;
     headers: Record<string, string>;
     onProgress?: (written: number, total: number) => void;
     signal?: AbortSignal;
-  }): Promise<void>;
+  }): Promise<{ uri?: string } | void>;
 };
 
 function joinUri(root: string, name: string): string {
   return `${root.replace(/\/+$/, '')}/${name}`;
 }
 
-export function opaqueFileName(performanceId: string, part = false): string {
+export function opaqueFileName(
+  performanceId: string,
+  extension: DownloadAudioExtension | 'part' | null,
+): string {
   const id = performanceId.replace(/[^A-Za-z0-9_-]/g, '');
-  return part ? `${id}.part` : id;
+  return extension ? `${id}.${extension}` : id;
 }
 
 function createNativeHost(): DownloadFileHost {
@@ -57,11 +63,11 @@ function createNativeHost(): DownloadFileHost {
       const space = Paths.availableDiskSpace;
       return typeof space === 'number' && Number.isFinite(space) ? space : Number.POSITIVE_INFINITY;
     },
-    completedUri(performanceId) {
-      return new File(audioDir(), opaqueFileName(performanceId)).uri;
+    completedUri(performanceId, extension) {
+      return new File(audioDir(), opaqueFileName(performanceId, extension)).uri;
     },
     partUri(performanceId) {
-      return new File(audioDir(), opaqueFileName(performanceId, true)).uri;
+      return new File(audioDir(), opaqueFileName(performanceId, 'part')).uri;
     },
     exists(uri) {
       try {
@@ -110,11 +116,17 @@ function createNativeHost(): DownloadFileHost {
     },
     promote(partUri, completedUri) {
       const part = fileFor(partUri);
+      if (!part.exists) {
+        throw new Error(DOWNLOAD_PART_MISSING_MESSAGE);
+      }
+      if (!part.size || part.size <= 0) {
+        throw new Error(DOWNLOAD_EMPTY_PART_MESSAGE);
+      }
       const completed = fileFor(completedUri);
       if (completed.exists) {
         completed.delete();
       }
-      part.move(completed);
+      return part.move(completed);
     },
     writeBytes(uri, bytes) {
       const file = fileFor(uri);
@@ -123,14 +135,35 @@ function createNativeHost(): DownloadFileHost {
       }
       file.write(bytes);
     },
+    async readPrefix(uri, maxBytes) {
+      try {
+        const file = fileFor(uri);
+        if (!file.exists) {
+          return null;
+        }
+        const handle = file.open(FileMode.ReadOnly);
+        try {
+          return handle.readBytes(maxBytes);
+        } finally {
+          handle.close();
+        }
+      } catch {
+        return null;
+      }
+    },
     async download({ url, destUri, headers, onProgress, signal }) {
       audioDir();
       const dest = fileFor(destUri);
       if (dest.exists) {
         dest.delete();
       }
-      const task = File.createDownloadTask(url, dest, {
+      // The task API reported successful full GETs without leaving a usable
+      // file on both platforms. The one-shot API owns transfer + destination
+      // materialisation as one native operation and still supports progress
+      // and cancellation.
+      const file = await File.downloadFileAsync(url, dest, {
         headers,
+        idempotent: true,
         signal,
         onProgress: onProgress
           ? ({ bytesWritten, totalBytes }) => {
@@ -138,10 +171,11 @@ function createNativeHost(): DownloadFileHost {
             }
           : undefined,
       });
-      const file = await task.downloadAsync();
       if (!file) {
         throw new Error('Download did not complete.');
       }
+      const returnedUri = typeof file.uri === 'string' ? file.uri.trim() : '';
+      return { uri: returnedUri || dest.uri };
     },
   };
 }
@@ -168,14 +202,15 @@ export function createMemoryDownloadHost(
     options.downloadImpl ??
     (async ({ destUri }) => {
       files.set(destUri, new Uint8Array([1, 2, 3, 4]));
+      return { uri: destUri };
     });
 
   return {
     files,
     documentDirectoryUri: () => root,
     availableBytes: () => options.availableBytes ?? 64 * 1024 * 1024,
-    completedUri: (performanceId) => joinUri(root, opaqueFileName(performanceId)),
-    partUri: (performanceId) => joinUri(root, opaqueFileName(performanceId, true)),
+    completedUri: (performanceId, extension) => joinUri(root, opaqueFileName(performanceId, extension)),
+    partUri: (performanceId) => joinUri(root, opaqueFileName(performanceId, 'part')),
     exists: (uri) => files.has(uri),
     size: (uri) => files.get(uri)?.byteLength ?? 0,
     deleteIfExists: (uri) => {
@@ -185,13 +220,24 @@ export function createMemoryDownloadHost(
     listAllUris: () => [...files.keys()],
     promote: (partUri, completedUri) => {
       const bytes = files.get(partUri);
-      files.delete(partUri);
-      if (bytes) {
-        files.set(completedUri, bytes);
+      if (!bytes) {
+        throw new Error(DOWNLOAD_PART_MISSING_MESSAGE);
       }
+      if (bytes.byteLength <= 0) {
+        throw new Error(DOWNLOAD_EMPTY_PART_MESSAGE);
+      }
+      files.delete(partUri);
+      files.set(completedUri, bytes);
     },
     writeBytes: (uri, bytes) => {
       files.set(uri, bytes);
+    },
+    readPrefix: async (uri, maxBytes) => {
+      const bytes = files.get(uri);
+      if (!bytes) {
+        return null;
+      }
+      return bytes.subarray(0, Math.min(maxBytes, bytes.length));
     },
     download: downloadImpl,
   };

@@ -1,11 +1,11 @@
 /**
  * Shared API environment defaults for app.config (CommonJS) and the RN app.
- * Keep types/tests in src/config/environments.ts wrapping this module.
+ * Keep types/tests in src/QueenZone.Mobile/src/config/environments.ts wrapping this module.
  * @type {const}
  */
 const defaultApiBaseUrls = {
   development: 'http://localhost:5146',
-  staging: 'https://www.queenzone.org',
+  staging: 'https://dev.queenzone.org',
   production: 'https://www.queenzone.org',
 };
 

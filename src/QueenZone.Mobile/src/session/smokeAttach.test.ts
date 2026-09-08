@@ -16,9 +16,11 @@ import {
 import { smokeAuthScheme } from './smokeAuth.ts';
 
 describe('smokeAttach', () => {
-  it('uses the same Debug/development gate as smoke-auth', () => {
+  it('uses the same development gate as smoke-auth (__DEV__ or smokeEmbed)', () => {
     assert.equal(isSmokeAttachEnabled({ dev: true, appEnv: 'development' }), true);
+    assert.equal(isSmokeAttachEnabled({ dev: false, smokeEmbed: true, appEnv: 'development' }), true);
     assert.equal(isSmokeAttachEnabled({ dev: true, appEnv: 'staging' }), false);
+    assert.equal(isSmokeAttachEnabled({ dev: false, smokeEmbed: true, appEnv: 'production' }), false);
     assert.equal(isSmokeAttachEnabled({ dev: false, appEnv: 'development' }), false);
     assert.equal(isSmokeAttachEnabled({}), false);
   });
@@ -43,7 +45,7 @@ describe('smokeAttach', () => {
     assert.throws(() => buildSmokeAttachUrl('   '), /non-empty file URI/);
   });
 
-  it('defaults Android to the app-private files URI', () => {
+  it('defaults Android to the app-private cache URI', () => {
     assert.deepEqual(defaultSmokeAttachAsset('android'), {
       uri: smokeAttachDefaultAndroidUri,
       name: smokeAttachFileName,

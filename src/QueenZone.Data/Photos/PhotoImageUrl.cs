@@ -7,8 +7,12 @@ namespace QueenZone.Data;
 /// </summary>
 public static class PhotoImageUrl
 {
-    private const string PublicBaseUrl = "https://cdn.queenzone.org";
-    private const string BlobStorageBaseUrl = "https://queenzone.blob.core.windows.net";
+    private const string DefaultPublicBaseUrl = "https://cdn.queenzone.org";
+    private const string DefaultBlobStorageBaseUrl = "https://queenzone.blob.core.windows.net";
+
+    public const string PublicBaseUrlEnvironmentVariable = "QUEENZONE_PHOTO_PUBLIC_BASE_URL";
+
+    public const string BlobEndpointEnvironmentVariable = "QUEENZONE_PHOTO_BLOB_ENDPOINT";
 
     /// <summary>
     /// Legacy PIC_FILES_T folders that do not match the Azure container after the usual
@@ -23,15 +27,23 @@ public static class PhotoImageUrl
 
     public static string Build(string legacyPath)
     {
-        return BuildFromBase(PublicBaseUrl, legacyPath);
+        return BuildFromBase(
+            Environment.GetEnvironmentVariable(PublicBaseUrlEnvironmentVariable) ?? DefaultPublicBaseUrl,
+            legacyPath);
     }
 
     public static string BuildBlobStorageUrl(string legacyPath, string? blobEndpoint = null) =>
-        BuildFromBase(blobEndpoint ?? BlobStorageBaseUrl, legacyPath);
+        BuildFromBase(
+            blobEndpoint
+                ?? Environment.GetEnvironmentVariable(BlobEndpointEnvironmentVariable)
+                ?? DefaultBlobStorageBaseUrl,
+            legacyPath);
 
     public static string ToBlobStorageUrl(string url, string? blobEndpoint = null)
     {
-        var endpoint = (blobEndpoint ?? BlobStorageBaseUrl).TrimEnd('/');
+        var endpoint = (blobEndpoint
+            ?? Environment.GetEnvironmentVariable(BlobEndpointEnvironmentVariable)
+            ?? DefaultBlobStorageBaseUrl).TrimEnd('/');
         if (TryParseBlobLocation(url, out var container, out var blobName))
         {
             return $"{endpoint}/{NormalizeContainer(container)}/{blobName}";

@@ -22,6 +22,13 @@ strategy": stored in the `Queenzone Development` Bitwarden project, with the
 repository variables mapping each to `CLOUDFLARE_API_TOKEN`
 ([`bitwarden-secrets.md`](../bitwarden-secrets.md) has the exact format).
 
+During the staged #1272 production-region migration, both mappings also expose
+the existing `QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING` secret. The
+workflows extract its SQL password into an ephemeral OpenTofu variable through
+[`Export-EphemeralSqlAdminPassword.ps1`](../../scripts/Export-EphemeralSqlAdminPassword.ps1).
+The AzureRM write-only password field sends it to Azure without persisting it
+in the plan or state.
+
 If either token is ever missing or revoked, every workflow below fails fast
 at an explicit "`CLOUDFLARE_API_TOKEN` is not configured" step rather than
 hanging or failing unpredictably later.
@@ -33,15 +40,15 @@ hanging or failing unpredictably later.
 | [`opentofu-plan.yml`](../../.github/workflows/opentofu-plan.yml) | Pull request touching `infra/**` | `opentofu-plan` (Reader) | No — read-only plan, posts a PR comment |
 | [`opentofu-apply.yml`](../../.github/workflows/opentofu-apply.yml) | Push to `main` touching `infra/**`, or manual dispatch | `opentofu-plan` for its own `plan` job, then `opentofu-apply` (Contributor) for `apply` | Yes, only after the required reviewer approves the `opentofu-apply` environment |
 | [`opentofu-drift.yml`](../../.github/workflows/opentofu-drift.yml) | Daily schedule, or manual dispatch | `opentofu-plan` (Reader) only | No — structurally incapable of applying |
-| [`deploy-dev.yml`](../../.github/workflows/deploy-dev.yml) migrate | Push to `main`/`master`, or manual dispatch | `dev-migrate`; Bitwarden mapping targets `queenzone-dev-db` | Temporarily skipped while dev uses sample data; when enabled, dev schema only and never production |
+| [`deploy-dev.yml`](../../.github/workflows/deploy-dev.yml) migrate | Push to `main`/`master`, or manual dispatch | `dev-migrate`; Bitwarden mapping targets `queenzone-dev-db` | Skipped until App Service `DevSnapshot__Ready=true`; dev schema only and never production |
+| [`refresh-dev-snapshot.yml`](../../.github/workflows/refresh-dev-snapshot.yml) | Manual confirmation plus `dev-data-refresh` approval | Separate production-read-only and dev-write SQL/Blob credentials | Reads production; resets and populates dev only |
 | [`deploy-dev.yml`](../../.github/workflows/deploy-dev.yml) configure/deploy | Push to `main`/`master`, or manual dispatch | `dev-deploy`; OIDC Website Contributor scope is limited to `queenzone-devbox` | Dev App Service only; never production |
 | [`deploy.yml`](../../.github/workflows/deploy.yml) | Push of a `v*` promotion tag, or manual dispatch from `main` | Existing production `dev`/`deploy` environments | Yes — production migration, App Service deployment, and smoke checks |
 
-The dev application temporarily runs with deterministic sample data while the
-legacy database baseline is completed in separate work. `deploy-dev.yml`
-removes `ConnectionStrings__QueenZoneLegacy` and skips its migrate job during
-this interim state. Dev deployment is therefore not yet proof of migrations or
-legacy SQL data shapes.
+The dev application runs with deterministic sample data while
+App Service `DevSnapshot__Ready` is absent or false. The curated refresh sets it only after
+the schema, sampled data, search rebuild, privacy/size guards, public smoke, and
+browser checks pass. See [`dev-curated-snapshot.md`](dev-curated-snapshot.md).
 
 `opentofu-plan.yml`'s `fmt-validate` job runs for every PR, including forks,
 with no cloud credentials at all (`scripts/Test-OpenTofu.ps1`), triggered by

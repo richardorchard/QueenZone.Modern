@@ -1,0 +1,17 @@
+# CodeQL path exclude for Expo Android modules (#1418, Bob Option A).
+#
+# Default setup on this repo is Settings-managed
+# (dynamic/github-code-scanning/codeql). This file is the path-ignore
+# half of Option A. After these globs, no first-party Java/Kotlin remains,
+# so Analyze (java-kotlin) must stay disabled on the default scan — an
+# empty job fails with no-source-code-seen-during-build. See
+# docs/architecture/codeql.md.
+#
+# Point the github-codeql-config-file repository property at this file
+# so default setup merges the ignore list. Do not exclude C# / JS /
+# Python / Actions.
+name: QueenZone CodeQL
+
+paths-ignore:
+  - src/QueenZone.Mobile/modules/**/android
+  - "**/modules/**/android/**"

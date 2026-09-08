@@ -110,8 +110,17 @@ public class LiveSiteMediaCdnTests : RealDataPageTest
             .Take(10)
             .ToList();
 
+        var expectedPhotoHost = Environment.GetEnvironmentVariable("E2E_EXPECTED_PHOTO_HOST");
+
         if (absoluteMedia.Count == 0)
         {
+            if (!string.IsNullOrWhiteSpace(expectedPhotoHost))
+            {
+                Assert.Fail(
+                    FailurePrefix() +
+                    $"/photography did not render an off-site image from required host {expectedPhotoHost}.");
+            }
+
             TestContext.Out.WriteLine(
                 "No off-site photography image hosts found on /photography; skipping CDN host assertions.");
             return;
@@ -125,6 +134,15 @@ public class LiveSiteMediaCdnTests : RealDataPageTest
 
         foreach (var mediaUri in absoluteMedia)
         {
+            if (!string.IsNullOrWhiteSpace(expectedPhotoHost)
+                && !string.Equals(mediaUri.Host, expectedPhotoHost, StringComparison.OrdinalIgnoreCase))
+            {
+                failures.Add(
+                    $"{FailurePrefix()}image host '{mediaUri.Host}' is not the isolated dev host " +
+                    $"'{expectedPhotoHost}' (url={mediaUri}).");
+                continue;
+            }
+
             if (!IsAllowedMediaHost(mediaUri.Host))
             {
                 failures.Add(

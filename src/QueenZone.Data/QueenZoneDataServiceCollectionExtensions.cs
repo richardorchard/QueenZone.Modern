@@ -83,6 +83,7 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddScoped<IPrivateMessageRepository, EfPrivateMessageRepository>();
         services.AddScoped<IMemberFollowRepository, EfMemberFollowRepository>();
         services.AddScoped<IMemberPublicActivityRepository, EfMemberPublicActivityRepository>();
+        services.AddScoped<IForumArchiveAuthorRepository, EfForumArchiveAuthorRepository>();
         services.AddScoped<ILinksRepository, EfLinksRepository>();
         services.AddScoped<IFreddieTributeRepository, EfFreddieTributeRepository>();
         services.AddScoped<IAdminFreddieTributeRepository, EfAdminFreddieTributeRepository>();
@@ -217,6 +218,7 @@ public static class QueenZoneDataServiceCollectionExtensions
         services.AddSingleton<IArticleRepository>(sp =>
             new InMemoryArticleRepository(sp.GetRequiredService<IArticleSubmissionRepository>(), sp.GetRequiredService<IEditorialArticleRepository>()));
         services.AddSingleton<IMemberPublicActivityRepository, InMemoryMemberPublicActivityRepository>();
+        services.AddSingleton<IForumArchiveAuthorRepository, InMemoryForumArchiveAuthorRepository>();
         services.AddSingleton<ILinksRepository>(_ => new InMemoryLinksRepository(SampleLinksData.CreateSeedCategories()));
         services.AddSingleton(_ => new SharedFreddieTributeStore(SampleFreddieTributeData.CreateSeedTributes()));
         services.AddSingleton<IFreddieTributeRepository, InMemoryFreddieTributeRepository>();

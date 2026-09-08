@@ -22,7 +22,7 @@ device token. The live API must send to production APNs.
 | What | Value |
 | --- | --- |
 | TestFlight workflow | `IOS_APS_ENVIRONMENT=production` in [`.github/workflows/publish-ios-testflight.yml`](../.github/workflows/publish-ios-testflight.yml) (already set; do not change it) |
-| App API origin | `https://www.queenzone.org` (`EXPO_PUBLIC_APP_ENV=staging` still uses that public origin) |
+| App API origin | Selected when dispatching the workflow; defaults to `https://www.queenzone.org` (`production`) |
 | App Service | `PushNotifications__Apns__Environment=production` (see [`bitwarden-secrets.md`](bitwarden-secrets.md)) |
 | Apple endpoint | `https://api.push.apple.com` |
 
@@ -43,9 +43,10 @@ exported IPA. That is not a reason to send TestFlight traffic to sandbox.
   someone else — you never get a push for your own message or your own reply.
 - For news only: an admin session on `https://www.queenzone.org/admin/news`.
 
-Trigger every category against the same live API the TestFlight app already
-uses (`https://www.queenzone.org`). A local or in-memory host will not reach
-that device token.
+Trigger every category against the same API the TestFlight app already uses
+(`https://www.queenzone.org` by default, or `https://dev.queenzone.org` for an
+explicitly staging-baked build). A local or in-memory host will not reach that
+device token.
 
 ### Smallest first check (private message)
 
@@ -53,8 +54,8 @@ Private messages are default-on and fan out to one recipient. Use this before
 forum or news.
 
 1. On the iPhone, open the TestFlight build and sign in as the **receiver**.
-2. Allow notifications when the OS prompt appears. Sign-in is what registers
-   the APNs token with `https://www.queenzone.org`. If you previously denied
+2. Allow notifications when the OS prompt appears. Sign-in registers the APNs
+   token with the app's selected API origin. If you previously denied
    the prompt, enable QueenZone in iOS Settings → Notifications, then
    foreground the app so it can register.
 3. Background the app (Home or lock). Foreground still shows an in-app banner,
@@ -179,7 +180,7 @@ The live API must send with the real FCM credentials from
 | What | Value |
 | --- | --- |
 | Android install | Google Play internal testing — [`.github/workflows/publish-android-google-play.yml`](../.github/workflows/publish-android-google-play.yml) |
-| App API origin | `https://www.queenzone.org` (`EXPO_PUBLIC_APP_ENV=staging` still uses that public origin) |
+| App API origin | Selected when dispatching the workflow; defaults to `https://www.queenzone.org` (`production`) |
 | App Service | `PushNotifications__Fcm__ProjectId` and `PushNotifications__Fcm__ServiceAccountJson` (see [`bitwarden-secrets.md`](bitwarden-secrets.md)) |
 | Firebase | project `queenzone-mobile`, Android app `org.queenzone.mobile` (`src/QueenZone.Mobile/google-services.json` is client config, not the sender credential) |
 | FCM endpoint | `https://fcm.googleapis.com/v1/projects/{project-id}/messages:send` |
@@ -197,8 +198,9 @@ is the Android installation path for this check.
   someone else — you never get a push for your own message or your own reply.
 - For news only: an admin session on `https://www.queenzone.org/admin/news`.
 
-Trigger every category against the same live API the internal-testing app
-already uses (`https://www.queenzone.org`). A local or in-memory host will not
+Trigger every category against the same API the internal-testing app already
+uses (`https://www.queenzone.org` by default, or `https://dev.queenzone.org`
+for an explicitly staging-baked build). A local or in-memory host will not
 reach that device token.
 
 ### Smallest first check (private message)
@@ -208,8 +210,8 @@ forum or news.
 
 1. On the Android phone, open the Play internal-test build and sign in as the
    **receiver**.
-2. Allow notifications when the OS prompt appears. Sign-in is what registers
-   the FCM token with `https://www.queenzone.org`. If you previously denied
+2. Allow notifications when the OS prompt appears. Sign-in registers the FCM
+   token with the app's selected API origin. If you previously denied
    the prompt, enable QueenZone in Settings → Apps → QueenZone →
    Notifications, then foreground the app so it can register.
 3. Background the app (Home or lock). Foreground still shows an in-app banner,

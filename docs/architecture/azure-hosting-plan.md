@@ -26,11 +26,11 @@ flowchart LR
 
 ## Environments
 
-Start with:
+- **Local development.**
+- **`dev`** — always-on environment at `dev.queenzone.org`, App Service `queenzone-devbox` / resource group `Queenzone-Dev-RG`, own SQL database and storage account. Every merge to `main` auto-deploys here via `deploy-dev.yml`. See [`opentofu-dev-environment.md`](opentofu-dev-environment.md).
+- **Production** — `queenzone.org` / `www.queenzone.org`, deployed via `deploy.yml`, which now triggers on `v*` tags rather than every merge to `main` (tag-based promotion, [epic #1264](https://github.com/richardorchard/QueenZone.Modern/issues/1264) Phase 5). Promote a merged commit by tagging it once it has been exercised on `dev`.
 
-- Local development.
-- Azure preview.
-- Production.
+> **Naming trap:** the production App Service is still literally named `queenzone-dev` (a historical accident predating the real `dev` environment above) and lives in resource group `Queenzone-RG`. It is **not** the `dev` environment. `queenzone-dev` = production; `queenzone-devbox` = dev. This is scheduled to be renamed to `queenzone-prod` as part of Phase 7 ([#1272](https://github.com/richardorchard/QueenZone.Modern/issues/1272)); every `queenzone-dev` reference below predates that rename.
 
 Optional later:
 

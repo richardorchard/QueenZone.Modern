@@ -5,3 +5,18 @@ appId: org.queenzone.mobile
 # until after 'booting'. Fresh-install iOS still shows the Open confirm.
 - openLink: ${SMOKE_AUTH_URL}
 - runFlow: accept-ios-open-link.yaml
+# iOS can accept the system Open prompt without delivering the first
+# foreground URL event. Retry once when the signed-in masthead affordance did
+# not appear; the scheme is trusted after the first prompt, so no second
+# confirmation is expected (#1281).
+- runFlow:
+    when:
+      platform: iOS
+      notVisible:
+        id: home-messages
+    commands:
+      - openLink: ${SMOKE_AUTH_URL}
+- extendedWaitUntil:
+    visible:
+      id: home-messages
+    timeout: 20000

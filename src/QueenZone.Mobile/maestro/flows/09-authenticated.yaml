@@ -1,7 +1,8 @@
 appId: org.queenzone.mobile
 ---
 # Testing-seeded access token from the contract-host fixture. The runner
-# exports SMOKE_AUTH_URL. Debug builds only handle queenzone://smoke-auth.
+# exports SMOKE_AUTH_URL. Debug or Release-embedded smoke builds handle
+# queenzone://smoke-auth when appEnv is development.
 - runFlow: open-smoke-auth.yaml
 - tapOn:
     id: tab-home
@@ -14,11 +15,13 @@ appId: org.queenzone.mobile
 - assertVisible:
     id: profile-display-name
 - assertVisible: Contract Member
-- tapOn: Messages
+- tapOn:
+    id: profile-messages
 - extendedWaitUntil:
     visible:
       id: inbox-screen
     timeout: 20000
 - assertNotVisible:
     id: member-gate
-- assertVisible: Contract Other
+- assertVisible:
+    text: '^Contract Other.*'

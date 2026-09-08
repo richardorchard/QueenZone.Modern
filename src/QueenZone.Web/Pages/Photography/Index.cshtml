@@ -6,6 +6,11 @@
 <section class="qz-section">
   <div class="qz-container">
     <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
+
+    <p class="qz-submit-cta">
+      Have a photo to add to the archive? <a class="qz-button qz-button--cta" href="/submit/photo">Submit a photo</a>
+    </p>
+
     <div class="qz-photo-cat-grid">
       @foreach (var category in Model.Categories)
       {

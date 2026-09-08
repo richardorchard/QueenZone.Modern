@@ -1,16 +1,25 @@
 /**
- * Device-smoke Debug bake (#1225).
+ * Device-smoke / journeys embed (#1225, #1322).
  *
- * Scheduled iOS smoke launched the expo-dev-client "Searching for development
- * servers" UI, so Maestro never saw `home-screen`. Smoke binaries must embed
- * the Debug JS bundle (`__DEV__` stays true for queenzone://smoke-auth) and
- * skip the launcher. Local `expo start --dev-client` is unchanged unless
- * QUEENZONE_MOBILE_SMOKE_EMBED=1 is set at prebuild.
+ * CI installs a Release-embedded binary (assembleRelease / Release-iphonesimulator)
+ * so the JS bundle is in the APK/app and Maestro never sees the expo-dev-client
+ * launcher. This plugin is belt-and-suspenders: strip expo-dev-client from
+ * plugins/autolinking, force Android Debug to bundle too, and set iOS
+ * FORCE_BUNDLING. Release embed is the primary fix — Debug + these flags
+ * alone still opened the launcher. Local `expo start --dev-client` is
+ * unchanged unless QUEENZONE_MOBILE_SMOKE_EMBED=1 is set at prebuild.
  */
-const { createRunOncePlugin, withAppBuildGradle, withXcodeProject } = require('expo/config-plugins');
+const {
+  createRunOncePlugin,
+  withAppBuildGradle,
+  withXcodeProject,
+  withAndroidManifest,
+  withGradleProperties,
+} = require('expo/config-plugins');
 
 const TAG = 'queenzone-smoke-embed';
 const EMBED_FLAG = 'QUEENZONE_MOBILE_SMOKE_EMBED';
+const ANDROID_GRADLE_JVM_ARGS = '-Xmx6g -XX:MaxMetaspaceSize=1g';
 
 const DEV_CLIENT_PACKAGES = [
   'expo-dev-client',
@@ -59,12 +68,84 @@ function applyAndroidBundleInDebug(contents) {
   );
 }
 
+function applyAndroidReleaseDebugSigning(contents) {
+  const marker = `${TAG}-release-signing`;
+  if (contents.includes(marker)) {
+    return contents;
+  }
+
+  if (/release\s*\{[\s\S]*?signingConfig\s+signingConfigs\.debug/.test(contents)) {
+    return contents;
+  }
+
+  if (!/release\s*\{/.test(contents)) {
+    return contents;
+  }
+
+  return contents.replace(
+    /release\s*\{/,
+    `release {\n        // @generated begin ${marker} - expo prebuild\n        signingConfig signingConfigs.debug\n        // @generated end ${marker}`,
+  );
+}
+
+/**
+ * Release blocks cleartext HTTP by default (no `debug/AndroidManifest.xml`
+ * override), but smoke/journeys bake EXPO_PUBLIC_API_BASE_URL as
+ * http://10.0.2.2:<port> to reach the Testing web host — every request was
+ * failing with "Unable to reach QueenZone" once #1324 switched to Release
+ * APKs (#1372). Scoped to smokeEmbed builds only; store Release stays HTTPS-only.
+ */
+function applyAndroidManifestCleartextTraffic(androidManifest) {
+  const application = androidManifest?.manifest?.application?.[0];
+  if (!application) {
+    return androidManifest;
+  }
+  application.$ = application.$ ?? {};
+  application.$['android:usesCleartextTraffic'] = 'true';
+  return androidManifest;
+}
+
+/**
+ * Release packaging can exceed Expo's generated 2 GiB Gradle heap after the
+ * native libraries and embedded JS bundle have been assembled. Keep the
+ * larger heap scoped to generated smoke builds; normal CNG/store builds keep
+ * Expo's defaults.
+ */
+function applyAndroidSmokeGradleProperties(properties) {
+  const list = Array.isArray(properties) ? properties : [];
+  const next = list.filter(
+    (item) => !(item?.type === 'property' && item.key === 'org.gradle.jvmargs'),
+  );
+  next.push({
+    type: 'property',
+    key: 'org.gradle.jvmargs',
+    value: ANDROID_GRADLE_JVM_ARGS,
+  });
+  return next;
+}
+
+function withAndroidSmokeGradleProperties(config) {
+  return withGradleProperties(config, (mod) => {
+    mod.modResults = applyAndroidSmokeGradleProperties(mod.modResults);
+    return mod;
+  });
+}
+
+function withAndroidSmokeEmbedManifest(config) {
+  return withAndroidManifest(config, (mod) => {
+    mod.modResults = applyAndroidManifestCleartextTraffic(mod.modResults);
+    return mod;
+  });
+}
+
 function withAndroidSmokeEmbed(config) {
   return withAppBuildGradle(config, (mod) => {
     if (mod.modResults.language !== 'groovy') {
       return mod;
     }
-    mod.modResults.contents = applyAndroidBundleInDebug(mod.modResults.contents);
+    let next = applyAndroidBundleInDebug(mod.modResults.contents);
+    next = applyAndroidReleaseDebugSigning(next);
+    mod.modResults.contents = next;
     return mod;
   });
 }
@@ -84,6 +165,8 @@ function withSmokeEmbeddedBundle(config) {
     return config;
   }
   config = withAndroidSmokeEmbed(config);
+  config = withAndroidSmokeEmbedManifest(config);
+  config = withAndroidSmokeGradleProperties(config);
   config = withIosSmokeEmbed(config);
   return config;
 }
@@ -93,6 +176,10 @@ plugin.isSmokeEmbedEnabled = isSmokeEmbedEnabled;
 plugin.filterExpoPluginsForSmokeEmbed = filterExpoPluginsForSmokeEmbed;
 plugin.smokeEmbedAutolinking = smokeEmbedAutolinking;
 plugin.applyAndroidBundleInDebug = applyAndroidBundleInDebug;
+plugin.applyAndroidReleaseDebugSigning = applyAndroidReleaseDebugSigning;
+plugin.applyAndroidManifestCleartextTraffic = applyAndroidManifestCleartextTraffic;
+plugin.applyAndroidSmokeGradleProperties = applyAndroidSmokeGradleProperties;
+plugin.ANDROID_GRADLE_JVM_ARGS = ANDROID_GRADLE_JVM_ARGS;
 plugin.DEV_CLIENT_PACKAGES = DEV_CLIENT_PACKAGES;
 plugin.EMBED_FLAG = EMBED_FLAG;
 module.exports = plugin;

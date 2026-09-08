@@ -6,13 +6,16 @@ This repository is the modern QueenZone rebuild. The project is archive-first: i
 
 - `README.md` gives the project overview and local development commands.
 - `docs/architecture/testing-policy.md` defines the required testing layers (including CI Web.Tests mixed sharding).
-- `docs/decisions/` contains accepted architectural decisions.
+- `docs/decisions/` contains accepted architectural decisions ([index](docs/decisions/README.md)).
 - `docs/decisions/0006-hybrid-ef-core-admin-writes.md` is the Dapper vs EF access matrix and contributor rules for SQL in `QueenZone.Data`.
 - `docs/architecture/blob-storage-ugc.md` is the UGC blob upload foundation (`QueenZone.Storage` / `IBlobUploadService`).
 - `docs/architecture/opentofu-inventory.md` is the live Azure/Cloudflare ownership inventory for OpenTofu adoption (`infra/import/` holds sanitised IDs).
 - `docs/architecture/opentofu-contributor-runbook.md` is the OpenTofu operating contract, including `prevent_destroy` on SQL, Storage, and other irreplaceable resources. OpenTofu does not manage blob objects or SQL rows, and it will not automatically refuse to destroy a data store unless that lifecycle flag is set.
+- `docs/architecture/github-environments.md` is the GitHub Environment map (purpose, secrets/vars, protection, workflows). Production Actions use `prod-release`, `prod-deploy`, `prod-google-play`, and `prod-data-read` — not legacy `dev` / `deploy`.
+- `docs/architecture/codeql.md` is the default CodeQL scan contract: Expo Android modules are path-ignored and `java-kotlin` is skipped because no first-party Java/Kotlin remains (#1418 Option A). Do not add an Android SDK CodeQL build.
 - `docs/decisions/0007-rich-text-editor-quill.md` is the shared Quill rich-text editor decision (partial + `/api/uploads/editor-image`).
 - `docs/architecture/json-api-v1.md` is the versioned `/api/v1` JSON API contract (pagination, Problem Details, OpenAPI).
+- `docs/decisions/0019-api-versioning-convention.md` is the mobile/store-lag operational convention (breaking → `/api/v2` alongside v1; keep v1 while installed store builds depend on it). Complements [ADR 0010](docs/decisions/0010-versioned-json-api-conventions.md).
 - `docs/decisions/0009-react-native-for-mobile-app.md` and `docs/decisions/0011-mobile-project-location-and-build-tooling.md` are the mobile client tech and project-location decisions. `docs/decisions/0012-react-navigation-app-shell.md` is the React Navigation shell and public vs member tab boundary. `docs/decisions/0018-mobile-server-state-strategy.md` is the mobile server-state decision (bespoke hooks, not React Query).
 - `docs/mobile-development-environment.md` is the shared Windows/macOS native toolchain (Node 24, JDK 17, Android SDK 36).
 - `docs/backlog/migration-backlog.md` tracks migration work.
@@ -238,13 +241,15 @@ GitHub Actions workflow `.github/workflows/ci.yml` blocks merge when these fail:
 | **Global line coverage** | At least **51%** across the union of deterministic suite reports | Yes |
 | **Changed-line coverage** | At least **70%** of changed, coverable `.cs` lines in the PR diff vs `main` | Yes |
 | **Smoke test** | Published app responds on `/health`, `/`, `/news` (starts after `build`, overlaps coverage) | Yes |
-| **EF migrations (Azure SQL)** | When migration-related paths change: `has-pending-model-changes` + `database update` against the deploy SQL Server | Yes (job runs only for those PRs) |
+| **EF migrations (SQL Express mirror)** | When migration-related paths change: `has-pending-model-changes` + `database update` against the SQL Express mirror (no production Azure SQL, no prod GitHub Environment) | Yes (job runs only for those PRs) |
 | **Playwright e2e** | Self-hosted runner selected by the `e2e` label (Windows or macOS) | Yes (required PR merge gate; not rerun by deploy) |
 | **Mobile JS** | `npm ci`, `scripts/check-npm-advisories.mjs` (high/critical fail-closed; see `src/QueenZone.Mobile/npm-advisory-allowlist.md`), typecheck, `npm run lint`, `npm run test:coverage`, `scripts/Test-MobileCoverageGate.mjs`, and Expo Doctor in `src/QueenZone.Mobile` when that tree (or the mobile coverage scripts) changes | Runs when mobile files change; skipped otherwise (non-matrix skip is treated as passing) |
 | **Mobile Android build** | Unsigned debug APK via `expo prebuild` + `gradlew assembleDebug`, uploaded as a 1-day workflow artifact | Runs when mobile files change (or `workflow_dispatch`) |
 | **Mobile iOS build** | Unsigned Simulator build via `expo prebuild` + `xcodebuild`; prefers an idle self-hosted `ios-build` Mac and falls back to `macos-26`; zipped and uploaded as a 1-day artifact | Runs when mobile files change (or `workflow_dispatch`) |
 
 PRs that only change `src/QueenZone.Mobile/` (or docs/infra/design) skip the .NET build, tests, coverage, smoke, e2e, and the App Service deploy. Mixed web + mobile PRs run both. See `scripts/classify-pipeline-changes.sh` and `docs/architecture/testing-policy.md`.
+
+There are two separate deploy workflows, not one: `deploy-dev.yml` auto-deploys every merge to `main` against the `dev` environment (App Service `queenzone-devbox`, `dev.queenzone.org`); `deploy.yml` deploys **production** and only triggers on a `v*` tag push (or manual dispatch) — see [epic #1264](https://github.com/richardorchard/QueenZone.Modern/issues/1264) Phase 4/5. Promote a change to production by tagging the already-merged, already-dev-verified commit: `git tag vX.Y.Z <sha> && git push --tags`. Note the production App Service is still named `queenzone-dev` (pre-Phase 7 legacy naming, [#1272](https://github.com/richardorchard/QueenZone.Modern/issues/1272)) — don't confuse it with the `dev` environment's `queenzone-devbox`. See `docs/architecture/azure-hosting-plan.md` ("Environments") for the full picture.
 
 Coverage exclusions are configured in `coverlet.runsettings`. EF Core files under `**/Migrations/**/*.cs` are excluded from coverage metrics.
 
@@ -267,9 +272,9 @@ If the PR touches any of:
 - `src/QueenZone.Data/QueenZoneDbContextFactory.cs`
 - `src/QueenZone.Data/Entities/`
 
-then CI runs **EF migrations (Azure SQL)** against the same database as deploy (`QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING`). Unit/SQLite tests do **not** catch SQL Server batch-binding errors or Azure SQL timeouts.
+then CI runs **EF migrations (SQL Express mirror)** (`has-pending-model-changes` + `database update` against `queenzone_legacy_sync` on the Windows self-hosted SQL Express). That job has no production connection string and no production GitHub Environment. Production Azure SQL `database update` runs on `deploy.yml` migrate after merge / tag / dispatch. Unit/SQLite tests do **not** catch SQL Server batch-binding errors; Express also misses Azure-only failures (filegroups, collation, DTU-bound DDL) — those move to the post-merge migrate.
 
-For a safer earlier look before that real-database run, `.github/workflows/test-migrations-against-mirror.yml` (manual `workflow_dispatch`) applies pending migrations to the SQL Express mirror instead — the same disposable, nightly-refreshed copy `nightly-legacy-checks.yml` maintains, with real data. Check "resync first" to force a fresh copy from the live DB (~3-5 min), or leave it against whatever's already there. Not a replacement for the real check: the mirror can be up to a day stale, so a clean run here doesn't guarantee a clean run against the actual deploy target.
+`.github/workflows/test-migrations-against-mirror.yml` (manual `workflow_dispatch`) is the on-demand path against the same mirror, including an optional live resync. Check "resync first" to force a fresh copy from the live DB (currently about 25-30 minutes), or leave it against whatever's already there. A clean mirror run does not guarantee a clean run against Azure SQL.
 
 Locally, before opening such a PR:
 

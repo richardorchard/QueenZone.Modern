@@ -82,6 +82,29 @@ public interface IMemberAccountRepository
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Lists accounts that currently have local email/password sign-in enabled.
+    /// Password hashes are deliberately excluded from the returned projection.
+    /// </summary>
+    Task<IReadOnlyList<LocalPasswordAccountSummary>> ListLocalPasswordAccountsAsync(
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Updates the editable details for an existing local-password account.
+    /// A null password hash leaves the current password unchanged.
+    /// </summary>
+    Task<MemberAccount?> UpdateLocalPasswordAccountAsync(
+        Guid memberId,
+        string email,
+        string displayName,
+        string? passwordHash,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Removes local password sign-in without deleting the member or their content.
+    /// </summary>
+    Task<bool> RemoveLocalPasswordAsync(Guid memberId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Marks a member account suspended, blocking new sign-ins and (via cookie re-validation)
     /// ending any existing session. Posts and other content are left untouched.
     /// </summary>
@@ -137,3 +160,11 @@ public interface IMemberAccountRepository
         IReadOnlyList<MemberSocialLink> links,
         CancellationToken cancellationToken = default);
 }
+
+public sealed record LocalPasswordAccountSummary(
+    Guid Id,
+    string Email,
+    string DisplayName,
+    DateTime CreatedAt,
+    DateTime? LastLoginAt,
+    bool IsSuspended);

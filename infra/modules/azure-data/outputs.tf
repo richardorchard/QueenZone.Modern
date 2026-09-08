@@ -16,5 +16,5 @@ output "storage_account_id" {
 
 output "sql_database_id" {
   description = "Managed SQL database resource ID."
-  value       = azurerm_mssql_database.production.id
+  value       = var.manage_sql_database ? azurerm_mssql_database.production[0].id : null
 }

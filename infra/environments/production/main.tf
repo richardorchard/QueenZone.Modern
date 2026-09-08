@@ -39,6 +39,42 @@ module "azure_data" {
   location            = var.azure_location
 }
 
+# Phase 7 (#1272), build-new stage. These resources intentionally coexist
+# with the imported australiaeast estate. No custom hostname, DNS record, or
+# existing resource changes in this stage. The copied database is added to
+# management only after Azure creates it from the verified source copy.
+module "azure_web_target" {
+  source = "../../modules/azure-web"
+
+  resource_group_name          = azurerm_resource_group.production.name
+  location                     = var.production_target_location
+  service_plan_name            = "ASP-Queenzone-Prod"
+  web_app_name                 = "queenzone-prod"
+  log_analytics_workspace_name = "queenzone-prod-law"
+  application_insights_name    = "queenzone-prod-ai"
+  sku_name                     = var.app_service_sku
+  worker_count                 = var.app_service_worker_count
+  environment_name             = "migration"
+  allow_direct_access          = true
+  custom_hostnames             = {}
+}
+
+module "azure_data_target" {
+  source = "../../modules/azure-data"
+
+  resource_group_id                          = azurerm_resource_group.production.id
+  resource_group_name                        = azurerm_resource_group.production.name
+  location                                   = var.production_target_location
+  sql_server_name                            = "queenzone-prod-sql"
+  sql_database_name                          = "queenzone-db"
+  storage_account_name                       = "queenzoneprod"
+  storage_custom_domain_name                 = null
+  blob_service_is_preexisting                = false
+  create_sql_server_with_write_only_password = true
+  sql_server_administrator_password_wo       = var.target_sql_admin_password
+  manage_sql_database                        = false
+}
+
 # azure-data can also attach a database to an existing logical server for the
 # dev root. Preserve these imported production resource addresses as indexed
 # optional resources without proposing a replacement.
@@ -55,6 +91,16 @@ moved {
 moved {
   from = module.azure_data.azurerm_mssql_server_extended_auditing_policy.production
   to   = module.azure_data.azurerm_mssql_server_extended_auditing_policy.production[0]
+}
+
+moved {
+  from = module.azure_data.azurerm_mssql_database.production
+  to   = module.azure_data.azurerm_mssql_database.production[0]
+}
+
+moved {
+  from = module.azure_data.azurerm_mssql_database_extended_auditing_policy.production
+  to   = module.azure_data.azurerm_mssql_database_extended_auditing_policy.production[0]
 }
 
 moved {

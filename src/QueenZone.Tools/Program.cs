@@ -43,6 +43,11 @@ internal static class ToolsApp
             return await CreateReviewerAccountCommand.RunAsync(args);
         }
 
+        if (args.Length > 0 && string.Equals(args[0], "dev-snapshot", StringComparison.OrdinalIgnoreCase))
+        {
+            return await DevSnapshotCommand.RunAsync(args[1..]);
+        }
+
         if (args.Length > 0 && string.Equals(args[0], "import-quotes", StringComparison.OrdinalIgnoreCase))
         {
             return await RunImportQuotesAsync(args);
@@ -194,6 +199,7 @@ internal static class ToolsApp
         Console.Error.WriteLine("  dotnet run --project src/QueenZone.Tools -- backfill-photo-dimensions [options]");
         Console.Error.WriteLine("  dotnet run --project src/QueenZone.Tools -- convert-legacy-bbcode [options]");
         Console.Error.WriteLine("  dotnet run --project src/QueenZone.Tools -- create-reviewer-account --email <email> --password <password> --display-name <name> --connection-string <connection-string>");
+        Console.Error.WriteLine("  dotnet run --project src/QueenZone.Tools -- dev-snapshot <copy|verify> --config <path> [--manifest <path>] [--summary <path>]");
         Console.Error.WriteLine();
         Console.Error.WriteLine("Connection string can also be supplied with ConnectionStrings__QueenZoneLegacy.");
     }

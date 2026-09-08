@@ -11,7 +11,59 @@
 # /warmup on HTTP 500 even though the new data-build-version was already live.
 # --sample-data omits the hard-coded production legacy topic while retaining
 # the common route and API checks used by the isolated dev environment.
+# /health/ready must be ASP.NET status Healthy (whitespace-tolerant).
+# /health and /warmup stay on status ok.
+#   bash ./scripts/Invoke-PostDeploySmoke.sh --self-test
 set -euo pipefail
+
+# Whitespace-tolerant JSON "status" matcher. /health/ready uses ASP.NET
+# HealthStatus.ToString() ("Healthy"); /health and /warmup stay on "ok".
+body_has_json_status() {
+  local file="$1"
+  local expected="$2"
+  grep -qiE '"status"[[:space:]]*:[[:space:]]*"'"${expected}"'"' "$file"
+}
+
+if [ "${1:-}" = "--self-test" ]; then
+  fail=0
+  tmp="$(mktemp)"
+  trap 'rm -f "${tmp}"' EXIT
+
+  assert_status() {
+    local name="$1"
+    local body="$2"
+    local expected="$3"
+    local want="$4"
+    printf '%s' "${body}" >"${tmp}"
+    if body_has_json_status "${tmp}" "${expected}"; then
+      got=0
+    else
+      got=1
+    fi
+    if [ "${got}" -eq "${want}" ]; then
+      echo "PASS ${name}" >&2
+    else
+      echo "FAIL ${name} (want exit ${want}, got ${got})" >&2
+      fail=1
+    fi
+  }
+
+  assert_status ready-compact '{"status":"Healthy","entries":{}}' Healthy 0
+  assert_status ready-spaced '{ "status" : "Healthy" }' Healthy 0
+  assert_status ready-pretty $'{\n  "status": "Healthy"\n}\n' Healthy 0
+  assert_status ready-rejects-ok '{"status":"ok"}' Healthy 1
+  assert_status liveness-ok '{"status":"ok"}' ok 0
+  assert_status liveness-spaced '{ "status" : "ok" }' ok 0
+  assert_status liveness-rejects-healthy '{"status":"Healthy"}' ok 1
+  assert_status warmup-ok '{"status":"ok"}' ok 0
+
+  if [ "${fail}" -ne 0 ]; then
+    echo "Invoke-PostDeploySmoke self-test failed." >&2
+    exit 1
+  fi
+  echo "Invoke-PostDeploySmoke self-test passed." >&2
+  exit 0
+fi
 
 BASE_URL="https://www.queenzone.org"
 WARMUP_ONLY=0
@@ -43,6 +95,7 @@ fi
 WARMUP_PATH="/warmup"
 PATHS=(
   "/health"
+  "/health/ready"
   "/"
   "/news"
   "/forum"
@@ -70,9 +123,15 @@ check_path() {
     rm -f "$body_file"
     return 1
   fi
-  if [ "$path" = "/health" ] || [ "$path" = "$WARMUP_PATH" ]; then
-    if ! grep -q '"status":"ok"' "$body_file"; then
-      echo "  ✗ $path → 200 but body missing \"status\":\"ok\""
+  if [ "$path" = "/health/ready" ]; then
+    if ! body_has_json_status "$body_file" "Healthy"; then
+      echo "  ✗ $path → 200 but body missing status Healthy"
+      rm -f "$body_file"
+      return 1
+    fi
+  elif [ "$path" = "/health" ] || [ "$path" = "$WARMUP_PATH" ]; then
+    if ! body_has_json_status "$body_file" "ok"; then
+      echo "  ✗ $path → 200 but body missing status ok"
       rm -f "$body_file"
       return 1
     fi

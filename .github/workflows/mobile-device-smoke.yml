@@ -1,6 +1,10 @@
 # Phase 1 device smoke (#872 Option A) plus on-demand journeys (#1071).
 # Not a required PR check. Do not silently enable branch protection.
 # Weekday 04:00 UTC stays smoke only. Journeys use dispatch and weekday 16:00 UTC.
+#
+# Device smoke/journeys install a Release-embedded binary (JS bundle baked in).
+# Never assembleDebug / Debug-iphonesimulator — that is an expo-dev-client
+# launcher waiting for Metro (#1322). Do not host Metro in Actions.
 name: Mobile device smoke
 
 on:
@@ -107,17 +111,18 @@ jobs:
         working-directory: .
         run: ./scripts/preinstall-android-ndk.sh
 
-      - name: Assemble Android Debug smoke APK
+      - name: Assemble Android Release smoke APK
         env:
           EXPO_PUBLIC_APP_ENV: development
           EXPO_PUBLIC_API_BASE_URL: http://10.0.2.2:5098
+          EXPO_PUBLIC_SMOKE_EMBED: "1"
           SENTRY_DISABLE_AUTO_UPLOAD: "true"
           QUEENZONE_MOBILE_SMOKE_EMBED: "1"
           FORCE_BUNDLING: "1"
         run: |
           npx expo prebuild --platform android
           cd android
-          ./gradlew assembleDebug
+          ./gradlew assembleRelease
 
       - name: Install Maestro
         working-directory: .
@@ -159,7 +164,7 @@ jobs:
           force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
-          script: ./scripts/run-mobile-device-smoke.sh --platform android --skip-build --no-build --apk src/QueenZone.Mobile/android/app/build/outputs/apk/debug/app-debug.apk $PROVE_FAILURE_ARGS
+          script: ./scripts/run-mobile-device-smoke.sh --platform android --skip-build --no-build --apk src/QueenZone.Mobile/android/app/build/outputs/apk/release/app-release.apk $PROVE_FAILURE_ARGS
 
       - name: Collect leftover Android smoke logs
         if: failure()
@@ -249,10 +254,11 @@ jobs:
           unset ConnectionStrings__SqlServerTest || true
           dotnet build src/QueenZone.Web/QueenZone.Web.csproj --configuration Release
 
-      - name: Build iOS Simulator Debug smoke app
+      - name: Build iOS Simulator Release smoke app
         env:
           EXPO_PUBLIC_APP_ENV: development
           EXPO_PUBLIC_API_BASE_URL: http://127.0.0.1:5098
+          EXPO_PUBLIC_SMOKE_EMBED: "1"
           SENTRY_DISABLE_AUTO_UPLOAD: "true"
           QUEENZONE_MOBILE_SMOKE_EMBED: "1"
           FORCE_BUNDLING: "1"
@@ -265,7 +271,7 @@ jobs:
             -workspace "$WORKSPACE" \
             -scheme "$SCHEME" \
             -sdk iphonesimulator \
-            -configuration Debug \
+            -configuration Release \
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
             build
@@ -307,7 +313,7 @@ jobs:
           unset ConnectionStrings__QueenZoneLegacy || true
           unset ConnectionStrings__BlobStorage || true
           unset ConnectionStrings__SqlServerTest || true
-          APP=$(ls -d src/QueenZone.Mobile/ios/build/Build/Products/Debug-iphonesimulator/*.app | head -n 1)
+          APP=$(ls -d src/QueenZone.Mobile/ios/build/Build/Products/Release-iphonesimulator/*.app | head -n 1)
           ./scripts/run-mobile-device-smoke.sh \
             --platform ios \
             --skip-build \
@@ -394,17 +400,18 @@ jobs:
         working-directory: .
         run: ./scripts/preinstall-android-ndk.sh
 
-      - name: Assemble Android Debug smoke APK
+      - name: Assemble Android Release smoke APK
         env:
           EXPO_PUBLIC_APP_ENV: development
           EXPO_PUBLIC_API_BASE_URL: http://10.0.2.2:5098
+          EXPO_PUBLIC_SMOKE_EMBED: "1"
           SENTRY_DISABLE_AUTO_UPLOAD: "true"
           QUEENZONE_MOBILE_SMOKE_EMBED: "1"
           FORCE_BUNDLING: "1"
         run: |
           npx expo prebuild --platform android
           cd android
-          ./gradlew assembleDebug
+          ./gradlew assembleRelease
 
       - name: Install Maestro
         working-directory: .
@@ -438,7 +445,7 @@ jobs:
           force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
-          script: ./scripts/run-mobile-device-smoke.sh --platform android --suite journeys --skip-build --no-build --apk src/QueenZone.Mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          script: ./scripts/run-mobile-device-smoke.sh --platform android --suite journeys --skip-build --no-build --apk src/QueenZone.Mobile/android/app/build/outputs/apk/release/app-release.apk
 
       - name: Collect leftover Android journeys logs
         if: failure()
@@ -528,10 +535,11 @@ jobs:
           unset ConnectionStrings__SqlServerTest || true
           dotnet build src/QueenZone.Web/QueenZone.Web.csproj --configuration Release
 
-      - name: Build iOS Simulator Debug smoke app
+      - name: Build iOS Simulator Release smoke app
         env:
           EXPO_PUBLIC_APP_ENV: development
           EXPO_PUBLIC_API_BASE_URL: http://127.0.0.1:5098
+          EXPO_PUBLIC_SMOKE_EMBED: "1"
           SENTRY_DISABLE_AUTO_UPLOAD: "true"
           QUEENZONE_MOBILE_SMOKE_EMBED: "1"
           FORCE_BUNDLING: "1"
@@ -544,7 +552,7 @@ jobs:
             -workspace "$WORKSPACE" \
             -scheme "$SCHEME" \
             -sdk iphonesimulator \
-            -configuration Debug \
+            -configuration Release \
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
             build
@@ -582,7 +590,7 @@ jobs:
           unset ConnectionStrings__QueenZoneLegacy || true
           unset ConnectionStrings__BlobStorage || true
           unset ConnectionStrings__SqlServerTest || true
-          APP=$(ls -d src/QueenZone.Mobile/ios/build/Build/Products/Debug-iphonesimulator/*.app | head -n 1)
+          APP=$(ls -d src/QueenZone.Mobile/ios/build/Build/Products/Release-iphonesimulator/*.app | head -n 1)
           ./scripts/run-mobile-device-smoke.sh \
             --platform ios \
             --suite journeys \

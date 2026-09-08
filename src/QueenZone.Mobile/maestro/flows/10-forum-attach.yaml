@@ -6,7 +6,6 @@ appId: org.queenzone.mobile
 # after BootSplash leaves booting, and iOS still shows the Open confirm
 # on a fresh install (#1281). Files first, then Debug inject (#1072).
 - launchApp:
-    clearState: true
     clearKeychain: true
 - extendedWaitUntil:
     visible:
@@ -47,14 +46,19 @@ appId: org.queenzone.mobile
     visible:
       id: forum-composer-attach-files
     timeout: 20000
+# Placeholder "Write a reply" is not a tappable iOS text node (#1387).
 - tapOn:
-    text: Write a reply
+    id: forum-composer-body
 - inputText: Journey attach reply
+# Android marks the wrapped inject control visible:false while the
+# keyboard covers it (Release embed still mounts the testID).
+- hideKeyboard
 - tapOn:
     id: forum-composer-attach-files
-- extendedWaitUntil:
-    visible:
+- scrollUntilVisible:
+    element:
       id: forum-composer-attach-inject
+    direction: DOWN
     timeout: 15000
 - runFlow:
     when:
@@ -69,7 +73,8 @@ appId: org.queenzone.mobile
       - openLink: ${SMOKE_ATTACH_URL}
       - runFlow: accept-ios-open-link.yaml
 - extendedWaitUntil:
-    visible: attach.txt
+    visible:
+      id: forum-composer-attachment
     timeout: 15000
 - tapOn:
     id: forum-composer-submit
@@ -79,11 +84,26 @@ appId: org.queenzone.mobile
     timeout: 20000
 - scrollUntilVisible:
     element:
-      text: attach.txt
+      id: forum-thread-attachment
     direction: DOWN
     timeout: 20000
-- tapOn: attach.txt
+- tapOn:
+    id: forum-thread-attachment
 - extendedWaitUntil:
     visible:
       id: forum-thread-attachment-opened
     timeout: 20000
+# Thread screens hide the tab bar. Return to the Forum root so the next
+# journey can switch tabs without depending on preserved nested state.
+- tapOn:
+    id: forum-thread-back
+- extendedWaitUntil:
+    visible:
+      id: forum-category-screen
+    timeout: 15000
+- tapOn:
+    id: tab-forum
+- extendedWaitUntil:
+    visible:
+      id: forum-screen
+    timeout: 15000

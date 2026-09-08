@@ -18,10 +18,17 @@ else
         <div class="qz-forum-post__content">
           <header class="qz-forum-post__header">
             @* Legacy archive posts have no AuthorMemberId; modern posts link to /members/{id}. *@
-            @if (post.AuthorMemberId is Guid authorProfileId)
+            @{
+              var authorHref = post.AuthorMemberId is Guid authorProfileId
+                ? $"/members/{authorProfileId}"
+                : post.AuthorLegacyUserId is int authorLegacyUserId
+                  ? $"/forum/archive-authors/{authorLegacyUserId}"
+                  : null;
+            }
+            @if (authorHref is not null)
             {
-              <a class="qz-forum-post__author-link" href="/members/@authorProfileId" title="View @post.AuthorUsername's profile">
-                <partial name="_MemberAvatar" model="@(new MemberAvatarViewModel { DisplayName = post.AuthorUsername, MemberId = authorProfileId, Size = "sm" })" />
+              <a class="qz-forum-post__author-link" href="@authorHref" title="View @post.AuthorUsername's profile">
+                <partial name="_MemberAvatar" model="@(new MemberAvatarViewModel { DisplayName = post.AuthorUsername, MemberId = post.AuthorMemberId, Size = "sm" })" />
               </a>
             }
             else
@@ -29,9 +36,9 @@ else
               <partial name="_MemberAvatar" model="@(new MemberAvatarViewModel { DisplayName = post.AuthorUsername, Size = "sm" })" />
             }
             <div class="qz-forum-post__author-meta">
-              @if (post.AuthorMemberId is Guid profileMemberId)
+              @if (authorHref is not null)
               {
-                <strong class="qz-forum-post__author"><a class="qz-forum-post__author-link" href="/members/@profileMemberId">@post.AuthorUsername</a></strong>
+                <strong class="qz-forum-post__author"><a class="qz-forum-post__author-link" href="@authorHref">@post.AuthorUsername</a></strong>
               }
               else
               {
@@ -121,7 +128,14 @@ else
             }
             @if (isAdmin)
             {
-              <a class="qz-button qz-button--danger" href="/forum/post/@post.Id/hide-author">Hide all by this author</a>
+              <a class="qz-forum-post__hide-author-link" href="/forum/post/@post.Id/hide-author" aria-label="Hide all posts by @post.AuthorUsername" title="Hide all posts by @post.AuthorUsername">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="m17 11 4 4m0-4-4 4" />
+                </svg>
+                <span class="visually-hidden">Hide all posts by @post.AuthorUsername</span>
+              </a>
             }
           </div>
         }

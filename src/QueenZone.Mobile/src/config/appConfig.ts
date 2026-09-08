@@ -10,6 +10,7 @@ import {
   rewriteLoopbackForAndroid,
   type AppEnvironment,
 } from './environments';
+import { resolveSmokeEmbedFlag } from './smokeEmbedFlag';
 
 export type AppConfig = {
   appEnv: AppEnvironment;
@@ -21,6 +22,11 @@ export type AppConfig = {
   buildRevision?: string;
   /** Public Sentry DSN baked at prebuild; unset keeps `initSentry()` a no-op. */
   sentryDsn?: string;
+  /**
+   * True when CI/local smoke prebuild set QUEENZONE_MOBILE_SMOKE_EMBED.
+   * Lets Release-embedded Testing binaries accept queenzone://smoke-auth.
+   */
+  smokeEmbed?: boolean;
 };
 
 type ExpoExtra = {
@@ -30,6 +36,7 @@ type ExpoExtra = {
   buildTimestampUtc?: string;
   buildRevision?: string;
   sentryDsn?: string;
+  smokeEmbed?: boolean | string;
 };
 
 function readExtra(): ExpoExtra {
@@ -46,7 +53,9 @@ function readSentryDsn(extra: ExpoExtra): string | undefined {
 /**
  * Resolved environment + API origin for the running build.
  * Prefer this over reading process.env in UI code — Metro inlines EXPO_PUBLIC_*
- * at bundle time, but `extra` is the single committed contract from app.config.
+ * at bundle time. `extra` is the committed contract from app.config; smokeEmbed
+ * also accepts `EXPO_PUBLIC_SMOKE_EMBED` so a Release embed does not wait on
+ * Constants.expoConfig being populated (#1387).
  */
 export function getAppConfig(): AppConfig {
   const extra = readExtra();
@@ -66,6 +75,7 @@ export function getAppConfig(): AppConfig {
     buildTimestampUtc: extra.buildTimestampUtc,
     buildRevision: extra.buildRevision,
     sentryDsn: readSentryDsn(extra),
+    smokeEmbed: resolveSmokeEmbedFlag(extra) || undefined,
   };
 }
 

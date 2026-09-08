@@ -17,6 +17,11 @@ if ($actualVersion -ne $expectedVersion) {
     throw "OpenTofu $expectedVersion is required; found $actualVersion."
 }
 
+& (Join-Path $PSScriptRoot "Test-AzureMigrationTargetCapacity.ps1") -SelfTest
+if ($LASTEXITCODE -ne 0) {
+    throw "Azure migration target capacity self-test failed."
+}
+
 & $tofu.Source fmt -check -recursive $infraPath
 if ($LASTEXITCODE -ne 0) {
     throw "OpenTofu formatting failed."
@@ -55,5 +60,11 @@ $webModulePath = Join-Path $infraPath "modules/azure-web"
 if ($LASTEXITCODE -ne 0) { throw "Azure web module test initialisation failed." }
 & $tofu.Source "-chdir=$webModulePath" test
 if ($LASTEXITCODE -ne 0) { throw "Azure web module contract tests failed." }
+
+$dataModulePath = Join-Path $infraPath "modules/azure-data"
+& $tofu.Source "-chdir=$dataModulePath" init -backend=false -input=false
+if ($LASTEXITCODE -ne 0) { throw "Azure data module test initialisation failed." }
+& $tofu.Source "-chdir=$dataModulePath" test
+if ($LASTEXITCODE -ne 0) { throw "Azure data module contract tests failed." }
 
 Write-Output "OpenTofu format, safety, initialisation, and root/module validation checks passed."

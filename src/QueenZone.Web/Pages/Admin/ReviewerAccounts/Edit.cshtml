@@ -1,0 +1,53 @@
+@page "/admin/reviewer-accounts/{id:guid}"
+@model QueenZone.Web.Pages.Admin.ReviewerAccounts.EditModel
+@{
+  var removeConfirmMessage = System.Text.Json.JsonSerializer.Serialize(
+    $"Remove password sign-in for {Model.Account.Email}? The member record and content will remain.");
+}
+
+<div class="admin-shell">
+  <h1>Edit reviewer account</h1>
+  <p><a href="/admin/reviewer-accounts">Back to reviewer accounts</a></p>
+
+  <section class="admin-form">
+    <form method="post">
+      <div asp-validation-summary="ModelOnly" class="validation-summary-errors"></div>
+
+      <label asp-for="Input.Email"></label>
+      <input asp-for="Input.Email" type="email" autocomplete="off" />
+      <span asp-validation-for="Input.Email"></span>
+
+      <label asp-for="Input.DisplayName"></label>
+      <input asp-for="Input.DisplayName" autocomplete="off" />
+      <span asp-validation-for="Input.DisplayName"></span>
+
+      <label asp-for="Input.NewPassword"></label>
+      <input id="Input_NewPassword" name="Input.NewPassword" type="password" autocomplete="new-password" />
+      <span asp-validation-for="Input.NewPassword"></span>
+      <p>Leave blank to keep the current password. Existing passwords cannot be displayed because only a one-way hash is stored.</p>
+
+      <label asp-for="Input.ConfirmNewPassword"></label>
+      <input id="Input_ConfirmNewPassword" name="Input.ConfirmNewPassword" type="password" autocomplete="new-password" />
+      <span asp-validation-for="Input.ConfirmNewPassword"></span>
+
+      <label>
+        <input type="checkbox" data-password-visibility="Input_NewPassword,Input_ConfirmNewPassword" />
+        Show new password while entering it
+      </label>
+
+      <button type="submit" class="qz-button">Save changes</button>
+    </form>
+  </section>
+
+  <section class="admin-form">
+    <h2>Remove password sign-in</h2>
+    <p>This prevents future local password sign-ins. Existing sessions are not ended. The member record, audit history, and contributed content remain.</p>
+    <form method="post" asp-page-handler="Delete" onsubmit="return confirm(@removeConfirmMessage);">
+      <button type="submit" class="qz-button qz-button--danger">Remove password sign-in</button>
+    </form>
+  </section>
+</div>
+
+@section Scripts {
+  <script src="~/js/admin-reviewer-accounts.js" asp-append-version="true"></script>
+}

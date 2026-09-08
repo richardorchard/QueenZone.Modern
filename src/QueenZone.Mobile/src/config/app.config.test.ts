@@ -37,3 +37,36 @@ describe('app.config android versionCode', () => {
     assert.match(source, /versionCode: androidVersionCode/);
   });
 });
+
+describe('Android home widget config', () => {
+  it('has a picker preview and does not require an unregistered configuration screen', () => {
+    type AndroidWidgetPlugin = [
+      string,
+      { widgets?: Record<string, unknown>[] },
+    ];
+    const appJson = JSON.parse(
+      readFileSync(new URL('../../app.json', import.meta.url), 'utf8'),
+    ) as {
+      expo: {
+        plugins: (string | AndroidWidgetPlugin)[];
+      };
+    };
+    const plugin = appJson.expo.plugins.find(
+      (candidate): candidate is AndroidWidgetPlugin =>
+        Array.isArray(candidate) && candidate[0] === 'react-native-android-widget',
+    );
+    const widget = plugin?.[1].widgets?.find(
+      (candidate) => candidate.name === 'OnThisDayWidget',
+    );
+
+    assert.equal(widget?.previewImage, './assets/android-widget-preview.png');
+    assert.equal(widget?.widgetFeatures, undefined);
+
+    const preview = readFileSync(
+      new URL('../../assets/android-widget-preview.png', import.meta.url),
+    );
+    assert.deepEqual([...preview.subarray(1, 4)], [0x50, 0x4e, 0x47]);
+    assert.equal(preview.readUInt32BE(16), 540);
+    assert.equal(preview.readUInt32BE(20), 330);
+  });
+});

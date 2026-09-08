@@ -234,6 +234,77 @@ public sealed class AdminTriviaRoutesTests : IClassFixture<QueenZoneWebApplicati
         Assert.Null(store.GetRandomPublished());
     }
 
+    [Fact]
+    public async Task PostDelete_preservesCategoryFilterAndPageNumberOnRedirect()
+    {
+        var store = new SharedTriviaStore();
+        var client = CreateWriteClient(store);
+        var text = $"WAF delete filtered {Guid.NewGuid():N}";
+        var create = await PostCreateAsync(client, text, category: "Albums", isPublished: true);
+        Assert.Equal(HttpStatusCode.Redirect, create.StatusCode);
+        var id = store.GetAll().Single(item => item.Text == text).Id;
+
+        var listPage = await client.GetStringAsync("/admin/trivia");
+        var fields = new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = AdminHttpTestHelpers.ExtractAntiforgeryToken(listPage),
+            ["id"] = id.ToString(),
+            ["PageNumber"] = "2",
+            ["category"] = "Albums",
+        };
+
+        var delete = await client.PostAsync("/admin/trivia?handler=Delete", new FormUrlEncodedContent(fields));
+
+        Assert.Equal(HttpStatusCode.Redirect, delete.StatusCode);
+        Assert.Equal("/admin/trivia?pageNumber=2&category=Albums", delete.Headers.Location?.OriginalString);
+    }
+
+    [Fact]
+    public async Task PostTogglePublish_preservesCategoryFilterAndPageNumberOnRedirect()
+    {
+        var store = new SharedTriviaStore();
+        var client = CreateWriteClient(store);
+        var text = $"WAF toggle filtered {Guid.NewGuid():N}";
+        var create = await PostCreateAsync(client, text, category: "Band", isPublished: true);
+        Assert.Equal(HttpStatusCode.Redirect, create.StatusCode);
+        var id = store.GetAll().Single(item => item.Text == text).Id;
+
+        var listPage = await client.GetStringAsync("/admin/trivia");
+        var fields = new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = AdminHttpTestHelpers.ExtractAntiforgeryToken(listPage),
+            ["id"] = id.ToString(),
+            ["isPublished"] = "true",
+            ["PageNumber"] = "3",
+            ["category"] = "Band",
+        };
+
+        var toggle = await client.PostAsync("/admin/trivia?handler=TogglePublish", new FormUrlEncodedContent(fields));
+
+        Assert.Equal(HttpStatusCode.Redirect, toggle.StatusCode);
+        Assert.Equal("/admin/trivia?pageNumber=3&category=Band", toggle.Headers.Location?.OriginalString);
+    }
+
+    [Fact]
+    public async Task ListIsPaginatedWhenFactCountExceedsPageSize()
+    {
+        var store = new SharedTriviaStore();
+        var client = CreateWriteClient(store);
+        var marker = $"WAF page {Guid.NewGuid():N}";
+        for (var i = 0; i < AdminTriviaRoutes.ListPageSize + 1; i++)
+        {
+            await PostCreateAsync(client, $"{marker} {i}", category: "Paging", isPublished: true);
+        }
+
+        var firstPage = await client.GetStringAsync("/admin/trivia?category=Paging");
+        var secondPage = await client.GetStringAsync("/admin/trivia?category=Paging&pageNumber=2");
+
+        Assert.Contains("archive-pagination", firstPage);
+        Assert.Contains($"{marker} {AdminTriviaRoutes.ListPageSize}", firstPage);
+        Assert.DoesNotContain($"{marker} 0", firstPage);
+        Assert.Contains($"{marker} 0", secondPage);
+    }
+
     private HttpClient CreateWriteClient(SharedTriviaStore store)
     {
         var appFactory = factory.WithWebHostBuilder(builder =>

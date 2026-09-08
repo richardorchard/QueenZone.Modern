@@ -5,9 +5,11 @@ using Microsoft.Extensions.Options;
 namespace QueenZone.Web;
 
 /// <summary>
-/// OAuth2 authorization-code + PKCE endpoints for the mobile public client.
+/// OAuth2 authorization-code + PKCE endpoints for the mobile public client, plus a
+/// resource-owner password grant for operator-created accounts (App Review / non-social).
 /// QueenZone remains the confidential client toward Google/Microsoft/Discord/GitHub/Apple;
-/// the React Native app never sees a provider secret or password.
+/// the React Native app never sees a provider secret. Password is typed only on the
+/// secondary “Other ways to sign in” path.
 /// </summary>
 public static class MobileAuthEndpoints
 {
@@ -184,6 +186,12 @@ public static class MobileAuthEndpoints
             ? await mobileAuth.ExchangeRefreshTokenAsync(
                 form["client_id"].ToString(),
                 form["refresh_token"].ToString(),
+                cancellationToken)
+            : string.Equals(grantType, "password", StringComparison.Ordinal)
+            ? await mobileAuth.ExchangePasswordGrantAsync(
+                form["client_id"].ToString(),
+                form["username"].ToString(),
+                form["password"].ToString(),
                 cancellationToken)
             : await mobileAuth.ExchangeAuthorizationCodeAsync(
                 grantType,

@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
+import { cacheDirectory, writeAsStringAsync } from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
@@ -58,9 +59,11 @@ function messageFromUnknownError(err: unknown): string {
 }
 
 function smokeAttachAllowed(): boolean {
+  const config = getAppConfig();
   return isSmokeAttachEnabled({
     dev: typeof __DEV__ !== 'undefined' ? __DEV__ : false,
-    appEnv: getAppConfig().appEnv,
+    appEnv: config.appEnv,
+    smokeEmbed: config.smokeEmbed,
   });
 }
 
@@ -210,10 +213,32 @@ function ComposerForm({ navigation, route }: Props) {
     }
   }, [applyPickedAsset]);
 
-  const injectSmokeAttach = useCallback(() => {
+  const injectSmokeAttach = useCallback(async () => {
     setSubmitError(null);
     const pending = takePendingSmokeAttachAsset();
-    applyPickedAsset(pending ?? defaultSmokeAttachAsset(Platform.OS));
+    if (pending) {
+      applyPickedAsset(pending);
+      return;
+    }
+
+    if (Platform.OS === 'android') {
+      if (!cacheDirectory) {
+        setSubmitError(composerAttachCopy.filesUnavailable);
+        return;
+      }
+
+      const uri = `${cacheDirectory}${smokeAttachFileName}`;
+      try {
+        await writeAsStringAsync(uri, 'QueenZone Maestro attach fixture\n');
+      } catch {
+        setSubmitError(composerAttachCopy.filesUnavailable);
+        return;
+      }
+      applyPickedAsset({ uri, name: smokeAttachFileName, mimeType: 'text/plain' });
+      return;
+    }
+
+    applyPickedAsset(defaultSmokeAttachAsset(Platform.OS));
   }, [applyPickedAsset]);
 
   const submit = useCallback(async () => {
@@ -389,6 +414,7 @@ function ComposerForm({ navigation, route }: Props) {
           placeholder={mode === 'reply' ? 'Write a reply' : 'Write the first post'}
           placeholderTextColor={c.textMuted}
           accessibilityLabel={mode === 'reply' ? 'Reply body' : 'Topic body'}
+          testID={testIds.forumComposerBody}
           multiline
           textAlignVertical="top"
           style={[

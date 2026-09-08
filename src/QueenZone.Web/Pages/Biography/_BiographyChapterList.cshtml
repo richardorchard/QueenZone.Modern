@@ -11,7 +11,7 @@
           <div class="qz-bio-chapter-row__range">@BiographyRoutes.GetChapterMarker(chapter)</div>
         </div>
         <div class="qz-bio-chapter-row__content">
-          <h2>@chapter.Title</h2>
+          <h2 class="visually-hidden">@chapter.Title</h2>
           @{
             var summary = BiographyContent.GetListSummary(chapter);
           }

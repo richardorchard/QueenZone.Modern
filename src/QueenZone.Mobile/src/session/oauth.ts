@@ -52,6 +52,50 @@ export async function refreshAccessToken(apiBaseUrl: string, refreshToken: strin
   });
 }
 
+/** Resource-owner password grant for operator-created accounts (App Review / non-social). */
+export async function signInWithPassword(
+  apiBaseUrl: string,
+  email: string,
+  password: string,
+): Promise<AuthTokens> {
+  const response = await fetch(authTokenUrl(apiBaseUrl), {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: tokenFormBody({
+      grant_type: 'password',
+      client_id: mobileClientId,
+      username: email,
+      password,
+    }),
+  });
+  const payload: unknown = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(passwordGrantError(payload));
+  }
+
+  return parseTokenResponse(payload);
+}
+
+function passwordGrantError(payload: unknown): string {
+  const error =
+    payload && typeof payload === 'object'
+      ? (payload as { error?: unknown; error_description?: unknown })
+      : null;
+  const description = typeof error?.error_description === 'string' ? error.error_description : '';
+  if (description === 'This account has been suspended.') {
+    return description;
+  }
+
+  if (error?.error === 'invalid_grant') {
+    return 'Incorrect email or password.';
+  }
+
+  return description.length > 0 ? description : 'Could not complete sign-in.';
+}
+
 /** Caps best-effort logout/revoke so a hung React Native fetch cannot block sign-out. */
 export const remoteAuthTimeoutMs = 8_000;
 

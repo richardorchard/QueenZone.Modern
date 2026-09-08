@@ -81,6 +81,11 @@ export const dark = {
 
   crest: 'crest-white.png',
   crestWatermarkOpacity: 0.06,
+
+  /** Archive section icon plate (#1321 handoff) — engraved-line glyph on a raised chip. */
+  iconPlateGradient: ['#1C1C1C', '#141414', '#101010'] as [string, string, string],
+  iconPlateBorder: 'rgba(255,255,255,0.14)',
+  glyphStroke: 'rgba(255,255,255,0.88)',
 } as const;
 
 /** Light theme — parity with web semantic aliases in colors.css. */
@@ -114,6 +119,11 @@ export const light = {
 
   crest: 'crest-black.png',
   crestWatermarkOpacity: 0.05,
+
+  /** Archive section icon plate (#1321 handoff) — light-theme counterpart. */
+  iconPlateGradient: [palette.grey100, palette.grey50, palette.white] as [string, string, string],
+  iconPlateBorder: palette.grey300,
+  glyphStroke: palette.grey700,
 } as const;
 
 export type ColorScheme = typeof dark | typeof light;

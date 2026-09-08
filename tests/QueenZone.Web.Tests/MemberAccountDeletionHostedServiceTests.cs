@@ -237,6 +237,23 @@ public sealed class MemberAccountDeletionHostedServiceTests
             CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
+        public Task<IReadOnlyList<LocalPasswordAccountSummary>> ListLocalPasswordAccountsAsync(
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<MemberAccount?> UpdateLocalPasswordAccountAsync(
+            Guid memberId,
+            string email,
+            string displayName,
+            string? passwordHash,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<bool> RemoveLocalPasswordAsync(
+            Guid memberId,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         public Task<MemberAccount?> SuspendAsync(
             Guid memberId,
             string reason,

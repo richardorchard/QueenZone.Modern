@@ -188,6 +188,7 @@ and CocoaPods. Clean-checkout commands live in
 
 ## References
 
+- [ADR 0019](decisions/0019-api-versioning-convention.md) — mobile/store-lag API versioning (breaking changes cut `/api/v2` alongside v1; keep v1 while installed store builds depend on it)
 - [Mobile push verification](mobile-push-testing.md) — iOS TestFlight / production APNs and Android Google Play internal testing / FCM receive + record on a real device
 - [React Native: Set Up Your Environment](https://reactnative.dev/docs/next/set-up-your-environment)
 - [Android Studio installation](https://developer.android.com/studio/install)

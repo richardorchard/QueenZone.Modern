@@ -5,6 +5,8 @@ Issue: [#624](https://github.com/richardorchard/QueenZone.Modern/issues/624) (Op
 **Audit date:** 2026-08-12  
 **Settings / GitHub refresh:** 2026-08-24 — added the four live APNs App Service setting names created for [#846](https://github.com/richardorchard/QueenZone.Modern/issues/846) and the Android FCM setting names for [#847](https://github.com/richardorchard/QueenZone.Modern/issues/847). GitHub environment names, Azure/Cloudflare resource IDs, storage ACLs, and `cdn`/`cdn2` probes were not re-run.
 
+**#1394 GitHub Environment refresh:** 2026-09-07 — legacy `dev` / `deploy` **deleted in Settings** (`gh api …/environments`: neither name present). Workflows already use `prod-*`. Azure/Cloudflare IDs were not re-probed.
+
 **#177 live refresh:** 2026-08-16 — `songfiles` ACL set to `None` via ARM; Worker `pictures-queenzone-org` published on `cdn2.queenzone.org/*` (404 `/songfiles/*`).  
 **Method:** read-only Azure CLI/`az` against subscription `Base Subscription`, live HTTP/DNS probes of public hostnames, Cloudflare API (tokens `CLOUDFLARE_API_TOKEN_READONLY` and `CLOUDFLARE_WORKER_READWRITE` from Bitwarden — values not recorded), GitHub API for environments/secret *names*, Bitwarden Secrets Manager key *names* only.  
 **Mutations performed:** none during the 2026-08-12 audit. 2026-08-16 applied the #177 ACL and Worker publish outside OpenTofu.
@@ -159,8 +161,12 @@ Account id `f93121b2086286e79a7a9fdb8d03cb4c`. Zone id `079fc2f37095c82fb3a2b4da
 | Item | Treatment | Notes |
 | --- | --- | --- |
 | Workflows under `.github/workflows/` | outside | App deploy path stays GitHub; OpenTofu CI is a later issue (#625). Inventory now includes `opentofu-backend-smoke.yml`. |
-| Environment `dev` | data / defer | No protection rules; used by `deploy.yml` for Bitwarden publish-profile zip deploy |
-| Environment `deploy` | outside | Protected branches only. Dedicated OIDC identity with **Website Contributor** on site `queenzone-dev` only. `deploy.yml` `configure-app-settings` writes ARM app settings through this environment. Not an OpenTofu principal — sibling bootstrap at `infra/bootstrap/Bootstrap-DeployIdentity.ps1`. |
+| Environment `prod-release` | outside | Custom policy: branch `main` + tags `v*`. Production migrate + zip deploy (`deploy.yml`). See [`github-environments.md`](github-environments.md). |
+| Environment `prod-deploy` | outside | Custom policy: branch `main` + tags `v*`. Dedicated OIDC identity with **Website Contributor** on site `queenzone-dev` only. `deploy.yml` `configure-app-settings` and `app-service-setting-names-check.yml`. Not an OpenTofu principal — sibling bootstrap at `infra/bootstrap/Bootstrap-DeployIdentity.ps1`. |
+| Environment `prod-google-play` | outside | Custom policy: branch `main`. Play signing / store upload only (`publish-android-google-play.yml`). |
+| Environment `prod-data-read` | outside | Custom policy: branch `main`. Production read used only to refresh/resync the SQL Express mirror. |
+| Environment `dev` (legacy) | outside | **Deleted in Settings** (2026-09-07, #1394). Retired from workflows in #1377. Do not recreate. |
+| Environment `deploy` (legacy) | outside | **Deleted in Settings** (2026-09-07, #1394). Entra FIC subject `environment:deploy` removed. Retired from workflows in #1377. ARM/OIDC now lives on `prod-deploy`. Do not recreate. |
 | Environment `opentofu-plan` | outside | Protected branches only. Reader on `Queenzone-RG` plus state-container data access. See [`opentofu-state-and-identity.md`](opentofu-state-and-identity.md). |
 | Environment `opentofu-apply` | outside | Protected branches + `richardorchard` approval. Contributor on `Queenzone-RG`. Do not reuse for routine zip deploys. |
 | Repo secret `BITWARDEN_SECRETS_MANAGER_ACCESS_TOKEN` | outside | Token only; never OpenTofu state |
@@ -168,14 +174,14 @@ Account id `f93121b2086286e79a7a9fdb8d03cb4c`. Zone id `079fc2f37095c82fb3a2b4da
 | Repo secret `SIXLABORS_LICENSE_KEY` | outside | CI/deploy ImageSharp licence; not an App Service setting |
 | Legacy raw GH secrets (`AZURE_WEBAPP_PUBLISH_PROFILE`, migration connection strings, etc.) | defer | Names still present; Bitwarden is intended SoT — reconcile/delete later (#618) |
 | Bitwarden project `Queenzone Development` | outside | Secret values; OpenTofu may later wire Key Vault / references but not store values |
-| App Service publish profile | outside | Rotatable credential; consumed by environment `dev`, not `deploy` |
+| App Service publish profile | outside | Rotatable credential; consumed by environment `prod-release`, not `prod-deploy` |
 
 ### Entra / identity (reference)
 
 | Item | Treatment | Notes |
 | --- | --- | --- |
 | App Service system-assigned MI | import with site | Principal id recorded in import JSON |
-| `QueenZone Deploy` OIDC app | outside | Used by GitHub environment `deploy` to write ARM settings. Not part of the OpenTofu plan/apply pair. |
+| `QueenZone Deploy` OIDC app | outside | Used by GitHub environment `prod-deploy` to write ARM settings. Not part of the OpenTofu plan/apply pair. |
 | Entra app registrations (Admin / member OAuth) | outside / defer | Documented in `entra-admin-auth.md`; not Azure RG resources |
 | SQL AAD admin | data | Login name known; do not put credentials in state |
 
@@ -214,7 +220,7 @@ Ownership of App Service settings is decided in [ADR 0008](../decisions/0008-app
 ### ARM-owned non-secret deploy keys (#666)
 
 These are **not** Bitwarden secrets, and they are **not** OpenTofu-managed either — `deploy.yml`'s
-`configure-app-settings` job writes them directly through ARM (`azure/login` on GitHub environment `deploy`), a
+`configure-app-settings` job writes them directly through ARM (`azure/login` on GitHub environment `prod-deploy`), a
 mechanism that predates and is unaffected by ADR 0008. Do **not** write them through Kudu `POST /api/settings`
 (that was the #664 no-op). ADR 0008 rejected importing any subset of the App Service `app_settings` map into
 OpenTofu (its "Option C") — AzureRM has no resource/API that safely manages a subset without risking the

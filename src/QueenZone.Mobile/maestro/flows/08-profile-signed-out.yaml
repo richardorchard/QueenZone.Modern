@@ -4,6 +4,12 @@ appId: org.queenzone.mobile
     id: tab-home
 - tapOn:
     id: home-profile
+# Release smoke embeds skip SecureStore restore (#1393). If a leftover
+# restoring frame still paints, wait it out before asserting signed-out.
+- extendedWaitUntil:
+    notVisible:
+      id: profile-restoring
+    timeout: 15000
 - extendedWaitUntil:
     visible:
       id: profile-signed-out

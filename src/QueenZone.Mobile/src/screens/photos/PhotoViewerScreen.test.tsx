@@ -1,4 +1,5 @@
-import { act, screen, userEvent, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, screen, userEvent, waitFor } from '@testing-library/react-native';
+import { Platform } from 'react-native';
 import { fetchPhotoDetail } from '../../api';
 import { ApiError } from '../../api/client';
 import type { PhotoDetail } from '../../api/types';
@@ -8,6 +9,8 @@ import { fakeNavigation, renderWithProviders } from '../../test/render';
 import { testIds } from '../../test/testIds';
 import { PhotoViewerScreen } from './PhotoViewerScreen';
 import { saveGalleryPhoto } from './saveGalleryPhoto';
+import { setAndroidGalleryWallpaper } from './setGalleryWallpaper';
+import { wallpaperCopy } from './wallpaperMeta';
 
 jest.mock('../../api', () => {
   const actual = jest.requireActual('../../api');
@@ -25,8 +28,15 @@ jest.mock('./saveGalleryPhoto', () => {
   };
 });
 
+jest.mock('./setGalleryWallpaper', () => ({
+  setAndroidGalleryWallpaper: jest.fn(),
+}));
+
 const fetchPhoto = fetchPhotoDetail as jest.MockedFunction<typeof fetchPhotoDetail>;
 const savePhoto = saveGalleryPhoto as jest.MockedFunction<typeof saveGalleryPhoto>;
+const setWallpaper = setAndroidGalleryWallpaper as jest.MockedFunction<
+  typeof setAndroidGalleryWallpaper
+>;
 
 type RecordedGesture = {
   handlers: {
@@ -122,6 +132,8 @@ describe('PhotoViewerScreen', () => {
     fetchPhoto.mockReset();
     savePhoto.mockReset();
     savePhoto.mockResolvedValue(undefined);
+    setWallpaper.mockReset();
+    setWallpaper.mockResolvedValue(undefined);
   });
 
   it('shows loading then the photograph chrome', async () => {
@@ -355,7 +367,9 @@ describe('PhotoViewerScreen', () => {
   it('saves the full imageUrl from the viewer chrome, not the thumbnail', async () => {
     await loadPhoto();
     expect(screen.getByTestId(testIds.photoViewerSave)).toBeOnTheScreen();
+    expect(screen.getByTestId(testIds.photoViewerWallpaper)).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Save to Photos' })).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Set as wallpaper' })).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Close' })).toBeOnTheScreen();
     expect(screen.getByText('Live Aid')).toBeOnTheScreen();
 
@@ -380,9 +394,11 @@ describe('PhotoViewerScreen', () => {
 
     act(() => recordedGestures().singleTap.handlers.onEnd?.({}));
     expect(screen.queryByTestId(testIds.photoViewerSave)).toBeNull();
+    expect(screen.queryByTestId(testIds.photoViewerWallpaper)).toBeNull();
     expect(screen.queryByText('Live Aid')).toBeNull();
     act(() => recordedGestures().singleTap.handlers.onEnd?.({}));
     expect(screen.getByTestId(testIds.photoViewerSave)).toBeOnTheScreen();
+    expect(screen.getByTestId(testIds.photoViewerWallpaper)).toBeOnTheScreen();
     expect(screen.getByText('Live Aid')).toBeOnTheScreen();
   });
 
@@ -417,6 +433,122 @@ describe('PhotoViewerScreen', () => {
       }),
     );
     expect(screen.queryByTestId(testIds.photoViewerSave)).toBeNull();
+    expect(screen.queryByTestId(testIds.photoViewerWallpaper)).toBeNull();
     expect(screen.queryByRole('button', { name: 'Save to Photos' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Set as wallpaper' })).toBeNull();
+  });
+
+  it('saves to Photos on iOS and never claims wallpaper was set', async () => {
+    await loadPhoto();
+    const user = userEvent.setup();
+    await user.press(screen.getByTestId(testIds.photoViewerWallpaper));
+    await waitFor(() =>
+      expect(savePhoto).toHaveBeenCalledWith('https://cdn.queenzone.org/brian-may/img-101.jpg'),
+    );
+    expect(screen.getByText(wallpaperCopy.iosSaved)).toBeOnTheScreen();
+    expect(screen.queryByText(wallpaperCopy.androidSet)).toBeNull();
+    expect(screen.queryByText(wallpaperCopy.home)).toBeNull();
+    expect(screen.queryByTestId(testIds.photoViewerWallpaperSheet)).toBeNull();
+    expect(setWallpaper).not.toHaveBeenCalled();
+  });
+
+  it('shows the save error when the iOS wallpaper save fails', async () => {
+    savePhoto.mockRejectedValueOnce(
+      new SaveToPhotosError('permission-denied', saveToPhotosCopy.denied),
+    );
+    await loadPhoto();
+    const user = userEvent.setup();
+    await user.press(screen.getByTestId(testIds.photoViewerWallpaper));
+    await waitFor(() => expect(screen.getByText(saveToPhotosCopy.denied)).toBeOnTheScreen());
+    expect(screen.queryByText(wallpaperCopy.androidSet)).toBeNull();
+    expect(screen.queryByText(wallpaperCopy.iosSaved)).toBeNull();
+  });
+
+  it('ignores a second iOS wallpaper tap while the save is in flight', async () => {
+    const pending = deferred<void>();
+    savePhoto.mockReturnValueOnce(pending.promise);
+    await loadPhoto();
+    const user = userEvent.setup();
+    await user.press(screen.getByTestId(testIds.photoViewerWallpaper));
+    await user.press(screen.getByTestId(testIds.photoViewerWallpaper));
+    expect(savePhoto).toHaveBeenCalledTimes(1);
+    pending.resolve();
+    await waitFor(() => expect(savePhoto).toHaveBeenCalledTimes(1));
+  });
+});
+
+describe('PhotoViewerScreen Android wallpaper', () => {
+  const originalOs = Platform.OS;
+
+  beforeEach(() => {
+    Object.defineProperty(Platform, 'OS', { configurable: true, value: 'android' });
+    fetchPhoto.mockReset();
+    savePhoto.mockReset();
+    savePhoto.mockResolvedValue(undefined);
+    setWallpaper.mockReset();
+    setWallpaper.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    Object.defineProperty(Platform, 'OS', { configurable: true, value: originalOs });
+  });
+
+  it('opens a Home / Lock / Both sheet and sets the chosen target', async () => {
+    await loadPhoto();
+    fireEvent.press(screen.getByTestId(testIds.photoViewerWallpaper));
+    expect(screen.getByTestId(testIds.photoViewerWallpaperSheet)).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: wallpaperCopy.home })).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: wallpaperCopy.lock })).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: wallpaperCopy.both })).toBeOnTheScreen();
+    expect(savePhoto).not.toHaveBeenCalled();
+
+    fireEvent.press(screen.getByTestId(testIds.photoViewerWallpaperHome));
+    await waitFor(() =>
+      expect(setWallpaper).toHaveBeenCalledWith(
+        'https://cdn.queenzone.org/brian-may/img-101.jpg',
+        'home',
+      ),
+    );
+    expect(screen.getByText(wallpaperCopy.androidSet)).toBeOnTheScreen();
+    expect(screen.queryByTestId(testIds.photoViewerWallpaperSheet)).toBeNull();
+  });
+
+  it('sets lock and both from the sheet', async () => {
+    await loadPhoto();
+    fireEvent.press(screen.getByTestId(testIds.photoViewerWallpaper));
+    fireEvent.press(screen.getByTestId(testIds.photoViewerWallpaperLock));
+    await waitFor(() =>
+      expect(setWallpaper).toHaveBeenCalledWith(
+        'https://cdn.queenzone.org/brian-may/img-101.jpg',
+        'lock',
+      ),
+    );
+
+    fireEvent.press(screen.getByTestId(testIds.photoViewerWallpaper));
+    fireEvent.press(screen.getByTestId(testIds.photoViewerWallpaperBoth));
+    await waitFor(() =>
+      expect(setWallpaper).toHaveBeenCalledWith(
+        'https://cdn.queenzone.org/brian-may/img-101.jpg',
+        'both',
+      ),
+    );
+  });
+
+  it('shows a lock-target error instead of a silent no-op', async () => {
+    setWallpaper.mockRejectedValueOnce(new Error(wallpaperCopy.lockFailed));
+    await loadPhoto();
+    fireEvent.press(screen.getByTestId(testIds.photoViewerWallpaper));
+    fireEvent.press(screen.getByTestId(testIds.photoViewerWallpaperLock));
+    await waitFor(() => expect(screen.getByText(wallpaperCopy.lockFailed)).toBeOnTheScreen());
+    expect(screen.queryByText(wallpaperCopy.androidSet)).toBeNull();
+  });
+
+  it('cancels the sheet without setting wallpaper', async () => {
+    await loadPhoto();
+    fireEvent.press(screen.getByTestId(testIds.photoViewerWallpaper));
+    fireEvent.press(screen.getByTestId(testIds.photoViewerWallpaperCancel));
+    expect(screen.queryByTestId(testIds.photoViewerWallpaperSheet)).toBeNull();
+    expect(setWallpaper).not.toHaveBeenCalled();
+    expect(savePhoto).not.toHaveBeenCalled();
   });
 });

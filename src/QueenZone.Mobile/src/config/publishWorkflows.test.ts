@@ -15,6 +15,11 @@ const testflight = readFileSync(
 );
 
 describe('Play publish workflow', () => {
+  it('defaults store builds to production and offers an explicit staging choice', () => {
+    assert.match(play, /app_environment:[\s\S]*options:\s*\n\s*- production\s*\n\s*- staging[\s\S]*default: production/);
+    assert.match(play, /EXPO_PUBLIC_APP_ENV: \$\{\{ inputs\.app_environment \}\}/);
+  });
+
   it('does not inject 0.1.0-internal as versionName', () => {
     assert.doesNotMatch(play, /0\.1\.0-internal/);
     assert.doesNotMatch(play, /android\.injected\.version\.name/);
@@ -35,14 +40,24 @@ describe('Play publish workflow', () => {
     assert.match(verifyBeforeUpload, /android:versionCode/);
     assert.match(verifyBeforeUpload, /ANDROID_VERSION_CODE/);
     assert.match(verifyBeforeUpload, /AAB versionCode=/);
+    assert.match(verifyBeforeUpload, /base\/assets\/app\.config/);
+    assert.match(verifyBeforeUpload, /AAB API target=/);
+    assert.match(verifyBeforeUpload, /expected_api_base_url/);
   });
 });
 
 describe('TestFlight publish workflow', () => {
+  it('defaults store builds to production and offers an explicit staging choice', () => {
+    assert.match(testflight, /app_environment:[\s\S]*options:\s*\n\s*- production\s*\n\s*- staging[\s\S]*default: production/);
+    assert.match(testflight, /EXPO_PUBLIC_APP_ENV: \$\{\{ inputs\.app_environment \}\}/);
+  });
+
   it('asserts CFBundleShortVersionString equals the baked marketing version', () => {
     assert.match(testflight, /CFBundleVersion/);
     assert.match(testflight, /CFBundleShortVersionString/);
     assert.match(testflight, /resolveMarketingVersion/);
     assert.match(testflight, /marketingVersionPrefix/);
+    assert.match(testflight, /IPA API target=/);
+    assert.match(testflight, /expected_api_base_url/);
   });
 });

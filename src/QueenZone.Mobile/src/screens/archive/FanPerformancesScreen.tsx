@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { Pressable, FlatList, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Pause, Play } from 'lucide-react-native';
 import {
@@ -20,6 +20,7 @@ import { testIds } from '../../test/testIds';
 import { ArticleRow } from '../../ui/ArticleRow';
 import { Button } from '../../ui/Button';
 import { EmptyBlock, ErrorBlock, ListFooterLoading, LoadingBlock } from '../../ui/ScreenStates';
+import { ThemedRefreshControl } from '../../ui/ThemedRefreshControl';
 import { space, type, useTheme } from '../../theme';
 
 type Props = NativeStackScreenProps<ArchiveStackParamList, 'FanPerformances'>;
@@ -216,11 +217,7 @@ export function FanPerformancesScreen({ navigation }: Props) {
       ListEmptyComponent={<EmptyBlock message="No fan performances are available yet." />}
       ListFooterComponent={<ListFooterLoading visible={paged.loadingMore} />}
       refreshControl={
-        <RefreshControl
-          refreshing={paged.refreshing}
-          onRefresh={paged.refresh}
-          tintColor={c.accentPrimary}
-        />
+        <ThemedRefreshControl refreshing={paged.refreshing} onRefresh={paged.refresh} />
       }
       onEndReached={paged.loadMore}
       onEndReachedThreshold={0.4}
@@ -233,7 +230,7 @@ export function FanPerformancesScreen({ navigation }: Props) {
             meta={metaLine(item)}
             hint={!canPlay && !isRestoring ? 'Sign in to play' : undefined}
             leading={
-              <View style={styles.leading}>
+              <View style={styles.leading} pointerEvents="box-none">
                 <Pressable
                   testID={`${testIds.fanPerformancePlayPrefix}${item.id}`}
                   accessibilityRole="button"
@@ -245,6 +242,8 @@ export function FanPerformancesScreen({ navigation }: Props) {
                         : `Play ${item.title}`
                       : `Sign in to play ${item.title}`
                   }
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 6 }}
+                  unstable_pressDelay={0}
                   onPress={() => onPlay(item)}
                   style={[
                     styles.play,
@@ -263,6 +262,7 @@ export function FanPerformancesScreen({ navigation }: Props) {
                 </Pressable>
                 {canPlay || isRestoring ? (
                   <DownloadAction
+                    key={String(item.id)}
                     track={item}
                     compact
                     onNeedSignIn={() =>

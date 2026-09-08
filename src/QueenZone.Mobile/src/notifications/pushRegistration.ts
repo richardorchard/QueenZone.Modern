@@ -14,6 +14,8 @@ type LastPushRegistration = {
   memberId: string;
 };
 
+const registrationFlights = new Map<string, Promise<void>>();
+
 /**
  * Ensures the signed-in member's device is registered for push (#850).
  * Best-effort throughout: a permission denial, an unavailable push service,
@@ -25,7 +27,24 @@ type LastPushRegistration = {
  * token, or the signed-in member has actually changed since the last
  * successful call.
  */
-export async function syncPushRegistration(accessToken: string, memberId?: string | null): Promise<void> {
+export function syncPushRegistration(accessToken: string, memberId?: string | null): Promise<void> {
+  const ownerId = resolvePushMemberId(accessToken, memberId);
+  const flightKey = ownerId ?? 'unknown-member';
+  const existing = registrationFlights.get(flightKey);
+  if (existing) {
+    return existing;
+  }
+
+  const flight = syncPushRegistrationCore(accessToken, memberId).finally(() => {
+    if (registrationFlights.get(flightKey) === flight) {
+      registrationFlights.delete(flightKey);
+    }
+  });
+  registrationFlights.set(flightKey, flight);
+  return flight;
+}
+
+async function syncPushRegistrationCore(accessToken: string, memberId?: string | null): Promise<void> {
   try {
     await ensureAndroidNotificationChannel();
 

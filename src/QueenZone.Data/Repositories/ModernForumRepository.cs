@@ -161,6 +161,37 @@ public sealed class ModernForumRepository(QueenZoneDbContext dbContext) : IForum
             .ToListAsync(cancellationToken);
     }
 
+    /// <summary>
+    /// John S Stuart's rare/discography analysis posts, flagged in the legacy import via
+    /// <c>LegacyDiscography = 1</c> (the old <c>Q_DISCOGRAPHY_LIST_SP</c> filter). Returns the
+    /// full set, ordered to match that legacy procedure's alphabetical listing.
+    /// </summary>
+    public async Task<IReadOnlyList<ForumRecentThreadItem>> GetLegacyDiscographyThreadsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        dbContext.Database.SetCommandTimeout(InteractiveCommandTimeoutSeconds);
+
+        return await dbContext.ModernForumThreads
+            .AsNoTracking()
+            .Where(thread =>
+                thread.IsLegacyTopicStarter
+                && thread.LegacyDiscography == 1
+                && !thread.IsHidden
+                && thread.StartedByUserValidated == true
+                && thread.LastActivityAt != null
+                && thread.Category != null
+                && !thread.Category.IsSynthetic)
+            .OrderBy(thread => thread.Title)
+            .Select(thread => new ForumRecentThreadItem(
+                thread.LegacyTopicId,
+                thread.Title,
+                thread.Category!.LegacyForumId,
+                thread.Category.Name,
+                thread.ReplyCount,
+                thread.LastActivityAt!.Value))
+            .ToListAsync(cancellationToken);
+    }
+
     [ExcludeFromCodeCoverage]
     public async Task<ForumArchiveStats> GetArchiveStatsAsync(CancellationToken cancellationToken = default)
     {
@@ -271,7 +302,8 @@ public sealed class ModernForumRepository(QueenZoneDbContext dbContext) : IForum
             row.EditedAt.HasValue
                 ? new DateTimeOffset(DateTime.SpecifyKind(row.EditedAt.Value, DateTimeKind.Utc))
                 : null,
-            row.EditCount);
+            row.EditCount,
+            row.USER_ID);
 
     [ExcludeFromCodeCoverage]
     private static ForumTopicItem MapTopic(ForumTopicRow row) =>

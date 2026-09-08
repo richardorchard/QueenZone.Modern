@@ -1,8 +1,9 @@
 import { ChevronRight } from 'lucide-react-native';
 import { Platform, Pressable, Text, View } from 'react-native';
-import { radius, space, type, useTheme } from '../theme';
-import { ArchiveImage } from './ArchiveImage';
+import { space, type, useTheme } from '../theme';
+import { ArchiveIconPlate } from './ArchiveIconPlate';
 import { Badge, type BadgeRole } from './Badge';
+import type { ArchiveIconName } from './icons/archiveSectionIcons';
 import { MetaLine } from './MetaLine';
 import { usePressProps } from './press';
 
@@ -11,7 +12,7 @@ type Props = {
   kicker: string;
   kickerRole: BadgeRole;
   meta: string[];
-  image: number;
+  icon: ArchiveIconName;
   onPress: () => void;
   showChevron?: boolean;
 };
@@ -21,7 +22,7 @@ export function DestinationRow({
   kicker,
   kickerRole,
   meta,
-  image,
+  icon,
   onPress,
   showChevron = true,
 }: Props) {
@@ -48,11 +49,7 @@ export function DestinationRow({
         Platform.OS === 'ios' && pressed ? { backgroundColor: 'rgba(255,255,255,0.04)' } : null,
       ]}
     >
-      <ArchiveImage
-        source={image}
-        label={title}
-        style={{ width: 84, height: 84, borderRadius: radius.xs }}
-      />
+      <ArchiveIconPlate name={icon} size={space.thumb} />
       <View style={{ flex: 1, gap: 7 }}>
         <Badge label={kicker} role={kickerRole} />
         <Text

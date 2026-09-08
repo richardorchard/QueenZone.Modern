@@ -85,6 +85,19 @@ jobs:
           tofu_version: 1.12.5
           tofu_wrapper: false
 
+      - name: Azure login for migration capacity preflight
+        if: matrix.root == 'production'
+        uses: azure/login@v3
+        with:
+          client-id: ${{ vars.ARM_CLIENT_ID }}
+          tenant-id: ${{ vars.ARM_TENANT_ID }}
+          subscription-id: ${{ vars.ARM_SUBSCRIPTION_ID }}
+
+      - name: Check migration target capacity
+        if: matrix.root == 'production'
+        shell: pwsh
+        run: ./scripts/Test-AzureMigrationTargetCapacity.ps1
+
       - name: Format, safety, init, and validate
         shell: pwsh
         run: ./scripts/Test-OpenTofu.ps1
@@ -96,6 +109,13 @@ jobs:
         with:
           access_token: ${{ secrets.BITWARDEN_SECRETS_MANAGER_ACCESS_TOKEN }}
           secrets: ${{ vars.BITWARDEN_OPENTOFU_PLAN_SECRETS }}
+
+      - name: Export ephemeral target SQL administrator password
+        if: matrix.root == 'production'
+        shell: pwsh
+        env:
+          SQL_CONNECTION_STRING: ${{ steps.bitwarden-secrets.outputs.QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING }}
+        run: ./scripts/Export-EphemeralSqlAdminPassword.ps1
 
       - name: Verify Cloudflare plan token is configured
         if: matrix.root == 'production'
@@ -192,6 +212,12 @@ jobs:
         with:
           access_token: ${{ secrets.BITWARDEN_SECRETS_MANAGER_ACCESS_TOKEN }}
           secrets: ${{ vars.BITWARDEN_OPENTOFU_APPLY_SECRETS }}
+
+      - name: Export ephemeral target SQL administrator password
+        shell: pwsh
+        env:
+          SQL_CONNECTION_STRING: ${{ steps.bitwarden-secrets.outputs.QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING }}
+        run: ./scripts/Export-EphemeralSqlAdminPassword.ps1
 
       - name: Verify Cloudflare apply token is configured
         env:

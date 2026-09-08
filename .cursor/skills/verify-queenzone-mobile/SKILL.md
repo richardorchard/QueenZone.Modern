@@ -1,6 +1,6 @@
 ---
 name: verify-queenzone-mobile
-description: Drive the QueenZone Expo mobile client the way a member does — launch an isolated Testing contract host, install a Debug build baked at that origin, and exercise Maestro flows. Use when proving home, news, photos, search, or forum behavior after a QueenZone.Mobile UI or navigation change.
+description: Drive the QueenZone Expo mobile client the way a member does — launch an isolated Testing contract host, install a Release-embedded build baked at that origin, and exercise Maestro flows. Use when proving home, news, photos, search, or forum behavior after a QueenZone.Mobile UI or navigation change.
 ---
 
 # Verify QueenZone.Mobile
@@ -25,7 +25,7 @@ Ready when:
 - The helper has written `.cursor/skills/verify-queenzone-mobile/.run/host.json` with `"environment": "Testing"`
 - The helper prints the base URL
 
-The host uses `ASPNETCORE_ENVIRONMENT=Testing`, `QUEENZONE_MOBILE_CONTRACT_HOST=1`, and `--no-launch-profile`. Connection-string env vars are cleared for that process. The Android smoke APK must be baked at `http://10.0.2.2:5098`; iOS Simulator at `http://127.0.0.1:5098`. A Debug binary aimed at production cannot talk to this host.
+The host uses `ASPNETCORE_ENVIRONMENT=Testing`, `QUEENZONE_MOBILE_CONTRACT_HOST=1`, and `--no-launch-profile`. Connection-string env vars are cleared for that process. The Android smoke APK must be baked at `http://10.0.2.2:5098`; iOS Simulator at `http://127.0.0.1:5098`. A store/Debug binary aimed at production cannot talk to this host. Device smoke uses Release-embedded builds (`assembleRelease` / `Release-iphonesimulator`), never `app-debug.apk`.
 
 Print the URL later with:
 
@@ -58,7 +58,7 @@ Before a Maestro drive, also confirm:
 
 - `adb devices` lists a device (Android) or a Simulator is booted (iOS, macOS only).
 - `maestro` is on `PATH`.
-- A Debug APK/app baked at this host's origin is installed, or you will rebuild with `scripts/run-mobile-device-smoke.sh`.
+- A Release-embedded APK/app baked at this host's origin is installed, or you will rebuild with `scripts/run-mobile-device-smoke.sh`.
 
 If doctor fails, stop. Do not fall back to another URL or to Expo Go.
 
@@ -74,7 +74,7 @@ pwsh -File .cursor/skills/verify-queenzone-mobile/scripts/control-queenzone-mobi
 
 That runs `src/QueenZone.Mobile/maestro/flows/04-news-story.yaml` against `org.queenzone.mobile`. Other `-Flow` values: `launch`, `tabs`, `home`, `news`, `photos`, `search`, `forum`, `profile`, `auth`, `attach`, `discussion`, `unread`.
 
-Full CI-shaped suite (rebuilds and reinstalls the Debug binary):
+Full CI-shaped suite (rebuilds and reinstalls the Release-embedded binary):
 
 ```bash
 ./scripts/run-mobile-device-smoke.sh --platform android
@@ -93,9 +93,9 @@ Seeded Testing titles that must stay stable:
 | Search | `search-input`, `search-result-news-1003` | Query `modernisation` |
 | Forum | `forum-board-1`, `forum-thread-1002` | `Ranking every studio album` |
 | Signed-out profile | `profile-signed-out` | `Join the archive` |
-| Signed-in profile | `profile-signed-in` | `Contract Member` (Debug `queenzone://smoke-auth` only) |
+| Signed-in profile | `profile-signed-in` | `Contract Member` (smoke-auth on Debug or Release-embed) |
 
-`queenzone://smoke-auth` exists only in `__DEV__` Debug builds. It is not a production bypass. Never print `SMOKE_AUTH_URL` or the access token.
+`queenzone://smoke-auth` exists when `appEnv` is development and either `__DEV__` is true or `smokeEmbed` was baked. It is not a production bypass. Never print `SMOKE_AUTH_URL` or the access token.
 
 ## Evidence
 

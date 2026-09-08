@@ -65,6 +65,27 @@ public sealed class LegacyForumRepository(QueenZoneDbContext dbContext) : IForum
         ORDER BY t.TOPIC_LAST_POST DESC, t.Q_FORUM_TOPIC_ID DESC
         """;
 
+    /// <summary>
+    /// Equivalent to the legacy <c>Q_DISCOGRAPHY_LIST_SP</c> filter (<c>DISCOGRAPHY = 1</c>),
+    /// enriched with the same board/reply/activity columns as <see cref="RecentThreadsSelect"/>
+    /// so the public page can render it the same way.
+    /// </summary>
+    private const string LegacyDiscographyThreadsSelect = """
+        SELECT
+            CAST(t.Q_FORUM_TOPIC_ID AS int) AS TopicId,
+            LTRIM(RTRIM(t.TOPIC_SUBJECT)) AS Title,
+            CAST(t.Q_FORUM_ID AS int) AS CategoryId,
+            f.Q_FORUM_NAME AS CategoryName,
+            ISNULL(CAST(t.TOPIC_REPLIES AS int), 0) AS ReplyCount,
+            t.TOPIC_LAST_POST AS LastActivityAt
+        FROM Q_FORUM_TOPIC_T t
+        INNER JOIN Q_FORUM_T f ON f.Q_FORUM_ID = t.Q_FORUM_ID
+        WHERE t.TOPIC_STARTER = 1
+          AND t.DISCOGRAPHY = 1
+          AND LTRIM(RTRIM(ISNULL(t.TOPIC_SUBJECT, ''))) <> ''
+        ORDER BY t.TOPIC_SUBJECT ASC
+        """;
+
     private const string TopicSitemapCountSelect = """
         SELECT COUNT(*) AS Value
         FROM Q_FORUM_TOPIC_T
@@ -205,6 +226,25 @@ public sealed class LegacyForumRepository(QueenZoneDbContext dbContext) : IForum
         dbContext.Database.SetCommandTimeout(CommandTimeoutSeconds);
         var rows = await dbContext.Database
             .SqlQueryRaw<ForumRecentThreadRow>(RecentThreadsSelect, take)
+            .ToListAsync(cancellationToken);
+        return rows
+            .Select(row => new ForumRecentThreadItem(
+                row.TopicId,
+                row.Title?.Trim() ?? string.Empty,
+                row.CategoryId,
+                row.CategoryName?.Trim() ?? string.Empty,
+                row.ReplyCount,
+                row.LastActivityAt ?? DateTime.MinValue))
+            .ToList();
+    }
+
+    [ExcludeFromCodeCoverage]
+    public async Task<IReadOnlyList<ForumRecentThreadItem>> GetLegacyDiscographyThreadsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        dbContext.Database.SetCommandTimeout(CommandTimeoutSeconds);
+        var rows = await dbContext.Database
+            .SqlQueryRaw<ForumRecentThreadRow>(LegacyDiscographyThreadsSelect)
             .ToListAsync(cancellationToken);
         return rows
             .Select(row => new ForumRecentThreadItem(

@@ -1,7 +1,7 @@
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import { useCallback, useMemo } from 'react';
-import { FlatList, Platform, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Plus } from 'lucide-react-native';
 import { fetchForumCategories, fetchForumStats, type ForumCategoryListItem } from '../../api';
@@ -15,6 +15,7 @@ import { ArticleRow } from '../../ui/ArticleRow';
 import { EmptyBlock, ErrorBlock, ListFooterLoading, LoadingBlock } from '../../ui/ScreenStates';
 import { PageTitleBlock } from '../../ui/PageTitleBlock';
 import { SectionHeader } from '../../ui/SectionHeader';
+import { ThemedRefreshControl } from '../../ui/ThemedRefreshControl';
 import { testIds } from '../../test/testIds';
 import { categoryMeta, forumIndexStatItems } from './forumListMeta';
 
@@ -101,11 +102,7 @@ export function ForumScreen({ navigation }: Props) {
         ListEmptyComponent={<EmptyBlock message="No forum boards are available yet." />}
         ListFooterComponent={<ListFooterLoading visible={paged.loadingMore} />}
         refreshControl={
-          <RefreshControl
-            refreshing={paged.refreshing}
-            onRefresh={refresh}
-            tintColor={c.accentPrimary}
-          />
+          <ThemedRefreshControl refreshing={paged.refreshing} onRefresh={refresh} />
         }
         onEndReached={paged.loadMore}
         onEndReachedThreshold={0.4}

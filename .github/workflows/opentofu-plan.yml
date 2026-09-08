@@ -125,6 +125,13 @@ jobs:
           access_token: ${{ secrets.BITWARDEN_SECRETS_MANAGER_ACCESS_TOKEN }}
           secrets: ${{ vars.BITWARDEN_OPENTOFU_PLAN_SECRETS }}
 
+      - name: Export ephemeral target SQL administrator password
+        if: matrix.root == 'production'
+        shell: pwsh
+        env:
+          SQL_CONNECTION_STRING: ${{ steps.bitwarden-secrets.outputs.QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING }}
+        run: ./scripts/Export-EphemeralSqlAdminPassword.ps1
+
       - name: Verify Cloudflare plan token is configured
         if: matrix.root == 'production'
         env:

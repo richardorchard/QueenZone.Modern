@@ -55,9 +55,11 @@ describe('resolveApiBaseUrl', () => {
     assert.equal(resolveApiBaseUrl({ appEnv: 'production' }), defaultApiBaseUrls.production);
   });
 
-  it('routes staging and production through the public site origin', () => {
-    assert.equal(defaultApiBaseUrls.staging, 'https://www.queenzone.org');
+  it('routes staging to the non-prod API and production to the public site', () => {
+    assert.equal(resolveApiBaseUrl({ appEnv: 'staging' }), 'https://dev.queenzone.org');
+    assert.equal(defaultApiBaseUrls.staging, 'https://dev.queenzone.org');
     assert.equal(defaultApiBaseUrls.production, 'https://www.queenzone.org');
+    assert.notEqual(defaultApiBaseUrls.staging, defaultApiBaseUrls.production);
   });
 
   it('lets EXPO_PUBLIC_API_BASE_URL override without code changes', () => {

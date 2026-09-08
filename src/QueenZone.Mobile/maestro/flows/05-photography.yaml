@@ -18,9 +18,22 @@ appId: org.queenzone.mobile
     visible:
       id: photo-viewer-screen
     timeout: 20000
-- tapOn:
-    id: tab-photos
+# Wallpaper lives in viewer chrome beside Save (#1409 Option A). Assert the
+# control is present; do not tap it (iOS saves, Android opens a target sheet).
 - extendedWaitUntil:
     visible:
-      id: photos-screen
+      id: photo-viewer-wallpaper
+    timeout: 10000
+- extendedWaitUntil:
+    visible:
+      id: photo-viewer-save
+    timeout: 5000
+# PhotoViewer hides the tab bar (navigation/visibility.ts) — leave via its
+# own close control, same pattern as 08-profile-signed-out.yaml's profile-back.
+# Close pops back to the category, not the tab root.
+- tapOn:
+    id: photo-viewer-close
+- extendedWaitUntil:
+    visible:
+      id: photo-category-screen
     timeout: 15000

@@ -19,7 +19,17 @@ public class LiveSiteContentApiTests : RealDataPageTest
 {
     private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(30);
     private const int SamplePageSize = 1;
-    private const string PhotoCdnOrigin = "https://cdn.queenzone.org/";
+    private static string PhotoCdnOrigin
+    {
+        get
+        {
+            var configuredHost = Environment.GetEnvironmentVariable("E2E_EXPECTED_PHOTO_HOST");
+            var host = string.IsNullOrWhiteSpace(configuredHost)
+                ? "cdn.queenzone.org"
+                : configuredHost.Trim().TrimEnd('/');
+            return $"https://{host}/";
+        }
+    }
 
     private static readonly string[] RequiredOpenApiPaths =
     [

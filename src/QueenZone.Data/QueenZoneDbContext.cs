@@ -388,6 +388,8 @@ public sealed class QueenZoneDbContext : DbContext
                 .HasDatabaseName("UQ_ModernForumPost_LegacyPostId");
             entity.HasIndex(post => post.AuthorMemberId)
                 .HasDatabaseName("IX_ModernForumPost_AuthorMemberId");
+            entity.HasIndex(post => new { post.AuthorLegacyUserId, post.PostedAt })
+                .HasDatabaseName("IX_ModernForumPost_AuthorLegacyUserId_PostedAt");
             entity.HasOne(post => post.Thread)
                 .WithMany()
                 .HasForeignKey(post => post.ThreadId)

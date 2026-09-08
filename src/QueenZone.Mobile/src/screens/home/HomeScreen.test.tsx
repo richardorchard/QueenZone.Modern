@@ -11,6 +11,8 @@ import {
   fetchRandomQuote,
   voteHomePoll,
 } from '../../api';
+import { ApiError } from '../../api/client';
+import { OFFLINE_MESSAGE, TIMEOUT_MESSAGE } from '../../api/errors';
 import { invalidate } from '../../cache/externalStore';
 import { NEWS_LIST_CACHE_KEY } from '../../cache/keys';
 import { deferred, forumRecentThreadFixture, newsItemFixture, pagedResponse } from '../../test/fixtures';
@@ -20,7 +22,7 @@ import { testIds } from '../../test/testIds';
 import { HomeScreen } from './HomeScreen';
 
 const mockAppConfig = {
-  appEnv: 'development' as const,
+  appEnv: 'development' as 'development' | 'staging' | 'production',
   apiBaseUrl: 'http://qz.test',
   version: '0.1.0',
   buildTimestampUtc: undefined as string | undefined,
@@ -106,6 +108,8 @@ describe('HomeScreen', () => {
     mockSession.accessToken = null;
     mockAppConfig.version = '0.1.0';
     mockAppConfig.buildTimestampUtc = undefined;
+    mockAppConfig.appEnv = 'development';
+    mockAppConfig.apiBaseUrl = 'http://qz.test';
     fetchNews.mockResolvedValue(
       pagedResponse(
         [
@@ -135,6 +139,119 @@ describe('HomeScreen', () => {
     renderHome();
     expect(screen.getByTestId(testIds.homeScreen)).toBeOnTheScreen();
     await waitFor(() => expect(screen.getByTestId(testIds.homeHero)).toBeOnTheScreen());
+  });
+
+  it('renders recent forum threads from fetchForumRecentThreads instead of a skeleton', async () => {
+    fetchForum.mockResolvedValue([
+      forumRecentThreadFixture(),
+      forumRecentThreadFixture({ topicId: 1003, title: 'True or not true?' }),
+    ]);
+    renderHome();
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Live Aid remembered' })).toBeOnTheScreen());
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Ranking every studio album' })).toBeOnTheScreen(),
+    );
+    expect(screen.getByRole('button', { name: 'True or not true?' })).toBeOnTheScreen();
+    expect(screen.getByText('In the forum')).toBeOnTheScreen();
+    expect(screen.queryByText(TIMEOUT_MESSAGE)).toBeNull();
+    expect(screen.queryByText(OFFLINE_MESSAGE)).toBeNull();
+    await flushVirtualizedList();
+  });
+
+  it('shows a retryable forum error when recent-threads times out', async () => {
+    fetchForum.mockRejectedValueOnce(ApiError.timeout());
+    fetchForum.mockResolvedValueOnce([forumRecentThreadFixture()]);
+    renderHome();
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Live Aid remembered' })).toBeOnTheScreen());
+    await waitFor(() => expect(screen.getByText(TIMEOUT_MESSAGE)).toBeOnTheScreen());
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeOnTheScreen();
+    expect(screen.queryByRole('button', { name: 'Ranking every studio album' })).toBeNull();
+
+    const user = userEvent.setup();
+    await user.press(screen.getByRole('button', { name: 'Try again' }));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Ranking every studio album' })).toBeOnTheScreen(),
+    );
+    expect(screen.queryByText(TIMEOUT_MESSAGE)).toBeNull();
+    await flushVirtualizedList();
+  });
+
+  it('shows a retryable forum error when recent-threads is offline', async () => {
+    fetchForum.mockRejectedValueOnce(ApiError.offline());
+    fetchForum.mockResolvedValueOnce([forumRecentThreadFixture()]);
+    renderHome();
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Live Aid remembered' })).toBeOnTheScreen());
+    await waitFor(() => expect(screen.getByText(OFFLINE_MESSAGE)).toBeOnTheScreen());
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeOnTheScreen();
+
+    const user = userEvent.setup();
+    await user.press(screen.getByRole('button', { name: 'Try again' }));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Ranking every studio album' })).toBeOnTheScreen(),
+    );
+    expect(screen.queryByText(OFFLINE_MESSAGE)).toBeNull();
+    await flushVirtualizedList();
+  });
+
+  it('recovers a failed forum section on pull-to-refresh', async () => {
+    fetchForum.mockRejectedValueOnce(ApiError.timeout());
+    renderHome();
+    await waitFor(() => expect(screen.getByText(TIMEOUT_MESSAGE)).toBeOnTheScreen());
+
+    fetchForum.mockResolvedValueOnce([forumRecentThreadFixture()]);
+    await act(async () => {
+      fireEvent(screen.UNSAFE_getByType(RefreshControl), 'refresh');
+    });
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Ranking every studio album' })).toBeOnTheScreen(),
+    );
+    expect(screen.queryByText(TIMEOUT_MESSAGE)).toBeNull();
+    await flushVirtualizedList();
+  });
+
+  it('recovers via pull-to-refresh after an initial-generation forum abort', async () => {
+    fetchForum.mockRejectedValueOnce(Object.assign(new Error('Aborted'), { name: 'AbortError' }));
+    renderHome();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Live Aid remembered' })).toBeOnTheScreen());
+    await waitFor(() => expect(screen.getByText(TIMEOUT_MESSAGE)).toBeOnTheScreen());
+    expect(screen.queryByRole('button', { name: 'Ranking every studio album' })).toBeNull();
+
+    fetchForum.mockResolvedValueOnce([forumRecentThreadFixture()]);
+    await act(async () => {
+      fireEvent(screen.UNSAFE_getByType(RefreshControl), 'refresh');
+    });
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Ranking every studio album' })).toBeOnTheScreen(),
+    );
+    expect(screen.queryByText(TIMEOUT_MESSAGE)).toBeNull();
+    await flushVirtualizedList();
+  });
+
+  // Field path (Richard/Pat): first Home forum load stays on the skeleton;
+  // pull-to-refresh starts a new generation and recovers. The aborted first
+  // generation must not flash a failed section.
+  it('recovers a first-load forum skeleton on pull-to-refresh', async () => {
+    const pendingForum = deferred<ReturnType<typeof forumRecentThreadFixture>[]>();
+    fetchForum.mockReturnValueOnce(pendingForum.promise);
+    renderHome();
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Live Aid remembered' })).toBeOnTheScreen());
+    expect(screen.getByText('In the forum')).toBeOnTheScreen();
+    expect(screen.queryByRole('button', { name: 'Ranking every studio album' })).toBeNull();
+    expect(screen.queryByText(TIMEOUT_MESSAGE)).toBeNull();
+
+    await act(async () => {
+      fireEvent(screen.UNSAFE_getByType(RefreshControl), 'refresh');
+    });
+    pendingForum.reject(Object.assign(new Error('Aborted'), { name: 'AbortError' }));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Ranking every studio album' })).toBeOnTheScreen(),
+    );
+    expect(screen.queryByText(TIMEOUT_MESSAGE)).toBeNull();
+    await flushVirtualizedList();
   });
 
   it('opens live news and forum rows with numeric ids, not placeholders', async () => {
@@ -444,6 +561,28 @@ describe('HomeScreen', () => {
     expect(footer).toBeOnTheScreen();
     expect(footer).toHaveTextContent('0.1.0');
     expect(within(screen.getByTestId(testIds.tabMasthead)).queryByTestId(testIds.homeVersion)).toBeNull();
+    await flushVirtualizedList();
+  });
+
+  it('shows the selected API target outside production', async () => {
+    mockAppConfig.appEnv = 'staging';
+    mockAppConfig.apiBaseUrl = 'https://dev.queenzone.org';
+    renderHome();
+
+    await waitFor(() => expect(screen.getByTestId(testIds.homeEnvironment)).toBeOnTheScreen());
+    expect(screen.getByTestId(testIds.homeEnvironment)).toHaveTextContent(
+      'STAGING · https://dev.queenzone.org',
+    );
+    await flushVirtualizedList();
+  });
+
+  it('does not show an environment banner for production', async () => {
+    mockAppConfig.appEnv = 'production';
+    mockAppConfig.apiBaseUrl = 'https://www.queenzone.org';
+    renderHome();
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Live Aid remembered' })).toBeOnTheScreen());
+    expect(screen.queryByTestId(testIds.homeEnvironment)).toBeNull();
     await flushVirtualizedList();
   });
 

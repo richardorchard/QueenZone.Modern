@@ -6,6 +6,7 @@ supported platforms. This project is not part of `QueenZone.sln`.
 Decisions: [ADR 0009](../../docs/decisions/0009-react-native-for-mobile-app.md),
 [ADR 0011](../../docs/decisions/0011-mobile-project-location-and-build-tooling.md),
 [ADR 0012](../../docs/decisions/0012-react-navigation-app-shell.md).
+API versioning / store-lag: [ADR 0019](../../docs/decisions/0019-api-versioning-convention.md).
 Host toolchain: [mobile development environment](../../docs/mobile-development-environment.md).
 
 ## Pinned versions
@@ -170,7 +171,7 @@ writes `extra.appEnv` and `extra.apiBaseUrl`; runtime code reads them via
 | `EXPO_PUBLIC_APP_ENV` | Default API origin |
 | --- | --- |
 | `development` (default) | `http://localhost:5146` (local `QueenZone.Web`) |
-| `staging` | `https://www.queenzone.org` |
+| `staging` | `https://dev.queenzone.org` |
 | `production` | `https://www.queenzone.org` |
 
 Override the origin for any environment without code changes:
@@ -195,7 +196,8 @@ Physical devices need your machine's LAN IP in `EXPO_PUBLIC_API_BASE_URL`.
 The Profile screen (Home masthead avatar) shows the active `appEnv` and resolved origin for a quick check.
 
 Call sites should use `apiV1Url('/content/news')` (or `getAppConfig().apiBaseUrl`)
-rather than hard-coding hosts.
+rather than hard-coding hosts. Path versioning and how long v1 stays live:
+[ADR 0019](../../docs/decisions/0019-api-versioning-convention.md).
 
 ## Crash and error monitoring
 
@@ -291,11 +293,16 @@ partial. One download runs at a time. Repeated taps do not start a second copy.
 
 A versioned, account-scoped manifest (beside `ContentCache`, not inside it)
 stores only completed rows: performance id, local URI, title/performer, byte
-size, `sourceRevision` (the audio response **ETag**), completed time, and owning
-`memberId`. Startup reconcile drops missing or zero-length files and scrubs
-orphan `.part` files. There is no silent eviction — members remove a download
-explicitly. Size is shown when known. The manager checks `Paths.availableDiskSpace`
-with an 8 MB margin before writing.
+size, `sourceRevision` (the audio response **ETag** when the size probe got
+headers), completed time, and owning `memberId`. Startup reconcile drops missing
+or zero-length files and scrubs orphan `.part` files. A `Range: bytes=0-0` probe
+is best-effort only (12s timeout, body cancelled immediately) so a proxy that
+ignores Range cannot buffer a whole MP3 in JS or fail longer tracks. Missing
+ETag is allowed. Partial, empty, or HTTP-error-page files are discarded and
+playback falls back to the authenticated stream so a failed download cannot
+wedge the shared player. There is no silent eviction of a completed download —
+members remove it explicitly. Size and in-situ percent are shown when known.
+The manager checks `Paths.availableDiskSpace` with an 8 MB margin before writing.
 
 `FanPerformancePlayer.load` resolves every source through `resolveAudioSource`
 (listing, detail, Play All / Shuffle, next/previous). A valid same-member local
@@ -473,16 +480,21 @@ used. Both jobs upload their build as a workflow artifact
 (`mobile-android-<run-id>` / `mobile-ios-<run-id>`), downloadable from the
 run's summary page for one day. Those compile artifacts are **not** the
 device-smoke binaries: `EXPO_PUBLIC_API_BASE_URL` is bake-time, so smoke
-rebuilds Debug with a loopback Testing origin.
+rebuilds a Release-embedded binary with a loopback Testing origin.
 
 ## Device smoke (Maestro)
 
-Device smoke boots a Debug APK / Simulator `.app` against the same
-Testing contract host as the consumer-contract suite
+Device smoke boots a **Release-embedded** APK / Simulator `.app` against the
+same Testing contract host as the consumer-contract suite
 (`ASPNETCORE_ENVIRONMENT=Testing`, `QUEENZONE_MOBILE_CONTRACT_HOST=1`).
 It is **not** a substitute for `npm test` (#833), consumer contracts
 (#869), or the unsigned compile jobs. It does not use EAS, Expo Go, the
-live site, Azure SQL, real OAuth, or member passwords.
+live site, Azure SQL, real OAuth, Metro in CI, or member passwords.
+Local `expo start` + Debug remains for developers; device smoke/journeys
+never install `app-debug.apk` or `Debug-iphonesimulator`.
+The Release smoke embed starts signed out and keeps its seeded smoke token in
+memory; it never restores from or writes to the device keychain. Debug and all
+staging/production builds retain the normal SecureStore session lifecycle.
 
 | Smoke is | Smoke is not |
 | --- | --- |
@@ -493,10 +505,14 @@ Shared flows live in [`maestro/`](maestro/). Android and iOS use the same YAML; 
 Local (repo root). Install [Maestro](https://maestro.mobile.dev) first
 (`curl -Ls "https://get.maestro.mobile.dev" | bash`). Unset any
 `ConnectionStrings__*` env vars. The script starts the Testing host on
-port 5098, bakes a Debug binary with the JS bundle embedded
-(`QUEENZONE_MOBILE_SMOKE_EMBED=1`, no expo-dev-client launcher), and runs
-`maestro/smoke.yaml`. That keeps `__DEV__` true for `queenzone://smoke-auth`
-and still points `EXPO_PUBLIC_API_BASE_URL` at the Testing host, not prod.
+port 5098, bakes a Release-embedded binary
+(`assembleRelease` / `-configuration Release`, `QUEENZONE_MOBILE_SMOKE_EMBED=1`
+to strip expo-dev-client), and runs `maestro/smoke.yaml`. Release embed is
+what puts the JS bundle in the binary — Debug + env flags still opened the
+dev-client launcher (#1322). `EXPO_PUBLIC_API_BASE_URL` still points at the
+Testing host (`10.0.2.2:5098` / `127.0.0.1:5098`), not prod.
+`SENTRY_DISABLE_AUTO_UPLOAD=true` stays. `queenzone://smoke-auth` is allowed
+on that bake because `appEnv` is development and `smokeEmbed` is set.
 
 ```bash
 # Android: start an API 36 emulator first
@@ -513,9 +529,10 @@ and still points `EXPO_PUBLIC_API_BASE_URL` at the Testing host, not prod.
 ```
 
 Authenticated smoke injects the contract-host access token through
-`queenzone://smoke-auth`. That deep link is handled only when `__DEV__`
-is true (Debug). It is not compiled into staging/production Release
-behavior.
+`queenzone://smoke-auth`. That deep link is handled when `appEnv` is
+development and either `__DEV__` is true (local Debug) or `smokeEmbed`
+was baked (CI/local Release smoke). It is not compiled into
+staging/production store Release behavior.
 
 CI: [`.github/workflows/mobile-device-smoke.yml`](../../.github/workflows/mobile-device-smoke.yml)
 runs on **Actions → Mobile device smoke** (`workflow_dispatch`) and
@@ -528,7 +545,14 @@ when `mobile=true` (with skip-success stubs) and then enabling branch
 protection; record the date on #872. See
 [`docs/architecture/testing-policy.md`](../../docs/architecture/testing-policy.md).
 Failures upload `maestro-results/` (screenshots, JUnit, host/app logs).
-Maestro flows are not retried.
+Maestro app assertions are not retried. The harness retries one Android ADB
+transport loss only when Maestro reports an Unknown-error result plus a dead or
+offline device before any assertion. It recovers ADB, reinstalls the same APK,
+and preserves the first diagnostics. An iOS driver startup may likewise retry
+once only when no JUnit file exists; the harness reboots the Simulator and
+preserves the first driver log. The authenticated smoke flow repeats only the
+iOS smoke-auth deep link when the profile explicitly remains signed out after
+the system Open prompt; it does not repeat failed app assertions.
 
 On-demand journeys (`maestro/journeys.yaml`, #1071–#1074) are a
 **separate job pair** in the same workflow: `Mobile Android device
@@ -563,8 +587,11 @@ The one-time Apple setup for `org.queenzone.mobile` consists of:
 - a Developer-role App Store Connect API key dedicated to GitHub uploads.
 
 Run **Publish iOS to TestFlight** from the repository's **Actions** tab and
-select `main`. The workflow intentionally rejects other branches and targets
-the self-hosted Mac runner through `[self-hosted, macOS, ARM64, ios-signing]`.
+select `main`. Leave **API environment** set to `production` for normal
+TestFlight and App Store candidates; choose `staging` only for a build that is
+deliberately testing `https://dev.queenzone.org`. The workflow intentionally
+rejects other branches and targets the self-hosted Mac runner through
+`[self-hosted, macOS, ARM64, ios-signing]`.
 The runner service does not load an interactive shell profile, so the workflow
 puts Homebrew (`/opt/homebrew/bin` or `/usr/local/bin`) on `PATH`, installs
 CocoaPods if `pod` is missing, runs `expo prebuild --no-install` with
@@ -576,8 +603,9 @@ HTTPS; this prevents each TestFlight build pausing for the same export-complianc
 questionnaire. Expo SDK 57 stamps `aps-environment=development` during prebuild;
 Xcode changes it to `production` when archiving with the App Store distribution
 profile. The workflow verifies both stages and rejects an exported IPA that does
-not carry the production entitlement, even when the binary still talks to the
-staging API. Expo's own CocoaPods auto-install is skipped
+not carry the production entitlement. It also reads the packaged Expo config
+back from the exported IPA and rejects an environment or API-origin mismatch
+before upload. Expo's own CocoaPods auto-install is skipped
 because a missing CLI is only a warning and otherwise continues without an
 `.xcworkspace`. It then imports signing material into a temporary Keychain,
 produces and verifies a signed `.ipa`, retains that IPA as a seven-day
@@ -627,9 +655,12 @@ text.
 
 Google Play's equivalent of TestFlight is the **internal testing track**. Run
 **Publish Android to Google Play** from the repository's **Actions** tab and
-select `main`. The workflow runs mobile preflight, builds a signed Android App
-Bundle (`.aab`) against the staging API, verifies it, retains it as a seven-day
-artifact, and uploads it to the `internal` track for opted-in testers.
+select `main`. Leave **API environment** set to `production` for normal Play
+candidates; choose `staging` only for a deliberate `https://dev.queenzone.org`
+test build. The workflow runs mobile preflight, builds a signed Android App
+Bundle (`.aab`), verifies its packaged environment and API origin, retains it
+as a seven-day artifact, and uploads it to the `internal` track for opted-in
+testers.
 
 The one-time Play Console setup for `org.queenzone.mobile` is:
 

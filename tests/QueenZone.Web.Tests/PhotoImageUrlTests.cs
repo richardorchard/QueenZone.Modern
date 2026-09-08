@@ -2,6 +2,7 @@ using QueenZone.Data;
 
 namespace QueenZone.Web.Tests;
 
+[Collection(EnvironmentVariableCollection.Name)]
 public sealed class PhotoImageUrlTests
 {
     [Fact]
@@ -21,6 +22,30 @@ public sealed class PhotoImageUrlTests
         Assert.Equal(
             "https://example.test/queen/img-201.jpg",
             PhotoImageUrl.BuildBlobStorageUrl("/Queen/img-201.jpg", "https://example.test"));
+
+    [Fact]
+    public void Dev_environment_origins_override_production_defaults()
+    {
+        var previousPublic = Environment.GetEnvironmentVariable(PhotoImageUrl.PublicBaseUrlEnvironmentVariable);
+        var previousBlob = Environment.GetEnvironmentVariable(PhotoImageUrl.BlobEndpointEnvironmentVariable);
+        try
+        {
+            Environment.SetEnvironmentVariable(PhotoImageUrl.PublicBaseUrlEnvironmentVariable, "https://queenzonedev.blob.core.windows.net");
+            Environment.SetEnvironmentVariable(PhotoImageUrl.BlobEndpointEnvironmentVariable, "https://queenzonedev.blob.core.windows.net");
+
+            Assert.Equal(
+                "https://queenzonedev.blob.core.windows.net/queen/img-201.jpg",
+                PhotoImageUrl.Build("/Queen/img-201.jpg"));
+            Assert.Equal(
+                "https://queenzonedev.blob.core.windows.net/queen/img-201.jpg",
+                PhotoImageUrl.ToBlobStorageUrl("/Queen/img-201.jpg"));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(PhotoImageUrl.PublicBaseUrlEnvironmentVariable, previousPublic);
+            Environment.SetEnvironmentVariable(PhotoImageUrl.BlobEndpointEnvironmentVariable, previousBlob);
+        }
+    }
 
     [Fact]
     public void ToBlobStorageUrl_ConvertsPublicUrlToBlobEndpoint() =>

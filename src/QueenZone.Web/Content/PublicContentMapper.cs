@@ -105,59 +105,73 @@ public static class PublicContentMapper
             item.AuthorName,
             item.Tags);
 
-    public static ForumCategorySummary ToForumCategorySummary(ForumCategoryItem category) =>
-        new(
+    public static ForumCategorySummary ToForumCategorySummary(ForumCategoryItem category)
+    {
+        var name = ForumTextCleaning.CleanForumText(category.Name);
+        return new(
             category.Id,
-            category.Name,
-            category.Description,
+            name,
+            ForumTextCleaning.CleanForumTextOrNull(category.Description),
             category.PostCount,
             category.LastActivityAt,
-            category.LatestThreadTitle,
-            ForumRoutes.GetCategoryCanonicalPath(category.Id, category.Name));
+            ForumTextCleaning.CleanForumTextOrNull(category.LatestThreadTitle),
+            ForumRoutes.GetCategoryCanonicalPath(category.Id, name));
+    }
 
     public static IReadOnlyList<ForumCategorySummary> ToForumCategorySummaries(
         IEnumerable<ForumCategoryItem> categories) =>
         categories.Select(ToForumCategorySummary).ToList();
 
-    public static ForumThreadSummary ToForumThreadSummary(ForumTopicItem topic) =>
-        new(
+    public static ForumThreadSummary ToForumThreadSummary(ForumTopicItem topic)
+    {
+        var title = ForumTextCleaning.CleanForumText(topic.Title);
+        return new(
             topic.Id,
-            topic.Title,
+            title,
             topic.LastActivityAt,
             topic.AuthorUsername,
             topic.ReplyCount,
             topic.LastPostUsername,
             topic.IsSticky,
-            ForumRoutes.GetTopicCanonicalPath(topic.Id, topic.Title));
+            ForumRoutes.GetTopicCanonicalPath(topic.Id, title));
+    }
 
     public static IReadOnlyList<ForumThreadSummary> ToForumThreadSummaries(
         IEnumerable<ForumTopicItem> topics) =>
         topics.Select(ToForumThreadSummary).ToList();
 
-    public static ForumRecentThreadSummary ToForumRecentThreadSummary(ForumRecentThreadItem item) =>
-        new(
+    public static ForumRecentThreadSummary ToForumRecentThreadSummary(ForumRecentThreadItem item)
+    {
+        var title = ForumTextCleaning.CleanForumText(item.Title);
+        var categoryName = ForumTextCleaning.CleanForumText(item.CategoryName);
+        return new(
             item.TopicId,
-            item.Title,
-            ForumRoutes.GetTopicCanonicalPath(item.TopicId, item.Title),
+            title,
+            ForumRoutes.GetTopicCanonicalPath(item.TopicId, title),
             item.CategoryId,
-            item.CategoryName,
-            ForumRoutes.GetCategoryCanonicalPath(item.CategoryId, item.CategoryName),
+            categoryName,
+            ForumRoutes.GetCategoryCanonicalPath(item.CategoryId, categoryName),
             item.ReplyCount,
             item.LastActivityAt);
+    }
 
     public static IReadOnlyList<ForumRecentThreadSummary> ToForumRecentThreadSummaries(
         IEnumerable<ForumRecentThreadItem> items) =>
         items.Select(ToForumRecentThreadSummary).ToList();
 
-    public static ForumThreadHeader ToForumThreadHeader(ForumTopicHeader header) =>
-        new(
+    public static ForumThreadHeader ToForumThreadHeader(ForumTopicHeader header)
+    {
+        var title = ForumTextCleaning.CleanForumText(header.Title);
+        var forumName = ForumTextCleaning.CleanForumText(header.ForumName);
+        return new(
             header.TopicId,
-            header.Title.Trim(),
+            title,
             header.ForumId,
-            header.ForumName.Trim(),
-            ForumRoutes.GetCategoryCanonicalPath(header.ForumId, header.ForumName),
-            ForumRoutes.GetTopicCanonicalPath(header.TopicId, header.Title),
+            forumName,
+            ForumRoutes.GetCategoryCanonicalPath(header.ForumId, forumName),
+            ForumRoutes.GetTopicCanonicalPath(header.TopicId, title),
             header.HasPoll);
+    }
 
     public static ForumPostViewModel ToForumPostViewModel(ForumPostItem post) =>
         new(
@@ -170,7 +184,8 @@ public static class PublicContentMapper
             ToForumAttachments(post.Attachments),
             post.AuthorMemberId,
             post.EditedAt,
-            post.EditCount);
+            post.EditCount,
+            AuthorLegacyUserId: post.AuthorLegacyUserId);
 
     public static ForumPostViewModel WithEditState(
         ForumPostViewModel post,

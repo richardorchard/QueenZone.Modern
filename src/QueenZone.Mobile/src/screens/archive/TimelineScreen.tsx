@@ -1,6 +1,6 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, Linking, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { fetchOnThisDay, fetchTimelinePage, type TimelineEvent } from '../../api';
 import { usePagedContent } from '../../hooks/usePagedContent';
 import { HeaderBackButton } from '../../navigation/headerButtons';
@@ -8,6 +8,7 @@ import { goBackOrFallback } from '../../navigation/nestedTab';
 import type { ArchiveStackParamList } from '../../navigation/types';
 import { testIds } from '../../test/testIds';
 import { EmptyBlock, ErrorBlock, ListFooterLoading, LoadingBlock } from '../../ui/ScreenStates';
+import { ThemedRefreshControl } from '../../ui/ThemedRefreshControl';
 import { space, type, useTheme } from '../../theme';
 
 type Props = NativeStackScreenProps<ArchiveStackParamList, 'Timeline'>;
@@ -164,11 +165,7 @@ export function TimelineScreen({ navigation, route }: Props) {
       ListEmptyComponent={<EmptyBlock message="No timeline events yet." />}
       ListFooterComponent={<ListFooterLoading visible={paged.loadingMore} />}
       refreshControl={
-        <RefreshControl
-          refreshing={paged.refreshing}
-          onRefresh={paged.refresh}
-          tintColor={c.accentPrimary}
-        />
+        <ThemedRefreshControl refreshing={paged.refreshing} onRefresh={paged.refresh} />
       }
       onEndReached={paged.loadMore}
       onEndReachedThreshold={0.4}

@@ -1,10 +1,11 @@
 /**
- * Debug-only smoke session injection (#872, tightened by #831 Option A).
+ * Smoke session injection (#872, tightened by #831 Option A, #1322).
  *
- * Enabled only when `__DEV__ === true` and `appEnv === 'development'`.
+ * Enabled when `appEnv === 'development'` and either `__DEV__` is true
+ * (local Debug) or `smokeEmbed` was baked at prebuild (CI Release embed).
  * Staging/production fail closed even if a Debug client is pointed at
- * those origins. Release builds also compile `__DEV__` to false.
- * `applySmokeSession` no-ops when this returns false.
+ * those origins. Store Release compiles `__DEV__` to false and does not
+ * bake `smokeEmbed`. `applySmokeSession` no-ops when this returns false.
  */
 
 export const smokeAuthScheme = 'queenzone';
@@ -13,15 +14,18 @@ export const smokeAuthRefreshPlaceholder = 'smoke-debug-no-refresh';
 export const smokeAuthExpiresInSeconds = 3600;
 
 export type SmokeAuthGate = {
-  /** Metro/Release compile flag. Missing or false fails closed. */
+  /** Metro/Release compile flag. Missing or false fails closed unless smokeEmbed. */
   dev?: boolean;
   /** Runtime app environment. Anything other than development fails closed. */
   appEnv?: string;
+  /** Baked QUEENZONE_MOBILE_SMOKE_EMBED so Release Testing binaries can inject. */
+  smokeEmbed?: boolean;
 };
 
 export function isSmokeAuthEnabled(env: SmokeAuthGate = {}): boolean {
   const dev = env.dev ?? (typeof __DEV__ !== 'undefined' ? __DEV__ : false);
-  return dev === true && env.appEnv === 'development';
+  const embed = env.smokeEmbed === true;
+  return (dev === true || embed) && env.appEnv === 'development';
 }
 
 export function parseSmokeAuthAccessToken(url: string): string | null {

@@ -22,6 +22,7 @@ const mockAppConfig = {
   apiBaseUrl: 'http://qz.test',
   appEnv: 'development' as string,
   version: '0.1.0',
+  smokeEmbed: false as boolean | undefined,
 };
 
 jest.mock('../config/appConfig', () => ({
@@ -42,6 +43,7 @@ jest.mock('../api/client', () => {
 
 jest.mock('./oauth', () => ({
   signInWithProvider: jest.fn(),
+  signInWithPassword: jest.fn(),
   refreshAccessToken: jest.fn(),
   revokeRefreshToken: jest.fn(),
   logoutRemote: jest.fn(),
@@ -75,6 +77,7 @@ const writeIdentity = tokenStore.writeStoredIdentityShell as jest.MockedFunction
 >;
 const clearStored = tokenStore.clearStoredSession as jest.MockedFunction<typeof tokenStore.clearStoredSession>;
 const signInWithProvider = oauth.signInWithProvider as jest.MockedFunction<typeof oauth.signInWithProvider>;
+const signInWithPassword = oauth.signInWithPassword as jest.MockedFunction<typeof oauth.signInWithPassword>;
 const refreshAccessToken = oauth.refreshAccessToken as jest.MockedFunction<typeof oauth.refreshAccessToken>;
 const logoutRemote = oauth.logoutRemote as jest.MockedFunction<typeof oauth.logoutRemote>;
 const revokeRefreshToken = oauth.revokeRefreshToken as jest.MockedFunction<typeof oauth.revokeRefreshToken>;
@@ -101,6 +104,13 @@ function Probe() {
         }}
       >
         do-sign-in
+      </Text>
+      <Text
+        onPress={() => {
+          void session.signInWithPassword('reviewer@example.com', 'review-pass').catch(() => {});
+        }}
+      >
+        do-password-sign-in
       </Text>
       <Text onPress={() => void session.signOut()}>do-sign-out</Text>
       <Text
@@ -145,6 +155,7 @@ beforeEach(() => {
   jest.spyOn(AppState, 'addEventListener').mockImplementation(() => ({ remove: jest.fn() }));
   mockAppConfig.appEnv = 'development';
   mockAppConfig.version = '0.1.0';
+  mockAppConfig.smokeEmbed = false;
   fetchJsonMock.mockReset();
   readStored.mockReset();
   writeStored.mockReset();
@@ -156,6 +167,7 @@ beforeEach(() => {
   writeIdentity.mockResolvedValue(undefined);
   clearStored.mockReset();
   signInWithProvider.mockReset();
+  signInWithPassword.mockReset();
   refreshAccessToken.mockReset();
   logoutRemote.mockReset();
   revokeRefreshToken.mockReset();
@@ -174,6 +186,30 @@ describe('SessionProvider', () => {
     renderSession();
     await waitFor(() => expect(screen.getByText('signed-out')).toBeOnTheScreen());
     expect(screen.getByText('no-token')).toBeOnTheScreen();
+  });
+
+  it('applies the smoke session when Release smokeEmbed is baked', async () => {
+    const user = userEvent.setup();
+    const runtime = globalThis as typeof globalThis & { __DEV__?: boolean };
+    const previous = runtime.__DEV__;
+    runtime.__DEV__ = false;
+    mockAppConfig.smokeEmbed = true;
+    try {
+      readStored.mockReturnValue(new Promise(() => {}));
+      renderSession();
+      await waitFor(() => expect(screen.getByText('signed-out')).toBeOnTheScreen());
+      expect(readStored).not.toHaveBeenCalled();
+
+      await user.press(screen.getByText('do-smoke-auth'));
+      await waitFor(() => expect(screen.getByText('signed-in')).toBeOnTheScreen());
+      expect(screen.getByText('smoke-applied')).toBeOnTheScreen();
+      expect(signInWithProvider).not.toHaveBeenCalled();
+      expect(writeStored).not.toHaveBeenCalled();
+      expect(writeIdentity).not.toHaveBeenCalled();
+      expect(fetchJsonMock).toHaveBeenCalledWith('/me', { accessToken: 'smoke-access' });
+    } finally {
+      runtime.__DEV__ = previous;
+    }
   });
 
   it('rejects the smoke session when __DEV__ is false', async () => {
@@ -375,6 +411,25 @@ describe('SessionProvider', () => {
     });
   });
 
+  it('signs in with email and password through the same token store as OAuth', async () => {
+    const user = userEvent.setup();
+    readStored.mockResolvedValue(null);
+    signInWithPassword.mockResolvedValue(authTokensFixture({ accessToken: 'password-access' }));
+    renderSession();
+    await waitFor(() => expect(screen.getByText('signed-out')).toBeOnTheScreen());
+
+    await user.press(screen.getByText('do-password-sign-in'));
+    await waitFor(() => expect(screen.getByText('signed-in')).toBeOnTheScreen());
+    expect(signInWithPassword).toHaveBeenCalledWith('http://qz.test', 'reviewer@example.com', 'review-pass');
+    expect(signInWithProvider).not.toHaveBeenCalled();
+    expect(writeStored).toHaveBeenCalledWith({
+      accessToken: 'password-access',
+      refreshToken: 'refresh-token',
+      expiresIn: 900,
+    });
+    await waitFor(() => expect(syncPushRegistration).toHaveBeenCalledWith('password-access', 'member-1'));
+  });
+
   it('signs out locally even when remote logout never completes', async () => {
     const user = userEvent.setup();
     readStored.mockResolvedValue({
@@ -548,6 +603,7 @@ describe('SessionProvider', () => {
     async (appEnv) => {
       const user = userEvent.setup();
       mockAppConfig.appEnv = appEnv;
+      mockAppConfig.smokeEmbed = true;
       readStored.mockResolvedValue(null);
       renderSession();
       await waitFor(() => expect(screen.getByText('signed-out')).toBeOnTheScreen());
@@ -581,6 +637,22 @@ describe('SessionProvider', () => {
     await user.press(screen.getByText('clear-token'));
     expect(screen.getByText('signed-out')).toBeOnTheScreen();
     expect(screen.getByText('no-token')).toBeOnTheScreen();
+  });
+
+  it('fail-opens a hung development restore so Profile is not stuck restoring', async () => {
+    jest.useFakeTimers();
+    try {
+      readStored.mockReturnValue(new Promise(() => {}));
+      renderSession();
+      expect(screen.getByText('restoring')).toBeOnTheScreen();
+      await act(async () => {
+        jest.advanceTimersByTime(5_000);
+      });
+      expect(screen.getByText('signed-out')).toBeOnTheScreen();
+      expect(clearStored).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('does not sign out when a locked keychain blocks restore, and retries on active', async () => {

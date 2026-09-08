@@ -268,9 +268,18 @@ public class AdminModerationWorkflowTests : RealDataPageTest
         Assert.That(response?.Status, Is.EqualTo(200));
         await Expect(adminPage.GetByRole(AriaRole.Heading, new() { Name = "Dashboard", Level = 1 })).ToBeVisibleAsync();
         await Expect(adminPage.Locator(".admin-dashboard__stat-value").First).ToBeVisibleAsync();
-        await Expect(adminPage.Locator(".admin-dashboard__queue-tile")).ToHaveCountAsync(5);
+        await Expect(adminPage.Locator(".admin-dashboard__queue-tile")).ToHaveCountAsync(8);
         await Expect(adminPage.Locator(".admin-dashboard__queue-tile-label")).ToHaveTextAsync(
-            ["Help requests", "Reported messages", "Photos", "News suggestions", "Articles"]);
+            [
+                "Help requests",
+                "Reported messages",
+                "Fan performance reports",
+                "Photos",
+                "News suggestions",
+                "Articles",
+                "Trivia suggestions",
+                "Fan performances",
+            ]);
         await Expect(adminPage.Locator(".admin-dashboard__queue-tile-count").First).ToBeVisibleAsync();
     }
 

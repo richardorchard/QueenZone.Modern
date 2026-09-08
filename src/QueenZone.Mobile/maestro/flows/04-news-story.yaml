@@ -8,13 +8,28 @@ appId: org.queenzone.mobile
     timeout: 20000
 - tapOn:
     id: news-story-1003
-- extendedWaitUntil:
-    visible:
-      id: news-story-screen
-    timeout: 20000
+# The hosted Simulator can briefly starve the loopback Testing host while
+# XCTest is active. Retry only the screen's read-only recovery action; a
+# selector failure or a second request failure still fails the flow.
+- retry:
+    maxRetries: 1
+    commands:
+      - runFlow:
+          when:
+            visible:
+              text: '^Try again$'
+          commands:
+            - tapOn:
+                text: '^Try again$'
+      - extendedWaitUntil:
+          visible:
+            id: news-story-screen
+          timeout: 20000
 - assertVisible: QueenZone modernisation begins
+# Story hides the tab bar (navigation/visibility.ts) — leave via its own
+# back control, same pattern as 08-profile-signed-out.yaml's profile-back.
 - tapOn:
-    id: tab-news
+    id: news-story-back
 - extendedWaitUntil:
     visible:
       id: news-screen

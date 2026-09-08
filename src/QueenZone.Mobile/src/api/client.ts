@@ -1,6 +1,6 @@
 import { apiV1Url } from '../config';
 import { reportApiFailure } from '../config/sentry';
-import { ApiError, isExpoFetchCanceled, isLostConnectionMessage, isOfflineFailure, isTimeoutFailure } from './errors';
+import { ApiError, isExpoFetchCanceled, isOfflineFailure, isTimeoutFailure } from './errors';
 import {
   classifyXhrFailure,
   interpretMultipartXhrResult,
@@ -50,6 +50,21 @@ const GET_MAX_ATTEMPTS = 2;
 const RETRY_BASE_MS = 300;
 const RETRY_CAP_MS = 1_500;
 const RETRYABLE_HTTP = new Set([502, 503, 504]);
+
+type AuthenticatedGetRecovery = (rejectedAccessToken: string) => Promise<string | null>;
+
+let authenticatedGetRecovery: AuthenticatedGetRecovery | null = null;
+
+/**
+ * Installs the session-owned recovery hook for Bearer GETs. A 401 is replayed
+ * at most once, after the session either returns a newer token or refreshes
+ * the rejected one. Writes remain explicit and are never replayed here.
+ */
+export function configureAuthenticatedGetRecovery(
+  recovery: AuthenticatedGetRecovery | null,
+): void {
+  authenticatedGetRecovery = recovery;
+}
 
 type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
 
@@ -194,17 +209,21 @@ export function classifyFetchFailure(
   deadline: Pick<DeadlineHandle, 'timedOut'>,
   caller?: AbortSignal,
 ): unknown {
+  // True caller abort only — supersede, unmount, or explicit cancel.
   if (caller?.aborted) {
     return toAbortError(err);
   }
+  // Deadline abort is a timeout, including Expo cancel / lost-connection
+  // messages that iOS emits instead of AbortError when the timer fires.
+  if (deadline.timedOut()) {
+    return ApiError.timeout(err);
+  }
   if (isCallerAbort(err)) {
-    return deadline.timedOut() ? ApiError.timeout(err) : err;
+    return err;
   }
-  // Expo cancel is not AbortError. Treat it as abort, not ApiError.offline (#1201).
+  // Expo cancel is not AbortError. Treat a live (non-timeout) cancel as
+  // abort, not ApiError.offline (#1201).
   if (isExpoFetchCanceled(err)) {
-    return toAbortError(err);
-  }
-  if (isLostConnectionMessage(err) && deadline.timedOut()) {
     return toAbortError(err);
   }
   return ApiError.offline(err);
@@ -397,14 +416,37 @@ async function request<T>(input: {
  * Throws {@link ApiError} for non-2xx responses (Problem Details when present).
  */
 export async function fetchJson<T>(path: string, options: FetchJsonOptions = {}): Promise<T> {
-  return request<T>({
-    method: 'GET',
-    path,
-    url: buildUrl(path, options.query),
-    headers: authHeaders(options.accessToken),
-    signal: options.signal,
-    policy: GET_POLICY,
-  });
+  const execute = (accessToken: string | null | undefined) =>
+    request<T>({
+      method: 'GET',
+      path,
+      url: buildUrl(path, options.query),
+      headers: authHeaders(accessToken),
+      signal: options.signal,
+      policy: GET_POLICY,
+    });
+
+  try {
+    return await execute(options.accessToken);
+  } catch (err) {
+    const rejectedToken = options.accessToken?.trim();
+    if (
+      !rejectedToken ||
+      !authenticatedGetRecovery ||
+      !(err instanceof ApiError) ||
+      err.status !== 401 ||
+      options.signal?.aborted
+    ) {
+      throw err;
+    }
+
+    const recoveredToken = await authenticatedGetRecovery(rejectedToken);
+    if (!recoveredToken || recoveredToken === rejectedToken) {
+      throw err;
+    }
+
+    return execute(recoveredToken);
+  }
 }
 
 /**

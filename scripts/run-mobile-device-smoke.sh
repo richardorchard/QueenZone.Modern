@@ -1,17 +1,20 @@
 #!/usr/bin/env bash
 # Boot the Testing contract host and run the Maestro device smoke suite
-# against a Debug build baked at the loopback Testing origin (#872 Option A).
+# against a Release-embedded build baked at the loopback Testing origin
+# (#872 Option A, #1322). Never Debug / expo-dev-client — that waits for Metro.
+# Do not start a packager here.
 #
 # Never points Testing at a real database, blob store, live site, or OAuth.
 # Usage (repo root):
 #   ./scripts/run-mobile-device-smoke.sh --platform android
 #   ./scripts/run-mobile-device-smoke.sh --platform ios
-#   ./scripts/run-mobile-device-smoke.sh --platform android --skip-build --apk path/to/app-debug.apk
+#   ./scripts/run-mobile-device-smoke.sh --platform android --skip-build --apk path/to/app-release.apk
 #   ./scripts/run-mobile-device-smoke.sh --platform android --prove-failure
 #   ./scripts/run-mobile-device-smoke.sh --platform android --suite journeys
 #
-# Maestro flows are not retried. A single emulator/simulator boot failure is
-# the runner's problem (android-emulator-runner / simctl), not a test retry.
+# Maestro selector and assertion failures are not retried. One Android device
+# transport failure or pre-flow iOS driver-startup failure may retry after
+# device recovery.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -262,12 +265,11 @@ push_attach_fixture() {
   fi
 
   if [ "$platform" = "android" ]; then
-    adb shell mkdir -p /sdcard/Download
-    adb push "$src" /sdcard/Download/attach.txt >/dev/null
-    adb shell mkdir -p /sdcard/Android/data/org.queenzone.mobile/files
-    adb push "$src" /sdcard/Android/data/org.queenzone.mobile/files/attach.txt >/dev/null
+    # The smoke-only Inject action writes the fixture into the app cache.
+    # Android 16 denies Release apps access to shell-owned ADB-pushed files,
+    # including files placed under their external app-specific directory.
     SMOKE_ATTACH_URL="$(
-      node -e 'process.stdout.write("queenzone://smoke-attach?uri=" + encodeURIComponent("file:///sdcard/Android/data/org.queenzone.mobile/files/attach.txt") + "&name=attach.txt&type=text/plain")'
+      node -e 'process.stdout.write("queenzone://smoke-attach?uri=" + encodeURIComponent("file:///data/user/0/org.queenzone.mobile/cache/attach.txt") + "&name=attach.txt&type=text/plain")'
     )"
   else
     local data
@@ -287,22 +289,51 @@ push_attach_fixture() {
   echo "SMOKE_ATTACH_URL is set (length ${#SMOKE_ATTACH_URL}; path not printed)."
 }
 
+android_release_apk() {
+  local dir="$root/src/QueenZone.Mobile/android/app/build/outputs/apk/release"
+  if [ -f "$dir/app-release.apk" ]; then
+    printf '%s\n' "$dir/app-release.apk"
+    return 0
+  fi
+  if [ -f "$dir/app-release-unsigned.apk" ]; then
+    printf '%s\n' "$dir/app-release-unsigned.apk"
+    return 0
+  fi
+  return 1
+}
+
+ios_release_app() {
+  local dir="$root/src/QueenZone.Mobile/ios/build/Build/Products/Release-iphonesimulator"
+  if [ -d "$dir/QueenZone.app" ]; then
+    printf '%s\n' "$dir/QueenZone.app"
+    return 0
+  fi
+  local found
+  found="$(ls -d "$dir"/*.app 2>/dev/null | head -n 1 || true)"
+  if [ -n "$found" ] && [ -d "$found" ]; then
+    printf '%s\n' "$found"
+    return 0
+  fi
+  return 1
+}
+
 build_android() {
   (
     cd src/QueenZone.Mobile
     export EXPO_PUBLIC_APP_ENV=development
     export EXPO_PUBLIC_API_BASE_URL="http://10.0.2.2:${port}"
+    export EXPO_PUBLIC_SMOKE_EMBED=1
     export SENTRY_DISABLE_AUTO_UPLOAD=true
     export QUEENZONE_MOBILE_SMOKE_EMBED=1
     export FORCE_BUNDLING=1
-    echo "Baking Android smoke APK for ${EXPO_PUBLIC_API_BASE_URL}"
+    echo "Baking Android Release smoke APK for ${EXPO_PUBLIC_API_BASE_URL}"
     npx expo prebuild --platform android
     (
       cd android
-      ./gradlew assembleDebug
+      ./gradlew assembleRelease
     )
   )
-  apk="$root/src/QueenZone.Mobile/android/app/build/outputs/apk/debug/app-debug.apk"
+  apk="$(android_release_apk || true)"
 }
 
 build_ios() {
@@ -310,10 +341,11 @@ build_ios() {
     cd src/QueenZone.Mobile
     export EXPO_PUBLIC_APP_ENV=development
     export EXPO_PUBLIC_API_BASE_URL="http://127.0.0.1:${port}"
+    export EXPO_PUBLIC_SMOKE_EMBED=1
     export SENTRY_DISABLE_AUTO_UPLOAD=true
     export QUEENZONE_MOBILE_SMOKE_EMBED=1
     export FORCE_BUNDLING=1
-    echo "Baking iOS Simulator smoke app for ${EXPO_PUBLIC_API_BASE_URL}"
+    echo "Baking iOS Simulator Release smoke app for ${EXPO_PUBLIC_API_BASE_URL}"
     npx expo prebuild --platform ios --clean
     cd ios
     workspace="$(ls -d *.xcworkspace | head -n 1)"
@@ -322,12 +354,12 @@ build_ios() {
       -workspace "$workspace" \
       -scheme "$scheme" \
       -sdk iphonesimulator \
-      -configuration Debug \
+      -configuration Release \
       -derivedDataPath build \
       CODE_SIGNING_ALLOWED=NO \
       build
   )
-  app="$(ls -d "$root"/src/QueenZone.Mobile/ios/build/Build/Products/Debug-iphonesimulator/*.app | head -n 1)"
+  app="$(ios_release_app || true)"
 }
 
 if [ "$skip_host" != true ]; then
@@ -354,10 +386,10 @@ if [ "$skip_build" != true ]; then
 fi
 
 if [ "$platform" = "android" ] && [ -z "$apk" ]; then
-  apk="$root/src/QueenZone.Mobile/android/app/build/outputs/apk/debug/app-debug.apk"
+  apk="$(android_release_apk || true)"
 fi
 if [ "$platform" = "ios" ] && [ -z "$app" ]; then
-  app="$(ls -d "$root"/src/QueenZone.Mobile/ios/build/Build/Products/Debug-iphonesimulator/*.app 2>/dev/null | head -n 1 || true)"
+  app="$(ios_release_app || true)"
 fi
 
 if [ "$platform" = "android" ]; then
@@ -372,12 +404,22 @@ if [ "$platform" = "android" ]; then
   echo "Installing $apk"
   adb wait-for-device
   adb install -r "$apk"
+  if [ "$suite" = "journeys" ]; then
+    # Clear before push_attach_fixture. Clearing from launchApp afterwards
+    # deletes the app-private attachment URI while leaving its UI metadata.
+    adb shell pm clear org.queenzone.mobile >/dev/null
+  fi
 else
   if [ -z "$app" ] || [ ! -d "$app" ]; then
     echo "iOS Simulator .app not found at '${app:-<empty>}'." >&2
     exit 1
   fi
   echo "Installing $app"
+  if [ "$suite" = "journeys" ]; then
+    # A Simulator install preserves an existing data container. Remove the
+    # prior install so journeys start clean before their fixture is copied.
+    xcrun simctl uninstall booted org.queenzone.mobile >/dev/null 2>&1 || true
+  fi
   xcrun simctl install booted "$app"
 fi
 
@@ -409,8 +451,7 @@ elif [ "$suite" = "journeys" ]; then
   echo "Running on-demand Maestro journeys (#1071)."
 fi
 
-echo "Running Maestro ($flow). Flows are not retried."
-set +e
+echo "Running Maestro ($flow). Selector and assertion failures are not retried."
 maestro_args=(
   test "$flow"
   --format junit
@@ -425,9 +466,83 @@ if [ "$suite" = "journeys" ]; then
     -e "ATTACH_TOPIC_ID=${ATTACH_TOPIC_ID}"
   )
 fi
-maestro "${maestro_args[@]}"
+
+maestro_console_log="$results_dir/maestro-console.log"
+run_maestro_once() {
+  maestro "${maestro_args[@]}" 2>&1 | tee -a "$maestro_console_log"
+  return "${PIPESTATUS[0]}"
+}
+
+set +e
+run_maestro_once
 maestro_status=$?
 set -e
+
+# Hosted Android emulators can drop off ADB while Maestro is running. Maestro
+# has emitted both a generic Unknown-error JUnit failure and the full
+# DeviceServerDiedException across observed runs. Preserve that attempt,
+# recover ADB, reinstall the same APK, and retry once. Selector and assertion
+# failures stay single-attempt.
+if [ "$platform" = "android" ] \
+  && [ "$maestro_status" -ne 0 ] \
+  && [ -d "$results_dir/debug" ] \
+  && grep -Eq 'DeviceServerDiedException|Device server died|device offline' "$results_dir/junit.xml" \
+  && grep -ERq 'DeviceServerDiedException|Device server died|device offline' "$results_dir/debug"; then
+  echo "Maestro lost the Android device transport; recovering ADB and retrying once."
+  if [ -d "$results_dir/debug" ]; then
+    mv "$results_dir/debug" "$results_dir/debug-android-transport-first"
+  fi
+  if [ -f "$results_dir/junit.xml" ]; then
+    mv "$results_dir/junit.xml" "$results_dir/junit-android-transport-first.xml"
+  fi
+  adb reconnect offline || true
+  adb kill-server || true
+  adb start-server
+  android_ready=false
+  for _ in $(seq 1 45); do
+    if [ "$(adb get-state 2>/dev/null || true)" = "device" ] \
+      && [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; then
+      android_ready=true
+      break
+    fi
+    sleep 2
+  done
+  if [ "$android_ready" = true ]; then
+    adb install -r "$apk"
+    set +e
+    run_maestro_once
+    maestro_status=$?
+    set -e
+  else
+    echo "Android emulator did not return online after the Maestro transport failure." >&2
+  fi
+fi
+
+# Hosted macOS occasionally exits Maestro's xcodebuild driver process before
+# XCTest starts listening. Run 34061996744 failed this way, while the same
+# Maestro/Xcode/Simulator combination started successfully hours earlier. A
+# missing JUnit file proves no app flow began. Reboot the Simulator and retry
+# only that infrastructure startup; assertion and in-flow failures stay
+# single-attempt.
+if [ "$platform" = "ios" ] \
+  && [ "$maestro_status" -ne 0 ] \
+  && [ ! -s "$results_dir/junit.xml" ] \
+  && grep -q "iOS driver not ready in time" "$maestro_console_log"; then
+  echo "Maestro iOS driver failed before any flow began; rebooting the Simulator and retrying driver startup once."
+  if [ -d "$results_dir/debug" ]; then
+    mv "$results_dir/debug" "$results_dir/debug-driver-startup-first"
+  fi
+  retry_udid="${IOS_SIM_UDID:-$(xcrun simctl list devices booted | grep -oE '[0-9A-F-]{36}' | head -n 1)}"
+  if [ -n "$retry_udid" ]; then
+    xcrun simctl shutdown "$retry_udid" || true
+    xcrun simctl boot "$retry_udid"
+    xcrun simctl bootstatus "$retry_udid" -b
+  fi
+  set +e
+  run_maestro_once
+  maestro_status=$?
+  set -e
+fi
 
 if [ "$maestro_status" -ne 0 ]; then
   echo "Maestro failed with status $maestro_status" >&2

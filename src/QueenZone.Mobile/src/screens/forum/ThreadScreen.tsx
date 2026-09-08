@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, RefreshControl, StyleSheet, Text, View, type ListRenderItem } from 'react-native';
+import { FlatList, StyleSheet, Text, View, type ListRenderItem } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   fetchForumTopicPostsResult,
@@ -9,12 +9,15 @@ import {
   type ForumPost,
 } from '../../api';
 import { usePagedContent } from '../../hooks/usePagedContent';
+import { HeaderBackButton } from '../../navigation/headerButtons';
+import { goBackOrFallback } from '../../navigation/nestedTab';
 import type { ForumStackParamList } from '../../navigation/types';
 import { resolvePushMemberId } from '../../notifications/pushMemberId';
 import { type OfflineQueueItem, useOfflineQueue } from '../../offlineQueue';
 import { useSession } from '../../session/SessionContext';
 import { openForumComposer, openSignIn } from '../../session/signInNavigation';
 import { EmptyBlock, ErrorBlock, LoadingBlock, OfflineBanner } from '../../ui/ScreenStates';
+import { ThemedRefreshControl } from '../../ui/ThemedRefreshControl';
 import { testIds } from '../../test/testIds';
 import { space, type, useTheme } from '../../theme';
 import { ForumPollCard } from './ForumPollCard';
@@ -72,7 +75,15 @@ export function ThreadScreen({ navigation, route }: Props) {
   );
 
   useLayoutEffect(() => {
-    navigation.setOptions({ title: topic?.title ?? title ?? 'Thread' });
+    navigation.setOptions({
+      title: topic?.title ?? title ?? 'Thread',
+      headerLeft: () => (
+        <HeaderBackButton
+          testID={testIds.forumThreadBack}
+          onPress={() => goBackOrFallback(navigation, 'ForumIndex')}
+        />
+      ),
+    });
   }, [navigation, topic?.title, title]);
 
   const retry = useCallback(() => {
@@ -210,7 +221,7 @@ export function ThreadScreen({ navigation, route }: Props) {
         />
       }
       refreshControl={
-        <RefreshControl refreshing={paged.refreshing} onRefresh={refresh} tintColor={c.accentPrimary} />
+        <ThemedRefreshControl refreshing={paged.refreshing} onRefresh={refresh} />
       }
       onEndReached={paged.loadMore}
       onEndReachedThreshold={0.4}

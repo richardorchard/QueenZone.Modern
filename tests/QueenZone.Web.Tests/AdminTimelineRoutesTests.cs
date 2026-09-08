@@ -276,6 +276,63 @@ public sealed class AdminTimelineRoutesTests : IClassFixture<QueenZoneWebApplica
         Assert.False(store.GetById(id)!.IsPublished);
     }
 
+    [Fact]
+    public async Task PostDelete_preservesFiltersAndPageNumberOnRedirect()
+    {
+        var store = new SharedQueenHistoryStore();
+        var client = CreateWriteClient(store);
+        var title = $"WAF delete filtered {Guid.NewGuid():N}";
+        var create = await PostCreateAsync(client, title, isPublished: true);
+        Assert.Equal(HttpStatusCode.Redirect, create.StatusCode);
+        var id = store.GetAll().Single(item => item.Title == title).Id;
+
+        var listPage = await client.GetStringAsync("/admin/timeline");
+        var fields = new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = AdminHttpTestHelpers.ExtractAntiforgeryToken(listPage),
+            ["id"] = id.ToString(),
+            ["PageNumber"] = "2",
+            ["Published"] = "unpublished",
+            ["Q"] = "queen",
+        };
+
+        var delete = await client.PostAsync("/admin/timeline?handler=Delete", new FormUrlEncodedContent(fields));
+
+        Assert.Equal(HttpStatusCode.Redirect, delete.StatusCode);
+        Assert.Equal(
+            "/admin/timeline?pageNumber=2&published=unpublished&q=queen",
+            delete.Headers.Location?.OriginalString);
+    }
+
+    [Fact]
+    public async Task PostTogglePublish_preservesFiltersAndPageNumberOnRedirect()
+    {
+        var store = new SharedQueenHistoryStore();
+        var client = CreateWriteClient(store);
+        var title = $"WAF toggle filtered {Guid.NewGuid():N}";
+        var create = await PostCreateAsync(client, title, isPublished: true);
+        Assert.Equal(HttpStatusCode.Redirect, create.StatusCode);
+        var id = store.GetAll().Single(item => item.Title == title).Id;
+
+        var listPage = await client.GetStringAsync("/admin/timeline");
+        var fields = new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = AdminHttpTestHelpers.ExtractAntiforgeryToken(listPage),
+            ["id"] = id.ToString(),
+            ["isPublished"] = "true",
+            ["PageNumber"] = "3",
+            ["Published"] = "published",
+            ["Q"] = "mercury",
+        };
+
+        var toggle = await client.PostAsync("/admin/timeline?handler=TogglePublish", new FormUrlEncodedContent(fields));
+
+        Assert.Equal(HttpStatusCode.Redirect, toggle.StatusCode);
+        Assert.Equal(
+            "/admin/timeline?pageNumber=3&published=published&q=mercury",
+            toggle.Headers.Location?.OriginalString);
+    }
+
     private HttpClient CreateWriteClient(SharedQueenHistoryStore store)
     {
         var appFactory = factory.WithWebHostBuilder(builder =>

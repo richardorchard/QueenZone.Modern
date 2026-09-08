@@ -13,11 +13,17 @@ import { Alert, AppState, Linking } from 'react-native';
 import { addNetworkStateListener } from 'expo-network';
 import * as Notifications from 'expo-notifications';
 import { getAppConfig } from '../config/appConfig';
-import { ApiError, fetchJson } from '../api/client';
+import { ApiError, configureAuthenticatedGetRecovery, fetchJson } from '../api/client';
 import { fallbackProfileLimits, parseMemberProfile, type MemberProfile } from '../api/me';
 import type { AuthTokens } from '../api/auth';
 import { clearPushRegistration, refreshPushRegistration, syncPushRegistration } from '../notifications';
-import { logoutRemote, refreshAccessToken, revokeRefreshToken, signInWithProvider } from './oauth';
+import {
+  logoutRemote,
+  refreshAccessToken,
+  revokeRefreshToken,
+  signInWithPassword as requestPasswordTokens,
+  signInWithProvider,
+} from './oauth';
 import {
   isSmokeAuthEnabled,
   parseSmokeAuthAccessToken,
@@ -34,6 +40,12 @@ import {
   discardOfflineQueue,
   flushOfflineQueue,
 } from '../offlineQueue';
+import {
+  developmentSessionRestoreTimeoutMs,
+  isSessionRestoreTimeoutError,
+  sessionRestoreTimeoutLabel,
+  withTimeout,
+} from './restoreTimeout';
 import {
   clearStoredSession,
   isKeychainLockedError,
@@ -54,6 +66,7 @@ export type Session = {
 
 export type SessionActions = {
   signIn: (provider: string) => Promise<void>;
+  signInWithPassword: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<MemberProfile | null>;
   ensureAccessToken: () => Promise<string | null>;
@@ -98,10 +111,17 @@ function sessionFromAccessToken(
 }
 
 function smokeAuthAllowed(): boolean {
+  const config = getAppConfig();
   return isSmokeAuthEnabled({
     dev: typeof __DEV__ !== 'undefined' ? __DEV__ : false,
-    appEnv: getAppConfig().appEnv,
+    appEnv: config.appEnv,
+    smokeEmbed: config.smokeEmbed,
   });
+}
+
+function releaseSmokeEmbedEnabled(): boolean {
+  const config = getAppConfig();
+  return config.appEnv === 'development' && config.smokeEmbed === true;
 }
 
 export function SessionProvider({ children }: { children: ReactNode }) {
@@ -162,13 +182,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     void reconcileDownloads(nextId).catch(() => {
       // Offline reconcile can retry on the next launch.
     });
-    void writeStoredIdentityShell({
-      displayName: profile.displayName,
-      memberId: profile.memberId,
-      avatarPath: profile.avatarPath,
-    }).catch(() => {
-      // Token grant is already stored. A shell write miss only delays initials until /me succeeds.
-    });
+    if (!releaseSmokeEmbedEnabled()) {
+      void writeStoredIdentityShell({
+        displayName: profile.displayName,
+        memberId: profile.memberId,
+        avatarPath: profile.avatarPath,
+      }).catch(() => {
+        // Token grant is already stored. A shell write miss only delays initials until /me succeeds.
+      });
+    }
     setSession(() => {
       const next = sessionFromAccessToken(accessToken, {
         displayName: profile.displayName,
@@ -271,7 +293,36 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return refreshWithStoredGrant();
   }, [refreshWithStoredGrant]);
 
+  const recoverRejectedAccessToken = useCallback(
+    async (rejectedAccessToken: string): Promise<string | null> => {
+      const current = sessionRef.current.accessToken;
+      if (current && current !== rejectedAccessToken) {
+        return current;
+      }
+      if (!refreshTokenRef.current) {
+        return null;
+      }
+      return refreshWithStoredGrant();
+    },
+    [refreshWithStoredGrant],
+  );
+
   useEffect(() => {
+    configureAuthenticatedGetRecovery(recoverRejectedAccessToken);
+    return () => configureAuthenticatedGetRecovery(null);
+  }, [recoverRejectedAccessToken]);
+
+  useEffect(() => {
+    // A Release-embedded smoke binary is a fresh, isolated Testing harness.
+    // Maestro clears its state/keychain before launch and injects the seeded
+    // session later, so a SecureStore restore can only add simulator flakiness.
+    if (releaseSmokeEmbedEnabled()) {
+      const next = { ...signedOut, isRestoring: false };
+      sessionRef.current = next;
+      setSession(next);
+      return;
+    }
+
     let cancelled = false;
     let inFlight = false;
     let lockedPending = false;
@@ -284,8 +335,22 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       try {
         let stored: StoredSession | null;
         try {
-          stored = await readStoredSession();
+          stored =
+            getAppConfig().appEnv === 'development'
+              ? await withTimeout(
+                  readStoredSession(),
+                  developmentSessionRestoreTimeoutMs,
+                  sessionRestoreTimeoutLabel,
+                )
+              : await readStoredSession();
         } catch (error) {
+          if (isSessionRestoreTimeoutError(error)) {
+            // Simulator SecureStore can hang instead of resolving. Fail open so
+            // Profile is not stuck on "Restoring your session…" (#1387).
+            lockedPending = false;
+            setSession({ ...signedOut, isRestoring: false });
+            return;
+          }
           if (isKeychainLockedError(error)) {
             // Keep isRestoring. A locked read is not sign-out and must not unhandled-reject.
             lockedPending = true;
@@ -450,6 +515,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         return false;
       }
 
+      if (releaseSmokeEmbedEnabled()) {
+        const expiresAt = Date.now() + Math.max(smokeAuthExpiresInSeconds - 30, 30) * 1000;
+        applyTokenState({
+          accessToken: token,
+          refreshToken: smokeAuthRefreshPlaceholder,
+          expiresAt,
+        });
+        const profile = await loadProfile(token);
+        applyProfile(token, profile);
+        return true;
+      }
+
       await applyTokens({
         accessToken: token,
         refreshToken: smokeAuthRefreshPlaceholder,
@@ -457,7 +534,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       });
       return true;
     },
-    [applyTokens],
+    [applyProfile, applyTokenState, applyTokens],
   );
 
   useEffect(() => {
@@ -560,6 +637,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [applyTokens],
   );
 
+  const signInWithPassword = useCallback(
+    async (email: string, password: string) => {
+      const tokens = await requestPasswordTokens(getAppConfig().apiBaseUrl, email, password);
+      await applyTokens(tokens);
+    },
+    [applyTokens],
+  );
+
   const signOut = useCallback(async () => {
     // Current tokens/profile are read via sessionRef / refreshTokenRef so this
     // callback identity stays stable across token refresh and /me.
@@ -612,13 +697,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const actions = useMemo<SessionActions>(
     () => ({
       signIn,
+      signInWithPassword,
       applySmokeSession,
       signOut,
       refreshProfile,
       ensureAccessToken,
       setAccessToken,
     }),
-    [applySmokeSession, ensureAccessToken, refreshProfile, setAccessToken, signIn, signOut],
+    [applySmokeSession, ensureAccessToken, refreshProfile, setAccessToken, signIn, signInWithPassword, signOut],
   );
 
   return (

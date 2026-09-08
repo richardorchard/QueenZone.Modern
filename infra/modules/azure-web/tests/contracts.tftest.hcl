@@ -83,6 +83,21 @@ run "dev_rejects_production_hostname" {
   expect_failures = [var.custom_hostnames]
 }
 
+run "migration_candidate_allows_direct_ingress_without_custom_hostnames" {
+  command = plan
+
+  variables {
+    environment_name    = "migration"
+    allow_direct_access = true
+    custom_hostnames    = {}
+  }
+
+  assert {
+    condition     = azurerm_linux_web_app.production.site_config[0].ip_restriction_default_action == "Allow" && length(azurerm_app_service_custom_hostname_binding.production) == 0
+    error_message = "The migration candidate must be directly testable before DNS cutover and must not claim production hostnames."
+  }
+}
+
 run "dev_managed_tls_after_dns" {
   command = plan
   variables {
