@@ -80,11 +80,11 @@ export const testIds = {
   pendingMessage: 'pending-message',
   pendingForumPost: 'pending-forum-post',
   forumNewThread: 'forum-new-thread',
+  forumComposerBody: 'forum-composer-body',
   forumComposerAttachPhotos: 'forum-composer-attach-photos',
   forumComposerAttachFiles: 'forum-composer-attach-files',
   forumComposerAttachInject: 'forum-composer-attach-inject',
   forumComposerAttachment: 'forum-composer-attachment',
-  forumComposerBody: 'forum-composer-body',
   forumComposerSubmit: 'forum-composer-submit',
 
   profileSignedOut: 'profile-signed-out',

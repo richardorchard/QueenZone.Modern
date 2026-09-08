@@ -47,15 +47,19 @@ appId: org.queenzone.mobile
     visible:
       id: forum-composer-attach-files
     timeout: 20000
+# Placeholder "Write a reply" is not a tappable iOS text node (#1387).
 - tapOn:
     id: forum-composer-body
 - inputText: Journey attach reply
+# Android marks the wrapped inject control visible:false while the
+# keyboard covers it (Release embed still mounts the testID).
 - hideKeyboard
 - tapOn:
     id: forum-composer-attach-files
-- extendedWaitUntil:
-    visible:
+- scrollUntilVisible:
+    element:
       id: forum-composer-attach-inject
+    direction: DOWN
     timeout: 15000
 - runFlow:
     when:

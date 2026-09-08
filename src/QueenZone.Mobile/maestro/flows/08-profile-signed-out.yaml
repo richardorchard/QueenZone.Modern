@@ -4,9 +4,8 @@ appId: org.queenzone.mobile
     id: tab-home
 - tapOn:
     id: home-profile
-# Session restore can still be finishing when Profile mounts. Wait it out
-# before asserting signed-out — a hang is a product bug (#1387), a short
-# restore is not.
+# Release smoke embeds skip SecureStore restore (#1393 / #1387). If a
+# leftover restoring frame still paints, wait it out before signed-out.
 - extendedWaitUntil:
     notVisible:
       id: profile-restoring

@@ -15,6 +15,11 @@ function readRepo(relFromWorkflowsOrScripts: string, base: URL): string {
 }
 
 describe('Maestro device flows (#1281)', () => {
+  it('always reselects ForumIndex so Home to Forum cannot restore leftover Category', () => {
+    const nav = readFileSync(new URL('../navigation/RootNavigator.tsx', import.meta.url), 'utf8');
+    assert.match(nav, /reselectRoot\('ForumTab', 'ForumIndex', \{ always: true \}\)/);
+  });
+
   it('does not add journeys to smoke.yaml', () => {
     const smoke = readMaestro('smoke.yaml');
     assert.match(smoke, /flows\/01-launch\.yaml/);
@@ -50,6 +55,24 @@ describe('Maestro device flows (#1281)', () => {
     assert.match(
       forum,
       /id: forum-thread-screen[\s\S]*id: forum-thread-back[\s\S]*id: forum-category-screen[\s\S]*id: tab-forum[\s\S]*id: forum-screen/,
+    );
+  });
+
+  it('waits out profile-restoring before asserting signed-out profile', () => {
+    const profile = readMaestro('flows/08-profile-signed-out.yaml');
+    assert.match(
+      profile,
+      /id: home-profile[\s\S]*notVisible:[\s\S]*id: profile-restoring[\s\S]*id: profile-signed-out/,
+    );
+  });
+
+  it('types the attach reply through a composer testID and reveals inject after hideKeyboard', () => {
+    const attach = readMaestro('flows/10-forum-attach.yaml');
+    assert.match(attach, /id: forum-composer-body/);
+    assert.doesNotMatch(attach, /text: Write a reply/);
+    assert.match(
+      attach,
+      /id: forum-composer-body[\s\S]*hideKeyboard[\s\S]*id: forum-composer-attach-files[\s\S]*forum-composer-attach-inject/,
     );
   });
 

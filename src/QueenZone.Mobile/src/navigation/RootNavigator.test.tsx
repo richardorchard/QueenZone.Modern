@@ -133,7 +133,7 @@ describe('RootNavigator', () => {
     expect(navigate).toHaveBeenCalledWith('ForumTab', { screen: 'ForumIndex', initial: false });
   });
 
-  it('pressing Forum after a board visit lands on ForumIndex, not leftover Category', () => {
+  it('pressing Forum after a leftover Category lands on ForumIndex', () => {
     const ref = createNavigationContainerRef();
     renderWithProviders(
       <NavigationContainer ref={ref}>
@@ -142,7 +142,7 @@ describe('RootNavigator', () => {
       { navigation: false },
     );
 
-    fireEvent.press(screen.getByRole('button', { name: 'Open board' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Open category' }));
     expect(ref.getCurrentRoute()?.name).toBe('Category');
 
     fireEvent.press(screen.getByLabelText('Home'));
@@ -236,7 +236,7 @@ function ForumTabRaceTabs() {
     <Tab.Navigator>
       <Tab.Screen
         name="HomeTab"
-        component={ForumHomeTabRaceScreen}
+        component={ForumHomeRaceScreen}
         options={{ title: 'Home', tabBarAccessibilityLabel: 'Home' }}
       />
       <Tab.Screen
@@ -249,7 +249,7 @@ function ForumTabRaceTabs() {
   );
 }
 
-function ForumHomeTabRaceScreen({
+function ForumHomeRaceScreen({
   navigation,
 }: {
   navigation: {
@@ -264,10 +264,10 @@ function ForumHomeTabRaceScreen({
       <Text>Home screen</Text>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Open board"
+        accessibilityLabel="Open category"
         onPress={() => navigation.navigate('ForumTab', nestedTabParams('Category', { id: 1 }))}
       >
-        <Text>Open board</Text>
+        <Text>Open category</Text>
       </Pressable>
     </>
   );
