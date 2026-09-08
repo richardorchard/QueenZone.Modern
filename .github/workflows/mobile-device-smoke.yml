@@ -124,6 +124,7 @@ jobs:
           npx expo prebuild --platform android
           cd android
           ./gradlew assembleRelease
+          ./gradlew --stop
 
       - name: Install Maestro
         working-directory: .
@@ -415,6 +416,7 @@ jobs:
           npx expo prebuild --platform android
           cd android
           ./gradlew assembleRelease
+          ./gradlew --stop
 
       - name: Install Maestro
         working-directory: .

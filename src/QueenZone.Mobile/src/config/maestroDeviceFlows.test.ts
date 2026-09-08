@@ -201,6 +201,11 @@ describe('device-smoke harness (#1281)', () => {
     assert.match(workflow, /SUITE="release"/);
   });
 
+  it('releases Gradle memory before either hosted Android emulator starts', () => {
+    const workflow = readRepo('mobile-device-smoke.yml', workflowsDir);
+    assert.equal((workflow.match(/\.\/gradlew --stop/g) ?? []).length, 2);
+  });
+
   it('prepends the Maestro install dir before probing PATH', () => {
     const script = readRepo('run-mobile-device-smoke.sh', scriptsDir);
     assert.match(script, /HOME\}\/\.maestro\/bin/);
