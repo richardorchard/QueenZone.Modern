@@ -30,6 +30,7 @@ const {
  * Override at start/build time:
  *   EXPO_PUBLIC_APP_ENV=staging|production|development
  *   EXPO_PUBLIC_API_BASE_URL=https://localhost:7162
+ *   EXPO_PUBLIC_TELEMETRYDECK_APP_ID=<public TelemetryDeck app identifier>
  *   ANDROID_VERSION_CODE=<positive integer> (Play versionCode; see GITHUB_RUN_NUMBER)
  *   IOS_BUILD_NUMBER=<positive integer> (TestFlight CFBundleVersion; see GITHUB_RUN_NUMBER)
  *   GITHUB_RUN_NUMBER=<positive integer> (store Version `{prefix}.{run}` + integer build)
@@ -104,6 +105,9 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       // Baked at prebuild into EXConstants so published JS bundles still
       // initialize Sentry when Metro does not inherit EXPO_PUBLIC_SENTRY_DSN.
       sentryDsn: (process.env.EXPO_PUBLIC_SENTRY_DSN ?? '').trim() || undefined,
+      // Public identifier only. Unset keeps product analytics disabled.
+      telemetryDeckAppId:
+        (process.env.EXPO_PUBLIC_TELEMETRYDECK_APP_ID ?? '').trim() || undefined,
       // Baked so Release smoke/journeys can still accept queenzone://smoke-auth
       // while store Release (no flag) stays closed (#1322).
       smokeEmbed: smokeEmbed || undefined,

@@ -85,6 +85,9 @@ export function ProfileScreen({ navigation }: Props) {
         <Pressable accessibilityRole="button" onPress={() => navigation.navigate('Contact')}>
           <Text style={[type.button, { color: c.accentPrimary }]}>Contact</Text>
         </Pressable>
+        <Pressable accessibilityRole="button" onPress={() => navigation.navigate('AnalyticsSettings')}>
+          <Text style={[type.button, { color: c.accentPrimary }]}>Analytics preferences</Text>
+        </Pressable>
         <ArchiveFooter />
       </ScrollView>
     );
@@ -156,6 +159,11 @@ export function ProfileScreen({ navigation }: Props) {
       />
       <SettingsRow title="Suggest news" onPress={() => openSuggestNews(navigation)} />
       <SettingsRow title="Contact" onPress={() => navigation.navigate('Contact')} />
+      <SettingsRow
+        title="Analytics preferences"
+        subtitle="Control anonymous app-usage analytics."
+        onPress={() => navigation.navigate('AnalyticsSettings')}
+      />
       <View style={{ paddingHorizontal: space.xl, paddingTop: space.xl, paddingBottom: space.xl, gap: 10 }}>
         <Button label="Sign out" variant="outline" loading={busy} onPress={() => void onSignOut()} />
       </View>
