@@ -118,8 +118,19 @@ public sealed class SearchReindexBuilder(
 
     public async Task ReindexBiographyAsync(CancellationToken cancellationToken = default)
     {
-        var chapters = await biographyRepository.GetChaptersAsync(cancellationToken);
-        var documents = chapters.Select(MapBiographyChapter).ToList();
+        var listedChapters = await biographyRepository.GetChaptersAsync(cancellationToken);
+        var documents = new List<SearchDocumentEntity>(listedChapters.Count);
+
+        // The public list projection (legacy Q_BIO list SP / EfBiographyRepository.MapListRow)
+        // leaves Body empty. Detail reads carry BIO_TEXT, which is what members search.
+        foreach (var listed in listedChapters)
+        {
+            var detail = await biographyRepository.GetByIdAsync(listed.Id, cancellationToken);
+            var chapter = detail is null || string.IsNullOrWhiteSpace(detail.Body)
+                ? listed
+                : listed with { Body = detail.Body };
+            documents.Add(MapBiographyChapter(chapter));
+        }
 
         await searchIndexService.ReplaceContentTypeAsync(SiteSearchContentType.Biography, documents, cancellationToken);
     }
@@ -127,7 +138,15 @@ public sealed class SearchReindexBuilder(
     public async Task ReindexDiscographyAsync(CancellationToken cancellationToken = default)
     {
         var albums = await discographyRepository.GetAlbumsAsync(cancellationToken);
-        var documents = albums.Select(MapAlbum).ToList();
+        var documents = new List<SearchDocumentEntity>(albums.Count);
+
+        // Album list rows are name-only. Track titles live on the album detail so a song
+        // query can hit the album document without adding a second content type.
+        foreach (var album in albums)
+        {
+            var detail = await discographyRepository.GetAlbumByIdAsync(album.AlbumId, cancellationToken);
+            documents.Add(MapAlbum(album, detail));
+        }
 
         await searchIndexService.ReplaceContentTypeAsync(SiteSearchContentType.Discography, documents, cancellationToken);
     }
@@ -192,19 +211,27 @@ public sealed class SearchReindexBuilder(
         };
     }
 
-    private static SearchDocumentEntity MapAlbum(AlbumSummary album) =>
-        new()
+    private static SearchDocumentEntity MapAlbum(AlbumSummary album, AlbumDetail? detail)
+    {
+        var trackTitles = detail?.Songs
+            .Select(song => song.Title)
+            .Where(title => !string.IsNullOrWhiteSpace(title))
+            ?? [];
+        var body = string.Join('\n', new[] { album.Name }.Concat(trackTitles));
+
+        return new SearchDocumentEntity
         {
             SourceKey = $"discography:{album.AlbumId}",
             ContentType = SiteSearchContentType.Discography,
             Title = album.Name,
-            Body = album.Name,
+            Body = body,
             Summary = album.Name,
             Url = DiscographyRoutes.GetAlbumPath(album),
             PublishedAt = album.ReleaseYear.HasValue
                 ? new DateTimeOffset(album.ReleaseYear.Value, 1, 1, 0, 0, 0, TimeSpan.Zero)
                 : null,
         };
+    }
 
     private static SearchDocumentEntity MapTimelineEvent(QueenHistoryEvent historyEvent) =>
         new()
