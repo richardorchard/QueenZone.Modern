@@ -391,6 +391,7 @@ function ComposerForm({ navigation, route }: Props) {
           placeholder={mode === 'reply' ? 'Write a reply' : 'Write the first post'}
           placeholderTextColor={c.textMuted}
           accessibilityLabel={mode === 'reply' ? 'Reply body' : 'Topic body'}
+          testID={testIds.forumComposerBody}
           multiline
           textAlignVertical="top"
           style={[
