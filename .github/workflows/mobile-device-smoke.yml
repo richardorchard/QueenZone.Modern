@@ -20,6 +20,15 @@ on:
           - release
           - both
         default: smoke
+      platform:
+        description: "Device platform to run"
+        required: false
+        type: choice
+        options:
+          - both
+          - android
+          - ios
+        default: both
       prove_failure:
         description: "Run the forced-assertion flow to prove failure artifacts (smoke only)"
         required: false
@@ -35,7 +44,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: mobile-device-${{ github.event.inputs.suite || github.event.schedule || 'smoke' }}-${{ github.ref }}
+  group: mobile-device-${{ github.event.inputs.suite || github.event.schedule || 'smoke' }}-${{ github.event.inputs.platform || 'both' }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -48,7 +57,8 @@ jobs:
     if: >-
       (github.event_name == 'schedule' && github.event.schedule == '0 4 * * 1-5')
       || (github.event_name == 'workflow_dispatch'
-        && (github.event.inputs.suite == 'smoke' || github.event.inputs.suite == 'both'))
+        && (github.event.inputs.suite == 'smoke' || github.event.inputs.suite == 'both')
+        && (github.event.inputs.platform == 'android' || github.event.inputs.platform == 'both'))
     runs-on: ubuntu-latest
     timeout-minutes: 90
     defaults:
@@ -198,7 +208,8 @@ jobs:
     if: >-
       (github.event_name == 'schedule' && github.event.schedule == '0 4 * * 1-5')
       || (github.event_name == 'workflow_dispatch'
-        && (github.event.inputs.suite == 'smoke' || github.event.inputs.suite == 'both'))
+        && (github.event.inputs.suite == 'smoke' || github.event.inputs.suite == 'both')
+        && (github.event.inputs.platform == 'ios' || github.event.inputs.platform == 'both'))
     runs-on: macos-26
     timeout-minutes: 90
     defaults:
@@ -340,7 +351,8 @@ jobs:
       || (github.event_name == 'workflow_dispatch'
         && (github.event.inputs.suite == 'journeys'
           || github.event.inputs.suite == 'release'
-          || github.event.inputs.suite == 'both'))
+          || github.event.inputs.suite == 'both')
+        && (github.event.inputs.platform == 'android' || github.event.inputs.platform == 'both'))
     runs-on: ubuntu-latest
     timeout-minutes: 90
     defaults:
@@ -489,7 +501,8 @@ jobs:
       || (github.event_name == 'workflow_dispatch'
         && (github.event.inputs.suite == 'journeys'
           || github.event.inputs.suite == 'release'
-          || github.event.inputs.suite == 'both'))
+          || github.event.inputs.suite == 'both')
+        && (github.event.inputs.platform == 'ios' || github.event.inputs.platform == 'both'))
     runs-on: macos-26
     timeout-minutes: 90
     defaults:

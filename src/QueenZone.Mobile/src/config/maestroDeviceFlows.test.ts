@@ -200,6 +200,9 @@ describe('device-smoke harness (#1281)', () => {
     assert.equal(workflow.match(/github\.event\.inputs\.suite == 'release'/g)?.length, 2);
     assert.match(workflow, /DEVICE_SUITE_ARGS=--suite release/);
     assert.match(workflow, /SUITE="release"/);
+    assert.match(workflow, /platform:[\s\S]*- both[\s\S]*- android[\s\S]*- ios/);
+    assert.equal(workflow.match(/github\.event\.inputs\.platform == 'android'/g)?.length, 2);
+    assert.equal(workflow.match(/github\.event\.inputs\.platform == 'ios'/g)?.length, 2);
   });
 
   it('releases Gradle memory before either hosted Android emulator starts', () => {

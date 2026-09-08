@@ -565,8 +565,9 @@ names to branch protection until soak. `smoke.yaml` stays exactly the
 9 #872 flows.
 
 The manual P0 release suite (`maestro/release.yaml`, #1411) is a third,
-independent layer. Dispatch `suite=release` to run it on Android and iOS
-against a fresh Testing host. Its three isolated flows authenticate with the
+independent layer. Dispatch `suite=release` against a fresh Testing host. It
+runs on Android and iOS (`platform=both`, the default), or one selected platform
+for focused diagnostics. Its three isolated flows authenticate with the
 Testing-only token and verify private-message compose/reply/archive/unarchive,
 forum topic creation and reply, and a news suggestion appearing under My
 submissions. It does not exercise real OAuth, SecureStore restoration, signed
