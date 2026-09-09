@@ -1,0 +1,6 @@
+appId: org.queenzone.mobile
+name: QueenZone mobile release P0
+---
+- runFlow: flows/13-messages-lifecycle.yaml
+- runFlow: flows/14-forum-create-reply.yaml
+- runFlow: flows/15-news-suggestion.yaml

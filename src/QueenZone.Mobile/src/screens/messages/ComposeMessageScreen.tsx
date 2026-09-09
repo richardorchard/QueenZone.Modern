@@ -23,6 +23,7 @@ import { enqueueMessageCompose, flushOfflineQueue, removeOfflineItem } from '../
 import { MemberGate } from '../../session/MemberGate';
 import { useSession } from '../../session/SessionContext';
 import { fonts, radius, space, type, useTheme } from '../../theme';
+import { testIds } from '../../test/testIds';
 import { Button } from '../../ui/Button';
 import { conversationBodyMaxLength, validateReplyBody } from './inboxMeta';
 
@@ -180,6 +181,7 @@ function ComposeForm({ navigation }: Pick<Props, 'navigation'>) {
         ) : (
           <>
             <TextInput
+              testID={testIds.composeMessageRecipient}
               value={query}
               onChangeText={setQuery}
               placeholder="Search by display name"
@@ -210,6 +212,7 @@ function ComposeForm({ navigation }: Pick<Props, 'navigation'>) {
               style={styles.matches}
               renderItem={({ item }) => (
                 <Pressable
+                  testID={`${testIds.composeMessageRecipientPrefix}${item.memberId}`}
                   onPress={() => {
                     setRecipient(item);
                     setQuery(item.displayName);
@@ -229,6 +232,7 @@ function ComposeForm({ navigation }: Pick<Props, 'navigation'>) {
 
         <Text style={[type.meta, { color: c.textMuted, marginTop: space.md }]}>Message</Text>
         <TextInput
+          testID={testIds.composeMessageBody}
           value={draft}
           onChangeText={setDraft}
           placeholder="Write a message"
@@ -252,6 +256,7 @@ function ComposeForm({ navigation }: Pick<Props, 'navigation'>) {
         {submitError ? <Text style={[type.caption, { color: c.textSecondary }]}>{submitError}</Text> : null}
         <Button
           label="Send message"
+          testID={testIds.composeMessageSubmit}
           onPress={() => {
             void submit();
           }}

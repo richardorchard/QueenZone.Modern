@@ -391,6 +391,7 @@ function ComposerForm({ navigation, route }: Props) {
 
         {mode === 'newTopic' ? (
           <TextInput
+            testID={testIds.forumComposerTitle}
             value={title}
             onChangeText={setTitle}
             placeholder="Topic title"

@@ -1,0 +1,85 @@
+appId: org.queenzone.mobile
+name: Create forum topic and reply
+---
+- launchApp:
+    clearState: true
+    clearKeychain: true
+- extendedWaitUntil:
+    visible:
+      id: home-screen
+    timeout: 45000
+- runFlow: open-smoke-auth.yaml
+- tapOn:
+    id: tab-forum
+- extendedWaitUntil:
+    visible:
+      id: forum-screen
+    timeout: 20000
+- tapOn:
+    id: forum-board-1
+- extendedWaitUntil:
+    visible:
+      id: forum-category-screen
+    timeout: 20000
+- tapOn:
+    id: forum-new-thread
+- extendedWaitUntil:
+    visible:
+      id: forum-composer-title
+    timeout: 15000
+- tapOn:
+    id: forum-composer-title
+- inputText: Release forum lifecycle
+- tapOn:
+    id: forum-composer-body
+- inputText: Release forum first post
+# A static ScrollView tap dismisses the iOS multiline keyboard; Maestro's
+# generic hideKeyboard cannot dismiss this return-key configuration.
+- tapOn:
+    text: '^The Music$'
+- scrollUntilVisible:
+    element:
+      id: forum-composer-submit
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: forum-composer-submit
+- extendedWaitUntil:
+    visible:
+      id: forum-thread-screen
+    timeout: 20000
+- assertVisible: Release forum lifecycle
+- assertVisible: Release forum first post
+- scrollUntilVisible:
+    element:
+      id: forum-thread-reply
+    direction: DOWN
+    timeout: 20000
+- tapOn:
+    id: forum-thread-reply
+- extendedWaitUntil:
+    visible:
+      id: forum-composer-body
+    timeout: 15000
+- tapOn:
+    id: forum-composer-body
+- inputText: Release forum reply
+- tapOn:
+    text: '^Release forum lifecycle$'
+- scrollUntilVisible:
+    element:
+      id: forum-composer-submit
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: forum-composer-submit
+- extendedWaitUntil:
+    visible:
+      id: forum-thread-screen
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      text: Release forum reply
+    direction: DOWN
+    timeout: 20000
+- assertVisible: Release forum reply

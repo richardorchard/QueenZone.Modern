@@ -95,6 +95,23 @@ describe('ProfileScreen', () => {
     expect(screen.getByRole('button', { name: 'Analytics preferences' })).toBeOnTheScreen();
   });
 
+  it('opens My submissions from the member profile', async () => {
+    const navigation = fakeNavigation();
+    const user = userEvent.setup();
+    mockSession.isSignedIn = true;
+    mockSession.displayName = 'Freddie';
+    mockSession.profile = memberProfileFixture();
+    mockSession.refreshProfile.mockResolvedValue(mockSession.profile);
+    renderWithProviders(
+      <ProfileScreen navigation={navigation as never} route={{ key: 'profile', name: 'Profile' } as never} />,
+      { navigation: false },
+    );
+
+    await user.press(screen.getByTestId('profile-my-submissions'));
+
+    expect(navigation.navigate).toHaveBeenCalledWith('MySubmissions');
+  });
+
   it('calls sign out and shows a busy control while it is pending', async () => {
     const user = userEvent.setup();
     mockSession.isSignedIn = true;
