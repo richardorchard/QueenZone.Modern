@@ -263,6 +263,9 @@ public sealed class EfNewsSectionLiveProbeTests
             await dbContext.NewsAuditLogs
                 .Where(entry => entry.NewsId == newsId)
                 .ExecuteDeleteAsync();
+            await SearchDocumentTeardown.DeleteBySourceKeysAsync(
+                dbContext,
+                [SearchDocumentSourceKey.ForNews(newsId)]);
 
             Assert.Null(await adminRepository.GetByIdAsync(newsId));
             Assert.False(await dbContext.NewsAuditLogs.AnyAsync(entry => entry.NewsId == newsId));

@@ -384,6 +384,15 @@ public sealed class SearchApiTests : IClassFixture<QueenZoneWebApplicationFactor
         Assert.Equal(expected, SearchDocumentSourceKey.TryParseNumericId(sourceKey));
     }
 
+    [Fact]
+    public void Source_key_factories_match_reindex_shapes()
+    {
+        Assert.Equal("news:42", SearchDocumentSourceKey.ForNews(42));
+        Assert.Equal("article:community-slug", SearchDocumentSourceKey.ForArticle("community-slug"));
+        Assert.Equal("biography:7", SearchDocumentSourceKey.ForBiography(7));
+        Assert.Equal("forum-thread:4521", SearchDocumentSourceKey.ForForumThread(4521));
+    }
+
     private static SiteSearchResult SampleResult(string contentType, string sourceKey, string url) =>
         new(contentType, sourceKey, "Title", "Plain excerpt", url, null, null, null, null);
 }
