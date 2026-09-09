@@ -92,7 +92,7 @@ function rewriteLoopbackForAndroid(apiBaseUrl, platform) {
  *
  * @type {string}
  */
-const marketingVersionPrefix = '0.1';
+const marketingVersionPrefix = '1.0';
 
 /**
  * @param {string | undefined | null} prefix
