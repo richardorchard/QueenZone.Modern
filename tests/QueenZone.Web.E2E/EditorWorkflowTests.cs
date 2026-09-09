@@ -107,6 +107,70 @@ public class EditorWorkflowTests : E2EPageTest
         await Expect(Page.GetByText("Article saved.")).ToBeVisibleAsync();
     }
 
+    [Test]
+    public async Task AdminCanPanCroppedImageUnderFixedCard()
+    {
+        await GotoAdminAsync("/admin/news/new");
+        var imagePath = Path.GetFullPath(
+            Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "design", "crest.jpg"));
+        await Page.GetByLabel("Article image").SetInputFilesAsync(imagePath);
+
+        var dialog = Page.Locator("[data-article-image-dialog]");
+        await Expect(dialog).ToBeVisibleAsync();
+        await Expect(dialog.GetByText("Drag the photo to position it. Zoom to tighten the crop."))
+            .ToBeVisibleAsync();
+
+        await Page.WaitForFunctionAsync("""
+            () => {
+              const img = document.querySelector("[data-article-image-stage-img]");
+              return !!(img && img.cropper && img.cropper.ready);
+            }
+            """);
+
+        await Page.Locator("[data-article-image-zoom]").EvaluateAsync("""
+            (input) => {
+              const max = Number(input.max);
+              const min = Number(input.min);
+              input.value = String(min + (max - min) * 0.6);
+              input.dispatchEvent(new Event("input", { bubbles: true }));
+            }
+            """);
+
+        var afterZoom = await ReadStageCropAsync();
+        var stage = Page.Locator("[data-article-image-stage]");
+        var box = await stage.BoundingBoxAsync();
+        Assert.That(box, Is.Not.Null);
+        await Page.Mouse.Move(box!.X + box.Width * 0.55, box.Y + box.Height * 0.55);
+        await Page.Mouse.DownAsync();
+        await Page.Mouse.Move(box.X + box.Width * 0.2, box.Y + box.Height * 0.2, new() { Steps = 12 });
+        await Page.Mouse.UpAsync();
+
+        var after = await ReadStageCropAsync();
+        Assert.That(after.Width / (double)after.Height, Is.EqualTo(1.5).Within(0.05));
+        Assert.That(
+            Math.Abs(after.X - afterZoom.X) + Math.Abs(after.Y - afterZoom.Y),
+            Is.GreaterThan(8),
+            "Pointer drag should pan the framed crop, not leave a centered default.");
+
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Use this crop" }).ClickAsync();
+        Assert.That(await Page.Locator("[data-crop-x]").InputValueAsync(), Is.EqualTo(after.X.ToString()));
+        Assert.That(await Page.Locator("[data-crop-y]").InputValueAsync(), Is.EqualTo(after.Y.ToString()));
+        Assert.That(await Page.Locator("[data-crop-width]").InputValueAsync(), Is.EqualTo(after.Width.ToString()));
+        Assert.That(await Page.Locator("[data-crop-height]").InputValueAsync(), Is.EqualTo(after.Height.ToString()));
+    }
+
+    private async Task<(int X, int Y, int Width, int Height)> ReadStageCropAsync()
+    {
+        var data = await Page.EvaluateAsync<int[]>("""
+            () => {
+              const img = document.querySelector("[data-article-image-stage-img]");
+              const crop = img.cropper.getData(true);
+              return [crop.x, crop.y, crop.width, crop.height];
+            }
+            """);
+        return (data[0], data[1], data[2], data[3]);
+    }
+
     private async Task GotoAdminAsync(string path)
     {
         var response = await Page.GotoAsync(path);

@@ -1,0 +1,15 @@
+<dialog class="admin-article-crop" data-article-image-dialog>
+  <h2 class="admin-article-crop__title">Crop article image</h2>
+  <p class="qz-help">Drag the photo to position it. Zoom to tighten the crop.</p>
+  <div class="admin-article-crop__stage" data-article-image-stage>
+    <img alt="" data-article-image-stage-img>
+  </div>
+  <label class="admin-article-crop__zoom">
+    Zoom
+    <input type="range" min="1" max="3" step="any" value="1" data-article-image-zoom disabled>
+  </label>
+  <div class="admin-form-actions">
+    <button type="button" class="qz-button" data-article-image-apply>Use this crop</button>
+    <button type="button" class="qz-button qz-button--outline" data-article-image-cancel>Cancel</button>
+  </div>
+</dialog>

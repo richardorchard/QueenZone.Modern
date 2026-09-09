@@ -44,7 +44,7 @@
           <input type="file" asp-for="Form.ArticleImage" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" data-article-image-input class="visually-hidden" />
         </div><p class="qz-error" data-article-image-error hidden></p>
         <input type="hidden" asp-for="Form.CropX" data-crop-x /><input type="hidden" asp-for="Form.CropY" data-crop-y /><input type="hidden" asp-for="Form.CropWidth" data-crop-width /><input type="hidden" asp-for="Form.CropHeight" data-crop-height />
-        <dialog class="admin-article-crop" data-article-image-dialog><h2>Crop article image</h2><p class="qz-help">Drag to frame the 3:2 card.</p><div class="admin-article-crop__stage" data-article-image-stage><img alt="" data-article-image-stage-img /></div><label class="admin-article-crop__zoom">Zoom <input type="range" min="1" max="3" step="any" value="1" data-article-image-zoom disabled /></label><div class="admin-form-actions"><button type="button" class="qz-button" data-article-image-apply>Use this crop</button><button type="button" class="qz-button qz-button--outline" data-article-image-cancel>Cancel</button></div></dialog>
+        <partial name="_ArticleImageCropDialog" />
       </div>
     </fieldset>
     <div class="admin-form-actions"><button class="qz-button" type="submit">Save draft</button>@if (f.Id is not null) { <a class="qz-button qz-button--ghost" href="/admin/articles/editor/@f.Id/preview">Preview</a> }</div>

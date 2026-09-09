@@ -96,6 +96,7 @@
       }
 
       cropper.zoomTo(Number(zoomInput.value) || baseRatio);
+      fillStageCropBox();
     });
 
     applyButton && applyButton.addEventListener("click", function () {
@@ -239,13 +240,18 @@
     function startCropper() {
       destroyCropper();
       zoomInput.disabled = false;
+      // Lock #1439: pan the photo under a fixed 3:2 card. viewMode 3 covers
+      // the stage so the outline is the viewport, not a free-floating box.
       cropper = new Cropper(stageImg, {
         aspectRatio: aspectWidth / aspectHeight,
-        viewMode: 2,
+        viewMode: 3,
         autoCropArea: 1,
         dragMode: "move",
         cropBoxMovable: false,
         cropBoxResizable: false,
+        toggleDragModeOnDblclick: false,
+        modal: false,
+        background: false,
         guides: false,
         center: false,
         highlight: false,
@@ -255,6 +261,8 @@
         zoomable: true,
         zoomOnWheel: true,
         ready: function () {
+          cropper.setDragMode("move");
+          fillStageCropBox();
           var imageData = cropper.getImageData();
           baseRatio = imageData.width / Math.max(imageData.naturalWidth, 1);
           zoomInput.min = String(baseRatio);
@@ -271,7 +279,26 @@
           syncingZoom = true;
           zoomInput.value = String(event.detail.ratio);
           syncingZoom = false;
+          fillStageCropBox();
         }
+      });
+    }
+
+    function fillStageCropBox() {
+      if (!cropper) {
+        return;
+      }
+
+      var container = cropper.getContainerData();
+      if (!container || container.width < 1 || container.height < 1) {
+        return;
+      }
+
+      cropper.setCropBoxData({
+        left: 0,
+        top: 0,
+        width: container.width,
+        height: container.height
       });
     }
 
