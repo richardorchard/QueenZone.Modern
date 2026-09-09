@@ -14,8 +14,11 @@
 #   ./scripts/run-mobile-device-smoke.sh --platform android --suite release
 #
 # Maestro selector and assertion failures are not retried. One Android device
-# transport failure or pre-flow iOS driver-startup failure may retry after
-# device recovery.
+# transport failure (DeviceServerDied / emulator gone) or pre-flow iOS
+# driver-startup failure may retry after device recovery. android-transport-death
+# is written only when the emulator is gone or the in-process retry itself
+# dies as transport, so CI can boot a fresh emulator. A selector miss on a
+# live emulator must not retrigger that outer restart.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -117,6 +120,7 @@ unset ConnectionStrings__BlobStorage || true
 unset ConnectionStrings__SqlServerTest || true
 
 mkdir -p "$results_dir"
+rm -f "$results_dir/android-transport-death"
 {
   echo "started_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   echo "platform=$platform"
@@ -476,6 +480,61 @@ if [ "$suite" = "journeys" ]; then
 fi
 
 maestro_console_log="$results_dir/maestro-console.log"
+# DeviceServerDiedException, viewHierarchy DEADLINE_EXCEEDED, and a vanished
+# emulator-5554 are transport death. JUnit "Unknown error" alone is not.
+android_transport_re="DeviceServerDiedException|Device server died|device offline|DEADLINE_EXCEEDED|host:transport:|device 'emulator-[0-9]+' not found"
+
+android_emulator_gone() {
+  [ "$(adb get-state 2>/dev/null || true)" != "device" ]
+}
+
+android_transport_died() {
+  local dir="${1:-$results_dir}"
+  if [ -f "$dir/junit.xml" ] && grep -Eq "$android_transport_re" "$dir/junit.xml"; then
+    return 0
+  fi
+  if [ -f "$maestro_console_log" ] && grep -Eq "$android_transport_re" "$maestro_console_log"; then
+    return 0
+  fi
+  if [ -d "$dir/debug" ] && grep -ERq "$android_transport_re" "$dir/debug"; then
+    return 0
+  fi
+  if command -v adb >/dev/null && android_emulator_gone; then
+    return 0
+  fi
+  return 1
+}
+
+# After the first-attempt JUnit/debug were moved aside, only the in-process
+# retry artifacts remain. Do not read maestro-console.log (tee -a still holds
+# the first DeviceServerDied lines) or android-transport-death (must not
+# self-satisfy). A home-hero / smoke-auth miss on a live emulator is a
+# selector miss.
+android_latest_attempt_transport_died() {
+  local dir="${1:-$results_dir}"
+  if [ -f "$dir/junit.xml" ] && grep -Eq "$android_transport_re" "$dir/junit.xml"; then
+    return 0
+  fi
+  if [ -d "$dir/debug" ] && grep -ERq "$android_transport_re" "$dir/debug"; then
+    return 0
+  fi
+  if command -v adb >/dev/null && android_emulator_gone; then
+    return 0
+  fi
+  return 1
+}
+
+write_android_transport_marker() {
+  local reason="${1:-device-server-or-emulator-transport-loss}"
+  {
+    echo "class=transport_death"
+    echo "reason=$reason"
+    echo "detected_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    echo "adb_state=$(adb get-state 2>/dev/null || echo missing)"
+  } > "$results_dir/android-transport-death"
+  echo "android_failure_class=transport_death reason=$reason" >> "$results_dir/harness.log"
+}
+
 run_maestro_once() {
   maestro "${maestro_args[@]}" 2>&1 | tee -a "$maestro_console_log"
   return "${PIPESTATUS[0]}"
@@ -489,12 +548,15 @@ set -e
 # Hosted Android emulators can drop off ADB while Maestro is running. Maestro
 # has emitted both a generic Unknown-error JUnit failure and the full
 # DeviceServerDiedException across observed runs. Preserve that attempt,
-# recover ADB, reinstall the same APK, and retry once. Selector and assertion
+# recover ADB, reinstall the same APK, and retry once when the emulator is
+# still alive. A hierarchy timeout is not a product assert failure. If the
+# emulator process is gone, write android-transport-death so CI can boot a
+# fresh emulator and rerun the same flows. A selector miss after a live
+# in-process retry must not write that marker. Selector and assertion
 # failures stay single-attempt.
 if [ "$platform" = "android" ] \
   && [ "$maestro_status" -ne 0 ] \
-  && [ -d "$results_dir/debug" ] \
-  && grep -ERq 'DeviceServerDiedException|Device server died|device offline' "$results_dir/debug"; then
+  && android_transport_died; then
   echo "Maestro lost the Android device transport; recovering ADB and retrying once."
   if [ -d "$results_dir/debug" ]; then
     mv "$results_dir/debug" "$results_dir/debug-android-transport-first"
@@ -506,10 +568,17 @@ if [ "$platform" = "android" ] \
   adb kill-server || true
   adb start-server
   android_ready=false
-  for _ in $(seq 1 45); do
+  for i in $(seq 1 45); do
     if [ "$(adb get-state 2>/dev/null || true)" = "device" ] \
       && [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; then
       android_ready=true
+      break
+    fi
+    # After ADB restarts, a still-running emulator may take a few seconds to
+    # reappear. A vanished qemu process never will — stop waiting so CI can
+    # boot a fresh emulator instead of burning 90s (#1432).
+    if [ "$i" -ge 5 ] && android_emulator_gone; then
+      echo "Android emulator is gone after the Maestro transport failure; a fresh-emulator job retry is required." >&2
       break
     fi
     sleep 2
@@ -520,7 +589,16 @@ if [ "$platform" = "android" ] \
     run_maestro_once
     maestro_status=$?
     set -e
+    if [ "$maestro_status" -eq 0 ]; then
+      echo "android_failure_class=recovered_after_transport_death" >> "$results_dir/harness.log"
+    elif android_latest_attempt_transport_died; then
+      write_android_transport_marker "retry-still-transport-death"
+    else
+      echo "In-process Android retry failed on a selector or assertion miss. Not requesting a fresh emulator." >&2
+      echo "android_failure_class=selector_miss" >> "$results_dir/harness.log"
+    fi
   else
+    write_android_transport_marker "emulator-gone"
     echo "Android emulator did not return online after the Maestro transport failure." >&2
   fi
 fi
@@ -553,10 +631,25 @@ fi
 
 if [ "$maestro_status" -ne 0 ]; then
   echo "Maestro failed with status $maestro_status" >&2
-  if [ -f "$results_dir/junit.xml" ]; then
+  android_failure_class="selector_miss"
+  if [ "$platform" = "android" ] \
+    && { [ -f "$results_dir/android-transport-death" ] || android_latest_attempt_transport_died; }; then
+    android_failure_class="transport_death"
+    echo "Maestro failing cause: Android device transport death" >&2
+    echo "A hierarchy timeout or dead emulator is not a selector miss." >&2
+  else
+    echo "Maestro failing cause: selector or assertion miss" >&2
+  fi
+  echo "android_failure_class=$android_failure_class" >> "$results_dir/harness.log"
+  junit_report="$results_dir/junit.xml"
+  if [ ! -f "$junit_report" ] && [ -f "$results_dir/junit-android-transport-first.xml" ]; then
+    junit_report="$results_dir/junit-android-transport-first.xml"
+  fi
+  if [ -f "$junit_report" ]; then
     node -e '
       const fs = require("fs");
       const xml = fs.readFileSync(process.argv[1], "utf8");
+      const printSelector = process.argv[2] !== "transport_death";
       const cases = [...xml.matchAll(/<testcase\b([^>]*)>([\s\S]*?)<\/testcase>/g)];
       for (const c of cases) {
         const name = /name="([^"]*)"/.exec(c[1])?.[1] ?? "?";
@@ -564,10 +657,12 @@ if [ "$maestro_status" -ne 0 ]; then
         const fail = /<failure(?:\s[^>]*)?>([^<]*)<\/failure>/.exec(c[2]);
         if (fail) {
           console.error("Maestro failing flow: " + (file || name));
-          console.error("Maestro failing selector: " + fail[1].trim());
+          if (printSelector) {
+            console.error("Maestro failing selector: " + fail[1].trim());
+          }
         }
       }
-    ' "$results_dir/junit.xml" >&2 || true
+    ' "$junit_report" "$android_failure_class" >&2 || true
   fi
   collect_diagnostics "maestro-$maestro_status"
 fi
