@@ -1,0 +1,113 @@
+appId: org.queenzone.mobile
+---
+- launchApp:
+    clearState: false
+- extendedWaitUntil:
+    visible:
+      id: home-screen
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      id: home-hero
+    timeout: 30000
+- waitForAnimationToEnd
+- takeScreenshot: 01-home
+- tapOn:
+    id: tab-news
+- extendedWaitUntil:
+    visible:
+      id: news-screen
+    timeout: 30000
+- takeScreenshot: 02-news
+- tapOn:
+    id: tab-photos
+- extendedWaitUntil:
+    visible:
+      id: photos-screen
+    timeout: 30000
+- takeScreenshot: 03-photography
+- tapOn:
+    id: tab-archive
+- extendedWaitUntil:
+    visible:
+      id: archive-hub-screen
+    timeout: 30000
+- takeScreenshot: 04-archive
+- tapOn:
+    id: tab-forum
+- extendedWaitUntil:
+    visible:
+      id: forum-screen
+    timeout: 30000
+- takeScreenshot: 05-forum
+- tapOn:
+    id: tab-home
+- scrollUntilVisible:
+    element:
+      id: home-quote
+    direction: DOWN
+    timeout: 20000
+- tapOn:
+    id: home-quote
+- extendedWaitUntil:
+    visible:
+      id: quote-screen
+    timeout: 30000
+- takeScreenshot: 06-quote
+- tapOn:
+    id: quote-back
+- tapOn:
+    id: tab-archive
+- tapOn: ".*Discography.*"
+- extendedWaitUntil:
+    visible: Discography
+    timeout: 30000
+- takeScreenshot: 07-discography
+- tapOn: ".*Archive.*"
+- scrollUntilVisible:
+    element: Fan performances
+    direction: DOWN
+    timeout: 20000
+- tapOn: Fan performances
+- extendedWaitUntil:
+    visible:
+      id: fan-performances-screen
+    timeout: 30000
+- takeScreenshot: 08-fan-performances
+- tapOn: ".*Archive.*"
+- scrollUntilVisible:
+    element: Trivia
+    direction: DOWN
+    timeout: 20000
+- tapOn: Trivia
+- extendedWaitUntil:
+    visible:
+      id: trivia-screen
+    timeout: 30000
+- takeScreenshot: 09-trivia
+- tapOn: ".*Archive.*"
+- scrollUntilVisible:
+    element: Biography
+    direction: UP
+    timeout: 20000
+- tapOn: ".*Biography.*"
+- extendedWaitUntil:
+    visible: Biography
+    timeout: 30000
+- takeScreenshot: 10-biography
+- tapOn:
+    id: tab-photos
+- tapOn:
+    point: 75%,30%
+- extendedWaitUntil:
+    visible:
+      id: photo-category-screen
+    timeout: 30000
+- takeScreenshot: 11-photo-gallery
+- tapOn:
+    point: 20%,42%
+- extendedWaitUntil:
+    visible:
+      id: photo-viewer-screen
+    timeout: 30000
+- takeScreenshot: 12-photo-viewer
