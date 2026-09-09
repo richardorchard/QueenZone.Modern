@@ -15,8 +15,10 @@
 #
 # Maestro selector and assertion failures are not retried. One Android device
 # transport failure (DeviceServerDied / emulator gone) or pre-flow iOS
-# driver-startup failure may retry after device recovery. A dead emulator
-# leaves android-transport-death so CI can boot a fresh emulator and rerun.
+# driver-startup failure may retry after device recovery. android-transport-death
+# is written only when the emulator is gone or the in-process retry itself
+# dies as transport, so CI can boot a fresh emulator. A selector miss on a
+# live emulator must not retrigger that outer restart.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -496,7 +498,23 @@ android_transport_died() {
   if [ -d "$dir/debug" ] && grep -ERq "$android_transport_re" "$dir/debug"; then
     return 0
   fi
-  if [ -f "$dir/android-transport-death" ]; then
+  if command -v adb >/dev/null && android_emulator_gone; then
+    return 0
+  fi
+  return 1
+}
+
+# After the first-attempt JUnit/debug were moved aside, only the in-process
+# retry artifacts remain. Do not read maestro-console.log (tee -a still holds
+# the first DeviceServerDied lines) or android-transport-death (must not
+# self-satisfy). A home-hero / smoke-auth miss on a live emulator is a
+# selector miss.
+android_latest_attempt_transport_died() {
+  local dir="${1:-$results_dir}"
+  if [ -f "$dir/junit.xml" ] && grep -Eq "$android_transport_re" "$dir/junit.xml"; then
+    return 0
+  fi
+  if [ -d "$dir/debug" ] && grep -ERq "$android_transport_re" "$dir/debug"; then
     return 0
   fi
   if command -v adb >/dev/null && android_emulator_gone; then
@@ -537,7 +555,6 @@ set -e
 if [ "$platform" = "android" ] \
   && [ "$maestro_status" -ne 0 ] \
   && android_transport_died; then
-  write_android_transport_marker "maestro-device-server-or-emulator-gone"
   echo "Maestro lost the Android device transport; recovering ADB and retrying once."
   if [ -d "$results_dir/debug" ]; then
     mv "$results_dir/debug" "$results_dir/debug-android-transport-first"
@@ -571,14 +588,15 @@ if [ "$platform" = "android" ] \
     maestro_status=$?
     set -e
     if [ "$maestro_status" -eq 0 ]; then
-      rm -f "$results_dir/android-transport-death"
       echo "android_failure_class=recovered_after_transport_death" >> "$results_dir/harness.log"
-    elif android_transport_died; then
+    elif android_latest_attempt_transport_died; then
       write_android_transport_marker "retry-still-transport-death"
     else
-      rm -f "$results_dir/android-transport-death"
+      echo "In-process Android retry failed on a selector or assertion miss. Not requesting a fresh emulator." >&2
+      echo "android_failure_class=selector_miss" >> "$results_dir/harness.log"
     fi
   else
+    write_android_transport_marker "emulator-gone"
     echo "Android emulator did not return online after the Maestro transport failure." >&2
   fi
 fi
@@ -612,7 +630,8 @@ fi
 if [ "$maestro_status" -ne 0 ]; then
   echo "Maestro failed with status $maestro_status" >&2
   android_failure_class="selector_miss"
-  if [ "$platform" = "android" ] && android_transport_died; then
+  if [ "$platform" = "android" ] \
+    && { [ -f "$results_dir/android-transport-death" ] || android_latest_attempt_transport_died; }; then
     android_failure_class="transport_death"
     echo "Maestro failing cause: Android device transport death" >&2
     echo "A hierarchy timeout or dead emulator is not a selector miss." >&2

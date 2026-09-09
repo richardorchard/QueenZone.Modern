@@ -274,6 +274,22 @@ describe('device-smoke harness (#1281)', () => {
       /grep -Eq 'DeviceServerDiedException\|Device server died\|device offline' "\$results_dir\/junit\.xml"/,
     );
     assert.match(script, /android-transport-death/);
+    assert.match(script, /android_latest_attempt_transport_died/);
+    assert.match(script, /write_android_transport_marker "emulator-gone"/);
+    assert.match(script, /write_android_transport_marker "retry-still-transport-death"/);
+    assert.doesNotMatch(
+      script,
+      /write_android_transport_marker "maestro-device-server-or-emulator-gone"/,
+    );
+    assert.match(
+      script,
+      /In-process Android retry failed on a selector or assertion miss\. Not requesting a fresh emulator/,
+    );
+    const firstWrite = script.indexOf('write_android_transport_marker "');
+    const recoverIdx = script.indexOf('adb reconnect offline');
+    const installIdx = script.indexOf('adb install -r "$apk"');
+    assert.ok(firstWrite >= 0 && recoverIdx >= 0 && firstWrite > recoverIdx);
+    assert.ok(installIdx >= 0 && firstWrite > installIdx);
     assert.match(script, /Maestro failing cause: Android device transport death/);
     assert.match(script, /Maestro failing cause: selector or assertion miss/);
     assert.match(script, /debug-android-transport-first/);
