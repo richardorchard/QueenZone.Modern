@@ -176,6 +176,17 @@
     "relevanceKeywords": "queen,freddie mercury,brian may,roger taylor"
   },
   {
+    "key": "planet-rock",
+    "displayName": "Planet Rock",
+    "homepageUrl": "https://www.hellorayo.co.uk/planet-rock",
+    "feedOrSiteUrl": "https://www.hellorayo.co.uk/planet-rock/news/rock-news",
+    "sourceType": "AllowlistedPage",
+    "trustTier": "Secondary",
+    "pollIntervalMinutes": 120,
+    "enabled": true,
+    "relevanceKeywords": "queen,freddie mercury,brian may,roger taylor"
+  },
+  {
     "key": "bbc-entertainment",
     "displayName": "BBC Entertainment & Arts",
     "homepageUrl": "https://www.bbc.co.uk/news/entertainment_and_arts",
