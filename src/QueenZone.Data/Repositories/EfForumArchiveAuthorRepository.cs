@@ -13,41 +13,53 @@ public sealed class EfForumArchiveAuthorRepository(QueenZoneDbContext dbContext)
         int legacyUserId,
         CancellationToken cancellationToken = default)
     {
-        var latest = await dbContext.ModernForumPosts
+        var posts = dbContext.ModernForumPosts
             .AsNoTracking()
-            .Where(post => post.AuthorLegacyUserId == legacyUserId && !post.IsHidden)
+            .Where(post => post.AuthorLegacyUserId == legacyUserId && !post.IsHidden);
+
+        // Keep identity and count in one SQL round trip. This route previously counted the same
+        // author's posts here and again while loading the page, which doubled an expensive query
+        // under crawler traffic.
+        var summary = await posts
             .OrderByDescending(post => post.PostedAt)
-            .Select(post => new { post.AuthorDisplayName, post.AuthorJoinedAt })
+            .ThenByDescending(post => post.Id)
+            .Select(post => new
+            {
+                post.AuthorDisplayName,
+                post.AuthorJoinedAt,
+                PostCount = posts.Count(),
+            })
             .FirstOrDefaultAsync(cancellationToken);
-        if (latest is null)
+        if (summary is null)
         {
             return null;
         }
 
-        var postCount = await dbContext.ModernForumPosts.CountAsync(
-            post => post.AuthorLegacyUserId == legacyUserId && !post.IsHidden,
-            cancellationToken);
-
-        return new ForumArchiveAuthorSummary(legacyUserId, latest.AuthorDisplayName, latest.AuthorJoinedAt, postCount);
+        return new ForumArchiveAuthorSummary(
+            legacyUserId,
+            summary.AuthorDisplayName,
+            summary.AuthorJoinedAt,
+            summary.PostCount);
     }
 
     public async Task<MemberPublicActivityPage> GetPostsPageAsync(
         int legacyUserId,
         int page,
         int pageSize,
+        int totalCount,
         CancellationToken cancellationToken = default)
     {
         page = Math.Max(page, 1);
         pageSize = Math.Clamp(pageSize, 1, 100);
+        totalCount = Math.Max(totalCount, 0);
 
         var query = dbContext.ModernForumPosts
             .AsNoTracking()
             .Where(post => post.AuthorLegacyUserId == legacyUserId && !post.IsHidden && post.Thread != null);
 
-        var totalCount = await query.CountAsync(cancellationToken);
-
         var rows = await query
             .OrderByDescending(post => post.PostedAt)
+            .ThenByDescending(post => post.Id)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Select(post => new

@@ -16,5 +16,6 @@ public interface IForumArchiveAuthorRepository
         int legacyUserId,
         int page,
         int pageSize,
+        int totalCount,
         CancellationToken cancellationToken = default);
 }

@@ -104,6 +104,69 @@ resource "cloudflare_zone_setting" "development_mode" {
   value      = "off"
 }
 
+# Keep high-volume archive crawlers at the edge. These four user agents were the
+# sustained source of expensive forum-author/topic reads in Application Insights
+# on 6-9 September 2026. Search-engine crawlers such as Googlebot and bingbot are
+# deliberately unaffected.
+resource "cloudflare_ruleset" "bot_blocking" {
+  zone_id     = var.zone_id
+  name        = "QueenZone custom firewall rules"
+  description = "Block crawlers proven to overload the forum archive read path"
+  kind        = "zone"
+  phase       = "http_request_firewall_custom"
+
+  rules = [{
+    ref         = "block_expensive_archive_crawlers"
+    description = "Block ClaudeBot, Amazonbot, SemrushBot, and MJ12bot"
+    expression  = <<-EOT
+      (http.host in {"queenzone.org" "www.queenzone.org"}) and (
+        http.user_agent contains "ClaudeBot" or
+        http.user_agent contains "Amazonbot" or
+        http.user_agent contains "SemrushBot" or
+        http.user_agent contains "MJ12bot"
+      )
+    EOT
+    action      = "block"
+    enabled     = true
+  }]
+}
+
+# Archive-author pages are public and identical for cookie-free visitors. Cache
+# them at Cloudflare for an hour so repeat legitimate crawler/browser requests do
+# not reach App Service or Azure SQL. Requests carrying any cookie bypass this
+# rule and retain the application's normal authentication-aware caching path.
+resource "cloudflare_ruleset" "archive_author_cache" {
+  zone_id     = var.zone_id
+  name        = "QueenZone cache rules"
+  description = "Cache expensive anonymous archive-author pages at the edge"
+  kind        = "zone"
+  phase       = "http_request_cache_settings"
+
+  rules = [{
+    ref         = "cache_anonymous_archive_authors"
+    description = "Cache cookie-free archive-author GET requests for one hour"
+    expression  = <<-EOT
+      (http.host in {"queenzone.org" "www.queenzone.org"}) and
+      (http.request.method eq "GET") and
+      starts_with(http.request.uri.path, "/forum/archive-authors/") and
+      (http.cookie eq "")
+    EOT
+    action      = "set_cache_settings"
+    enabled     = true
+
+    action_parameters = {
+      cache = true
+      edge_ttl = {
+        mode    = "override_origin"
+        default = 3600
+      }
+      browser_ttl = {
+        mode = "respect_origin"
+      }
+    }
+  }]
+}
+
 # --- DNS records (infra/import/cloudflare-hostnames.json, #624 audit) ---
 
 # comment/comment_modified_on are ignored on every record below: adding a

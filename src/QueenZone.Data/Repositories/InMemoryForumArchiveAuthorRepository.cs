@@ -26,10 +26,12 @@ public sealed class InMemoryForumArchiveAuthorRepository(IForumRepository forumR
         int legacyUserId,
         int page,
         int pageSize,
+        int totalCount,
         CancellationToken cancellationToken = default)
     {
         page = Math.Max(page, 1);
         pageSize = Math.Clamp(pageSize, 1, 100);
+        totalCount = Math.Max(totalCount, 0);
 
         var ordered = (await GetAllPostsByAuthorAsync(legacyUserId, cancellationToken))
             .OrderByDescending(entry => entry.Post.PostedAt)
@@ -49,7 +51,7 @@ public sealed class InMemoryForumArchiveAuthorRepository(IForumRepository forumR
                 AuthorDisplayName: entry.Post.AuthorUsername))
             .ToList();
 
-        return new MemberPublicActivityPage(items, ordered.Count, page, pageSize);
+        return new MemberPublicActivityPage(items, totalCount, page, pageSize);
     }
 
     private async Task<List<(ForumPostItem Post, string ThreadTitle, int TopicId)>> GetAllPostsByAuthorAsync(

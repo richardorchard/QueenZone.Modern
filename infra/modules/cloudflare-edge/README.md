@@ -4,6 +4,11 @@ Issue [#626](https://github.com/richardorchard/QueenZone.Modern/issues/626) decl
 
 The zone, public DNS records, both Worker scripts, and both Worker routes set `lifecycle { prevent_destroy = true }`. `min_tls_version` is intentionally left unmanaged: it is a dashboard default (`1.0`), not a reviewed decision (see `docs/architecture/opentofu-inventory.md`).
 
+## Archive traffic controls
+
+- The zone custom-firewall ruleset blocks `ClaudeBot`, `Amazonbot`, `SemrushBot`, and `MJ12bot` on the apex and `www` hosts. These were the crawlers proven to drive sustained Azure SQL Data IO; Googlebot and bingbot remain allowed.
+- The zone cache ruleset caches cookie-free `GET /forum/archive-authors/*` responses at the edge for one hour. Any request carrying a cookie bypasses this rule and follows the application's authentication-aware cache policy.
+
 ## Hostnames
 
 - `cdn.queenzone.org` is a straight proxy to Azure Blob Storage. It has **no** Worker route.
