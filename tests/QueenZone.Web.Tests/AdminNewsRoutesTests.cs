@@ -765,6 +765,7 @@ public sealed class AdminNewsRoutesTests : IClassFixture<QueenZoneWebApplication
         Assert.Contains($"data-min-crop-width=\"{NewsArticleImageProcessor.MinCropWidth}\"", body);
         Assert.Contains($"data-min-crop-height=\"{NewsArticleImageProcessor.MinCropHeight}\"", body);
         Assert.Contains("Crop article image", body);
+        Assert.Contains("Drag the photo to position it. Zoom to tighten the crop.", body);
         Assert.Contains("3:2 news-card frame", body);
         Assert.Contains("/js/admin/cropper.min.js", body);
         Assert.Contains("/css/admin/cropper.min.css", body);
@@ -813,6 +814,27 @@ public sealed class AdminNewsRoutesTests : IClassFixture<QueenZoneWebApplication
         Assert.Contains("zoomInput.disabled = false", script);
         Assert.Contains("zoomInput.disabled = true", script);
         Assert.Contains("}, true);", script);
+    }
+
+    [Fact]
+    public async Task ArticleImageCropScript_pans_photo_under_fixed_three_by_two_card()
+    {
+        var client = CreateClient(AdminEmail);
+        var script = await client.GetStringAsync("/js/admin/article-image-crop.js");
+        var css = await client.GetStringAsync("/css/site.css");
+
+        Assert.Contains("viewMode: 3", script);
+        Assert.Contains("dragMode: \"move\"", script);
+        Assert.Contains("cropBoxMovable: false", script);
+        Assert.Contains("cropBoxResizable: false", script);
+        Assert.Contains("toggleDragModeOnDblclick: false", script);
+        Assert.Contains("fillStageCropBox", script);
+        Assert.Contains("setDragMode(\"move\")", script);
+        Assert.DoesNotContain("viewMode: 2", script);
+        Assert.DoesNotContain("cropBoxMovable: true", script);
+        Assert.Contains("pointer-events: none", css);
+        Assert.Contains(".admin-article-crop .cropper-crop-box", css);
+        Assert.Contains(".admin-article-crop .cropper-face", css);
     }
 
     [Fact]
