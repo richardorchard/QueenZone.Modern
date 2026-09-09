@@ -7,7 +7,7 @@ step 5 of epic [#615](https://github.com/richardorchard/QueenZone.Modern/issues/
 
 The production root declares imports for the existing Azure SQL logical server,
 Basic database, Azure-services firewall rule, disabled server/database auditing
-settings, Storage account, Blob service, and 26 product containers.
+settings, Storage account, Blob service, and 29 product containers.
 
 OpenTofu records the existing SQL server administrator name because ARM requires
 it, but does not manage its password. Database principals, schema, EF migrations,
@@ -38,12 +38,12 @@ absent. The first import deliberately avoids new storage cost or retention.
 
 The imported ACLs match live product behaviour:
 
-- `databasebackup`, `ugc-avatars`, `ugc-forum`, and `songfiles` are private;
+- `databasebackup`, `ugc-articles`, `ugc-avatars`, `ugc-forum`, `ugc-photos`, and `songfiles` are private;
 - archive/media containers retain public blob access;
 - `css` retains public container access;
 - `attachments` remain public blob access (legacy forum files; out of scope for #177);
-- scratch `test` remains outside the stack;
-- missing `ugc-photos` and `ugc-articles` are not created.
+- `test` retains public blob access and is preserved through the production
+  region migration.
 
 Live `songfiles` is already private (ARM apply 2026-08-16 after the #702
 app proxy shipped). The module desired state is `None`. The next reviewed

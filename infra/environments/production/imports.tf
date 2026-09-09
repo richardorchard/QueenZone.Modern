@@ -13,7 +13,8 @@ locals {
     "miscellaneous", "mp3", "pre-queen", "queen",
     "queen-and-adam-lambert", "queen-and-paul-rodgers",
     "queen-memorabillia", "roger-taylor", "songfiles", "special-events",
-    "ugc-avatars", "ugc-forum", "us-convention-2001",
+    "test", "ugc-articles", "ugc-avatars", "ugc-forum", "ugc-photos",
+    "us-convention-2001",
   ])
 }
 

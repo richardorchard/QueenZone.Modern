@@ -48,6 +48,16 @@ run "existing_production_shape_remains_managed" {
     condition     = length(azapi_resource.sql_server) == 1 && length(azurerm_mssql_server.created) == 0 && length(azurerm_mssql_database.production) == 1
     error_message = "The default imported production shape must retain its AzAPI server and managed database."
   }
+
+  assert {
+    condition     = length(var.containers) == 29 && var.containers["test"] == "Blob"
+    error_message = "The complete 29-container source inventory, including the public test container, must remain managed."
+  }
+
+  assert {
+    condition     = var.containers["ugc-articles"] == "None" && var.containers["ugc-photos"] == "None"
+    error_message = "Article and photo UGC containers must remain private."
+  }
 }
 
 run "migration_target_uses_write_only_password_and_defers_database" {

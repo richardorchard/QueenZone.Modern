@@ -44,6 +44,36 @@ module "azure_data" {
   storage_account_name                   = "queenzonedev"
   storage_custom_domain_name             = null
   manage_blob_service                    = false
+  # Keep dev's existing 26-container inventory stable. The three additional
+  # live source containers are production migration scope only.
+  containers = {
+    "album-or-single-covers"  = "Blob"
+    "attachments"             = "Blob"
+    "avatars"                 = "Blob"
+    "brian-may"               = "Blob"
+    "css"                     = "Container"
+    "databasebackup"          = "None"
+    "fan-art"                 = "Blob"
+    "fan-pics"                = "Blob"
+    "forum"                   = "Blob"
+    "freddie-mercury"         = "Blob"
+    "freddie-tribute-concert" = "Blob"
+    "images"                  = "Blob"
+    "john-deacon"             = "Blob"
+    "miscellaneous"           = "Blob"
+    "mp3"                     = "Blob"
+    "pre-queen"               = "Blob"
+    "queen"                   = "Blob"
+    "queen-and-adam-lambert"  = "Blob"
+    "queen-and-paul-rodgers"  = "Blob"
+    "queen-memorabillia"      = "Blob"
+    "roger-taylor"            = "Blob"
+    "songfiles"               = "None"
+    "special-events"          = "Blob"
+    "ugc-avatars"             = "None"
+    "ugc-forum"               = "None"
+    "us-convention-2001"      = "Blob"
+  }
 }
 
 moved {

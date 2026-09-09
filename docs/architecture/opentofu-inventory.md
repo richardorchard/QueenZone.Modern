@@ -7,6 +7,8 @@ Issue: [#624](https://github.com/richardorchard/QueenZone.Modern/issues/624) (Op
 
 **#1394 GitHub Environment refresh:** 2026-09-07 — legacy `dev` / `deploy` **deleted in Settings** (`gh api …/environments`: neither name present). Workflows already use `prod-*`. Azure/Cloudflare IDs were not re-probed.
 
+**#1272 storage refresh:** 2026-09-09 — the live source has 29 containers. `test`, `ugc-articles`, and `ugc-photos` were added to the managed inventory so every source container is preserved during the Canada East migration.
+
 **#177 live refresh:** 2026-08-16 — `songfiles` ACL set to `None` via ARM; Worker `pictures-queenzone-org` published on `cdn2.queenzone.org/*` (404 `/songfiles/*`).  
 **Method:** read-only Azure CLI/`az` against subscription `Base Subscription`, live HTTP/DNS probes of public hostnames, Cloudflare API (tokens `CLOUDFLARE_API_TOKEN_READONLY` and `CLOUDFLARE_WORKER_READWRITE` from Bitwarden — values not recorded), GitHub API for environments/secret *names*, Bitwarden Secrets Manager key *names* only.  
 **Mutations performed:** none during the 2026-08-12 audit. 2026-08-16 applied the #177 ACL and Worker publish outside OpenTofu.
@@ -198,9 +200,8 @@ site; no empty or speculative RBAC resources are declared.
 | `songfiles` | **`None` (private)** | Fan audio streamed by `/fan-performances/{id}/audio` | Live since 2026-08-16 (ARM). Module desired state already `None`. |
 | `attachments` | **`blob` (public)** | Legacy forum files; app redirects after auth | URL guessing bypasses app gate. Relates to #177 / media lockdown |
 | `databasebackup` | private | Backups | Keep private; **never** public |
-| `ugc-avatars`, `ugc-forum` | private | Modern UGC | Keep private; app proxy. Relates to [#583](https://github.com/richardorchard/QueenZone.Modern/issues/583), [#584](https://github.com/richardorchard/QueenZone.Modern/issues/584) |
-| `ugc-photos`, `ugc-articles` | **missing** | Mentioned in `blob-storage-ugc.md` | Create only when product needs them — do not invent in first import |
-| `test` | `blob` | Scratch | Consider delete or exclude from prod module |
+| `ugc-articles`, `ugc-avatars`, `ugc-forum`, `ugc-photos` | private | Modern UGC | Keep private; app proxy. All four were live at the 2026-09-09 refresh. Relates to [#583](https://github.com/richardorchard/QueenZone.Modern/issues/583), [#584](https://github.com/richardorchard/QueenZone.Modern/issues/584) |
+| `test` | `blob` | Legacy/scratch content | **2,320 blobs / 4,110,472,406 bytes** at the 2026-09-09 refresh. Preserve during migration; review any later deletion separately. |
 
 No storage lifecycle policy exists. Soft delete is 7 days for blobs and containers; versioning is off.
 

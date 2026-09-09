@@ -136,7 +136,7 @@ variable "blob_service_is_preexisting" {
 }
 
 variable "containers" {
-  description = "Live Blob container ACLs approved for import. None means private; test and missing future UGC containers are excluded."
+  description = "Live Blob container ACLs approved for import and migration. None means private."
   type        = map(string)
   default = {
     "album-or-single-covers"  = "Blob"
@@ -162,8 +162,11 @@ variable "containers" {
     "roger-taylor"            = "Blob"
     "songfiles"               = "None"
     "special-events"          = "Blob"
+    "test"                    = "Blob"
+    "ugc-articles"            = "None"
     "ugc-avatars"             = "None"
     "ugc-forum"               = "None"
+    "ugc-photos"              = "None"
     "us-convention-2001"      = "Blob"
   }
 
@@ -173,7 +176,7 @@ variable "containers" {
   }
 
   validation {
-    condition     = var.containers["databasebackup"] == "None" && var.containers["ugc-avatars"] == "None" && var.containers["ugc-forum"] == "None" && var.containers["songfiles"] == "None"
+    condition     = var.containers["databasebackup"] == "None" && lookup(var.containers, "ugc-articles", "None") == "None" && var.containers["ugc-avatars"] == "None" && var.containers["ugc-forum"] == "None" && lookup(var.containers, "ugc-photos", "None") == "None" && var.containers["songfiles"] == "None"
     error_message = "Backup, modern UGC, and songfiles containers must remain private."
   }
 }
