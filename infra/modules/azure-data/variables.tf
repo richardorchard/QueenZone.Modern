@@ -176,7 +176,7 @@ variable "containers" {
   }
 
   validation {
-    condition     = var.containers["databasebackup"] == "None" && var.containers["ugc-articles"] == "None" && var.containers["ugc-avatars"] == "None" && var.containers["ugc-forum"] == "None" && var.containers["ugc-photos"] == "None" && var.containers["songfiles"] == "None"
+    condition     = var.containers["databasebackup"] == "None" && lookup(var.containers, "ugc-articles", "None") == "None" && var.containers["ugc-avatars"] == "None" && var.containers["ugc-forum"] == "None" && lookup(var.containers, "ugc-photos", "None") == "None" && var.containers["songfiles"] == "None"
     error_message = "Backup, modern UGC, and songfiles containers must remain private."
   }
 }
