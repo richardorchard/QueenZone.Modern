@@ -300,6 +300,17 @@ describe('device-smoke harness (#1281)', () => {
     assert.match(workflow, /Retry Android device journeys after transport death/);
     assert.match(workflow, /android-transport-death/);
     assert.match(workflow, /Not a selector miss/);
+    assert.match(
+      workflow,
+      /cp -a src\/QueenZone.Mobile\/maestro-results\/\. src\/QueenZone.Mobile\/maestro-results-transport-first\/[\s\S]*rm -rf src\/QueenZone.Mobile\/maestro-results/,
+    );
+    assert.equal(
+      (workflow.match(/rm -rf src\/QueenZone\.Mobile\/maestro-results\r?\n/g) ?? []).length,
+      2,
+    );
+    assert.match(script, /rm -f "\$results_dir\/android-transport-death"/);
+    const clearMarker = script.indexOf('rm -f "$results_dir/android-transport-death"');
+    assert.ok(clearMarker >= 0 && clearMarker < script.indexOf('run_maestro_once()'));
     assert.doesNotMatch(workflow, /Gilfoyle|Glory11/);
 
     const pattern = /android_transport_re="([^"]+)"/.exec(script)?.[1];

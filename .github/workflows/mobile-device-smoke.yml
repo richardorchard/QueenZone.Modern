@@ -195,6 +195,10 @@ jobs:
             rm -rf src/QueenZone.Mobile/maestro-results-transport-first
             mkdir -p src/QueenZone.Mobile/maestro-results-transport-first
             cp -a src/QueenZone.Mobile/maestro-results/. src/QueenZone.Mobile/maestro-results-transport-first/
+            # Fresh-emulator rerun must not inherit the first-attempt marker
+            # or tee -a console, or a later selector miss looks like transport.
+            rm -rf src/QueenZone.Mobile/maestro-results
+            mkdir -p src/QueenZone.Mobile/maestro-results
           else
             echo "retry=false" >> "$GITHUB_OUTPUT"
             echo "First Android smoke attempt was a selector or assertion miss. Not retrying."
@@ -534,6 +538,8 @@ jobs:
             rm -rf src/QueenZone.Mobile/maestro-results-transport-first
             mkdir -p src/QueenZone.Mobile/maestro-results-transport-first
             cp -a src/QueenZone.Mobile/maestro-results/. src/QueenZone.Mobile/maestro-results-transport-first/
+            rm -rf src/QueenZone.Mobile/maestro-results
+            mkdir -p src/QueenZone.Mobile/maestro-results
           else
             echo "retry=false" >> "$GITHUB_OUTPUT"
             echo "First Android journeys attempt was a selector or assertion miss. Not retrying."

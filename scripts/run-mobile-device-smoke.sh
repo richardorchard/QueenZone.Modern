@@ -120,6 +120,7 @@ unset ConnectionStrings__BlobStorage || true
 unset ConnectionStrings__SqlServerTest || true
 
 mkdir -p "$results_dir"
+rm -f "$results_dir/android-transport-death"
 {
   echo "started_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   echo "platform=$platform"
