@@ -13,6 +13,8 @@ public sealed class EditPostModel(
 {
     public ChapterFormViewModel? Form { get; private set; }
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = AdminBreadcrumbs.Page("Biography", "/admin/biography", "Edit chapter");
+
     public async Task<IActionResult> OnPostAsync(
         int id,
         [FromForm] AdminBiographyForm form,

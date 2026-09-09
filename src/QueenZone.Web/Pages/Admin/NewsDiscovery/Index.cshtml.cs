@@ -72,6 +72,8 @@ public sealed class IndexModel(
 
     public string? StatusMessageKind => TempData["DiscoveryMessageKind"] as string;
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
+
     public async Task<IActionResult> OnGetAsync(CancellationToken cancellationToken)
     {
         if (PageNumber < 1)
@@ -197,6 +199,7 @@ public sealed class IndexModel(
         PageSize = normalizedPageSize;
 
         ViewData["Title"] = CurrentPage <= 1 ? "News discovery review" : $"News discovery review – Page {CurrentPage}";
+        Breadcrumbs = AdminBreadcrumbs.Section("AI discovery", "/admin/news-discovery");
         RecentRuns = await runRequestRepository.ListRecentAsync(5, cancellationToken);
         RunnerHeartbeat = await runRequestRepository.GetLatestHeartbeatAsync(cancellationToken);
         Sources = await discoveryRepository.GetSourcesAsync(cancellationToken: cancellationToken);

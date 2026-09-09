@@ -11,11 +11,14 @@ public sealed class IndexModel(IHelpRequestRepository helpRequestRepository) : A
 
     public string StatusFilter { get; private set; } = HelpRequestStatus.Open;
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
+
     public async Task OnGetAsync(string? status = HelpRequestStatus.Open, int pageNumber = 1, CancellationToken cancellationToken = default)
     {
         PageNumber = Math.Max(1, pageNumber);
         StatusFilter = string.IsNullOrWhiteSpace(status) ? HelpRequestStatus.Open : status;
         List = await helpRequestRepository.ListAsync(StatusFilter, PageNumber, 50, cancellationToken);
         ViewData["Title"] = "Help requests";
+        Breadcrumbs = AdminBreadcrumbs.Section("Help requests", "/admin/help");
     }
 }

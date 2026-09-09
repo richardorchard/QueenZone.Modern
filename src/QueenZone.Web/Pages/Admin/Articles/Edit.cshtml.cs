@@ -23,6 +23,7 @@ public sealed class EditModel(
     [BindProperty] public EditorialArticleForm Form { get; set; } = new();
     public List<string> Errors { get; } = [];
     public IReadOnlyList<string> Categories { get; private set; } = [];
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
 
     public async Task<IActionResult> OnGetAsync(Guid? id, int? legacyId, CancellationToken ct)
     {
@@ -59,6 +60,7 @@ public sealed class EditModel(
             Form.Category = "Feature";
         }
         ViewData["Title"] = Form.Id is null ? "Create article" : "Edit article";
+        Breadcrumbs = AdminBreadcrumbs.Page("Articles", "/admin/articles", (string)ViewData["Title"]!);
         await LoadCategoriesAsync(ct);
         return Page();
     }
@@ -142,6 +144,7 @@ public sealed class EditModel(
     internal async Task PrepareRedisplayAsync(CancellationToken ct)
     {
         ViewData["Title"] = Form.Id is null ? "Create article" : "Edit article";
+        Breadcrumbs = AdminBreadcrumbs.Page("Articles", "/admin/articles", (string)ViewData["Title"]!);
         await LoadCategoriesAsync(ct);
     }
 

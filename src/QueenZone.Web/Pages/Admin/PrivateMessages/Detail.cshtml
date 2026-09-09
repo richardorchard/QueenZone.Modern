@@ -9,8 +9,8 @@
 }
 
 <div class="admin-shell">
+  <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
   <h1>Reported message</h1>
-  <p><a href="/admin/private-messages">Back to reported messages</a></p>
 
   @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
   {

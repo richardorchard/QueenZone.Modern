@@ -11,6 +11,8 @@ public sealed class EditModel(IBiographyRepository biographyRepository) : AdminB
 
     public string? StatusMessageKind { get; private set; }
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
+
     public async Task<IActionResult> OnGetAsync(int id, CancellationToken cancellationToken)
     {
         var chapter = await biographyRepository.GetByIdAsync(id, cancellationToken);
@@ -22,6 +24,7 @@ public sealed class EditModel(IBiographyRepository biographyRepository) : AdminB
         StatusMessage = TempData[MessageKey] as string;
         StatusMessageKind = TempData[MessageKindKey] as string;
         ViewData["Title"] = "Edit biography chapter";
+        Breadcrumbs = AdminBreadcrumbs.Page("Biography", "/admin/biography", "Edit chapter");
         Form = BuildForm(chapter, ToDraft(chapter), null);
         return Page();
     }

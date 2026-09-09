@@ -2,6 +2,7 @@
 @model ReviewModel
 
 <div class="admin-shell">
+<partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
 @if (Model.Candidate is null)
 {
   <p>Candidate not found.</p>
@@ -10,7 +11,6 @@ else
 {
   var candidate = Model.Candidate;
   <h1>Review candidate #@candidate.Id</h1>
-  <p><a href="/admin/news-discovery">Back to review queue</a></p>
 
   @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
   {

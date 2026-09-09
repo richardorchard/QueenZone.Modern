@@ -16,8 +16,8 @@
 }
 <link rel="stylesheet" href="~/css/admin/cropper.min.css" asp-append-version="true" />
 <div class="admin-shell admin-form-panel" data-gallery-picker-host>
+  <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
   <h1>@(f.Id is null ? "Create article" : "Edit article")</h1>
-  <p><a href="/admin/articles">Back to articles</a></p>
   @if (Model.Errors.Count > 0) { <ul class="admin-errors">@foreach (var error in Model.Errors) { <li>@error</li> }</ul> }
   <form method="post" action="@formAction" enctype="multipart/form-data" class="admin-form qz-form" data-busy-submit data-busy-label="Saving…">
     <input type="hidden" name="__RequestVerificationToken" value="@token" />

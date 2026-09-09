@@ -18,6 +18,8 @@ public sealed class DetailModel(
 
     public string? StatusMessageKind { get; private set; }
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
+
     public async Task<IActionResult> OnGetAsync(Guid id, CancellationToken cancellationToken)
     {
         Report = await privateMessageRepository.GetReportAsync(id, cancellationToken);
@@ -36,6 +38,7 @@ public sealed class DetailModel(
         StatusMessage = TempData["PrivateMessageReportMessage"] as string;
         StatusMessageKind = TempData["PrivateMessageReportMessageKind"] as string;
         ViewData["Title"] = "Reported message";
+        Breadcrumbs = AdminBreadcrumbs.Page("Reported messages", "/admin/private-messages", "Reported message");
         return Page();
     }
 }

@@ -6,9 +6,9 @@
 }
 
 <div class="admin-shell">
+  <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
   <div class="admin-form-panel">
     <h1>Add photo</h1>
-    <p><a href="/admin/photos">Back to photos</a></p>
 
     <form class="admin-form" method="post" action="/admin/photos/create" enctype="multipart/form-data">
       <input type="hidden" name="@AdminPhotosPageModel.AntiforgeryTokenFieldName" value="@antiforgeryToken" />

@@ -16,6 +16,8 @@ public sealed class DetailModel(
 
     public ForumAuthorContentSummary? ForumContent { get; private set; }
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
+
     public async Task<IActionResult> OnGetAsync(Guid id, CancellationToken cancellationToken)
     {
         Member = await memberAccountRepository.FindByIdAsync(id, cancellationToken);
@@ -30,6 +32,7 @@ public sealed class DetailModel(
         StatusMessage = TempData["MemberMessage"] as string;
         StatusMessageKind = TempData["MemberMessageKind"] as string;
         ViewData["Title"] = $"Member — {Member.DisplayName}";
+        Breadcrumbs = AdminBreadcrumbs.Page("Members", "/admin/members", Member.DisplayName);
         return Page();
     }
 }

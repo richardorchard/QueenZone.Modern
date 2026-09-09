@@ -4,8 +4,9 @@
 @if (Model.Article is not null && Model.Item is not null)
 {
   <div class="admin-shell">
+  <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
   <p class="admin-preview-banner">Preview mode. @(Model.Article.IsPublished ? "This article is published." : "This article is not published.")</p>
-  <p class="article-nav"><a href="/admin/news">Back to admin</a> | <a href="/admin/news/@Model.Article.Id/edit">Edit</a></p>
+  <p class="article-nav"><a href="/admin/news/@Model.Article.Id/edit">Edit</a></p>
 
   @if (Model.DiscoveryProvenance is not null)
   {

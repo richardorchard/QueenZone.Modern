@@ -2,10 +2,8 @@
 @model IndexModel
 
 <div class="admin-shell">
+  <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
   <h1>Members</h1>
-  <p>
-    <a href="/admin">Back to admin</a>
-  </p>
 
   <form method="get" class="admin-search-form">
     <input type="search" name="query" value="@Model.Query" placeholder="Search by display name or email" />

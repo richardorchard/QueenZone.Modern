@@ -11,6 +11,8 @@ public sealed class DetailModel(IHelpRequestRepository helpRequestRepository) : 
 
     public string? StatusMessageKind { get; private set; }
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
+
     public async Task<IActionResult> OnGetAsync(Guid id, CancellationToken cancellationToken)
     {
         Item = await helpRequestRepository.GetByIdAsync(id, cancellationToken);
@@ -22,6 +24,7 @@ public sealed class DetailModel(IHelpRequestRepository helpRequestRepository) : 
         StatusMessage = TempData["HelpRequestMessage"] as string;
         StatusMessageKind = TempData["HelpRequestMessageKind"] as string;
         ViewData["Title"] = $"Help request — {Item.Subject}";
+        Breadcrumbs = AdminBreadcrumbs.Page("Help requests", "/admin/help", Item.Subject);
         return Page();
     }
 }

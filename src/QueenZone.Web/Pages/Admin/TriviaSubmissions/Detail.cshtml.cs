@@ -12,6 +12,8 @@ public sealed class DetailModel(ITriviaFactSubmissionRepository triviaFactSubmis
 
     public string? StatusMessageKind { get; private set; }
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
+
     public async Task<IActionResult> OnGetAsync(Guid id, CancellationToken cancellationToken)
     {
         Submission = await triviaFactSubmissionRepository.GetByIdAsync(id, cancellationToken);
@@ -23,6 +25,7 @@ public sealed class DetailModel(ITriviaFactSubmissionRepository triviaFactSubmis
         StatusMessage = TempData["TriviaSubmissionMessage"] as string;
         StatusMessageKind = TempData["TriviaSubmissionMessageKind"] as string;
         ViewData["Title"] = "Review trivia suggestion";
+        Breadcrumbs = AdminBreadcrumbs.Page("Trivia submissions", "/admin/trivia-submissions", "Review trivia suggestion");
         return Page();
     }
 }

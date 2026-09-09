@@ -8,8 +8,8 @@
 }
 
 <div class="admin-shell">
+  <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
   <h1>Edit generated draft</h1>
-  <p><a href="/admin/news-discovery/@Model.Id">Back to candidate review</a></p>
 
   @if (Model.Errors.Count > 0)
   {

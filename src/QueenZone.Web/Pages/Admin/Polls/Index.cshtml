@@ -6,6 +6,7 @@
 }
 
 <div class="admin-shell">
+<partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
 @if (Model.CreateForm is not null)
 {
   ViewData["AntiforgeryToken"] = antiforgeryToken;

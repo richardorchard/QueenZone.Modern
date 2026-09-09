@@ -7,5 +7,13 @@ public sealed class PreviewModel(IEditorialArticleRepository articles, UgcHtml u
 {
     public EditorialArticle? Article { get; private set; }
     public string Body { get; private set; } = string.Empty;
-    public async Task<IActionResult> OnGetAsync(Guid id, CancellationToken ct) { Article = await articles.GetAsync(id, ct); if (Article is null) return NotFound(); Body = ugcHtml.FormatForDisplay(Article.Body); return Page(); }
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
+    public async Task<IActionResult> OnGetAsync(Guid id, CancellationToken ct)
+    {
+        Article = await articles.GetAsync(id, ct);
+        if (Article is null) return NotFound();
+        Body = ugcHtml.FormatForDisplay(Article.Body);
+        Breadcrumbs = AdminBreadcrumbs.Page("Articles", "/admin/articles", "Preview");
+        return Page();
+    }
 }

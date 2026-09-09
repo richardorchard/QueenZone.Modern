@@ -21,6 +21,8 @@ public sealed class IndexModel(
 
     public ForumAuthorContentSummary? NoAccountAuthor { get; private set; }
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
+
     public async Task OnGetAsync(string? query, int pageNumber = 1, CancellationToken cancellationToken = default)
     {
         Query = string.IsNullOrWhiteSpace(query) ? null : query.Trim();
@@ -34,5 +36,6 @@ public sealed class IndexModel(
             NoAccountAuthor = await forumWriteRepository.FindNoAccountForumAuthorAsync(Query, cancellationToken);
         }
         ViewData["Title"] = "Members";
+        Breadcrumbs = AdminBreadcrumbs.Section("Members", "/admin/members");
     }
 }

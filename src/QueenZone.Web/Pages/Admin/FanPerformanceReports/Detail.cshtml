@@ -9,8 +9,8 @@
 }
 
 <div class="admin-shell">
+  <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
   <h1>Fan performance report</h1>
-  <p><a href="/admin/fan-performance-reports">Back to reports</a></p>
 
   @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
   {

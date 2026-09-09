@@ -3,10 +3,8 @@
 @using QueenZone.Storage
 
 <div class="admin-shell">
+  <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
   <h1>Photo submissions</h1>
-  <p>
-    <a href="/admin">Back to admin</a>
-  </p>
 
   @if (Model.Submissions.Count == 0)
   {
