@@ -2,9 +2,9 @@
 
 ## Required and recommended set
 
-Google Play requires at least two screenshots across device types. For strong phone-store eligibility, prepare **six portrait phone screenshots at 1080 × 1920px**. Play permits up to eight per device type.
+Google Play requires at least two screenshots across device types. For strong phone-store eligibility, prepare **eight portrait phone screenshots at 1080 × 1920px**. Play permits up to eight per device type.
 
-The files must be JPEG or 24-bit PNG without alpha. They must show the actual app experience. Final screenshots remain pending until a release-candidate build is selected.
+The files must be JPEG or 24-bit PNG without alpha. The long edge cannot exceed twice the short edge. They must show the actual app experience.
 
 ## Phone sequence and exact overlay copy
 

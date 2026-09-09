@@ -2,12 +2,13 @@
 
 ## Required deliverables
 
-Because the Expo configuration currently sets `ios.supportsTablet` to `true`, prepare both:
+QueenZone is iPhone-only (`ios.supportsTablet` is `false`), so prepare:
 
-- iPhone 6.9-inch portrait: **1290 × 2796 px**, PNG or JPEG, no alpha.
-- iPad 13-inch portrait: **2064 × 2752 px** (or Apple's accepted 2048 × 2732 alternative), PNG or JPEG, no alpha.
+- iPhone 6.9-inch portrait: **1290 × 2796 px**, PNG or JPEG, no alpha. Capture natively from the iPhone 15 Pro Max Simulator profile.
 
-Produce six images for each device. Apple permits one to ten; six tells the story without repetition.
+Apple also accepts 1260 × 2736 and 1320 × 2868 for the current 6.9-inch slot, but the release set standardises on 1290 × 2796 to match the App Store Connect upload target used for QueenZone.
+
+The upload-ready set contains ten images, Apple's maximum. Reorder or remove images in App Store Connect if a shorter story is preferred.
 
 ## Shot sequence and exact overlay copy
 

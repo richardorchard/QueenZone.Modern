@@ -7,7 +7,7 @@
 | App Review notes | Draft complete | Contains contact and reviewer-account placeholders |
 | Screenshot shot list | Complete | Uses actual implemented screen inventory |
 | iPhone final screenshots | Blocked on release-candidate capture | Requires installed simulator runtime or TestFlight device |
-| iPad final screenshots | Blocked on release-candidate capture | Required while `supportsTablet: true` |
+| iPad final screenshots | Not applicable | QueenZone is iPhone-only (`supportsTablet: false`) |
 | Release icon | Complete | `assets/icon/QueenZone-AppStore-1024.png`; deterministic alpha removal, exact visible-pixel comparison passed |
 | App Store Connect record / draft | Not changed by this pack | Load only after product-owner review and authenticated App Store Connect access |
 
