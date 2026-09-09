@@ -172,6 +172,14 @@ public sealed class NewsDiscoveryServiceTests
         Assert.Contains(sources, source => source.Key == "nme-music" && source.TrustTier == NewsDiscoveryTrustTier.Secondary);
         Assert.Contains(sources, source => source.Key == "musicradar" && source.SourceType == NewsDiscoverySourceType.Rss && source.FeedOrSiteUrl == "https://www.musicradar.com/feeds/all");
         Assert.Contains(sources, source => source.Key == "gold-radio" && !source.Enabled);
+        Assert.Contains(
+            sources,
+            source => source.Key == "planet-rock"
+                && source.SourceType == NewsDiscoverySourceType.AllowlistedPage
+                && source.TrustTier == NewsDiscoveryTrustTier.Secondary
+                && source.Enabled
+                && source.HomepageUrl == "https://www.hellorayo.co.uk/planet-rock"
+                && source.FeedOrSiteUrl == "https://www.hellorayo.co.uk/planet-rock/news/rock-news");
         Assert.Contains(sources, source => source.Key == "music-news" && !source.Enabled);
         Assert.Contains(sources, source => source.Key == "youtube-queen-official" && !source.Enabled);
     }
