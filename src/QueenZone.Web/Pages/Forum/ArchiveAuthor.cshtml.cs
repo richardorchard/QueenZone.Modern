@@ -42,6 +42,7 @@ public sealed class ArchiveAuthorModel(
             legacyUserId,
             PageNumber,
             PageSize,
+            Author.PostCount,
             cancellationToken);
         var totalPages = ArchivePagination.GetTotalPages(postsPage.TotalCount, PageSize);
         if (totalPages > 0 && PageNumber > totalPages)

@@ -1,5 +1,7 @@
+using System.Data.Common;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using QueenZone.Data;
 using QueenZone.Data.Entities;
 
@@ -12,6 +14,7 @@ public sealed class EfForumArchiveAuthorRepositoryTests : IAsyncDisposable
     private readonly SqliteConnection connection;
     private readonly QueenZoneDbContext dbContext;
     private readonly EfForumArchiveAuthorRepository repository;
+    private readonly CommandCounter commandCounter = new();
 
     public EfForumArchiveAuthorRepositoryTests()
     {
@@ -19,6 +22,7 @@ public sealed class EfForumArchiveAuthorRepositoryTests : IAsyncDisposable
         connection.Open();
         dbContext = new QueenZoneDbContext(new DbContextOptionsBuilder<QueenZoneDbContext>()
             .UseSqlite(connection)
+            .AddInterceptors(commandCounter)
             .Options);
         dbContext.Database.EnsureCreated();
         dbContext.Database.ExecuteSqlRaw("""
@@ -112,13 +116,34 @@ public sealed class EfForumArchiveAuthorRepositoryTests : IAsyncDisposable
         SeedPost(5, 2, 9999, "Someone else", "Different author", DateTime.Parse("2023-01-01T00:00:00Z"));
         await dbContext.SaveChangesAsync();
 
-        var page1 = await repository.GetPostsPageAsync(LegacyUserId, page: 1, pageSize: 2);
+        var page1 = await repository.GetPostsPageAsync(LegacyUserId, page: 1, pageSize: 2, totalCount: 3);
 
         Assert.Equal(3, page1.TotalCount);
         Assert.Equal(["Third post", "Second post"], page1.Items.Select(item => item.Summary ?? string.Empty).ToArray());
 
-        var page2 = await repository.GetPostsPageAsync(LegacyUserId, page: 2, pageSize: 2);
+        var page2 = await repository.GetPostsPageAsync(LegacyUserId, page: 2, pageSize: 2, totalCount: 3);
         Assert.Equal(["First post"], page2.Items.Select(item => item.Summary ?? string.Empty).ToArray());
+    }
+
+    [Fact]
+    public async Task ArchiveAuthorPageData_UsesOneSummaryAndOnePageQuery()
+    {
+        SeedThread(1, "Thread one");
+        SeedPost(1, 1, LegacyUserId, "John S Stuart", "First post", DateTime.Parse("2020-01-01T00:00:00Z"));
+        SeedPost(2, 1, LegacyUserId, "John S Stuart", "Second post", DateTime.Parse("2021-01-01T00:00:00Z"));
+        await dbContext.SaveChangesAsync();
+        commandCounter.Reset();
+
+        var summary = await repository.GetSummaryAsync(LegacyUserId);
+        Assert.NotNull(summary);
+        var page = await repository.GetPostsPageAsync(
+            LegacyUserId,
+            page: 1,
+            pageSize: 20,
+            totalCount: summary!.PostCount);
+
+        Assert.Equal(2, commandCounter.ReaderCount);
+        Assert.Equal(2, page.TotalCount);
     }
 
     private void SeedThread(long id, string title) =>
@@ -157,5 +182,22 @@ public sealed class EfForumArchiveAuthorRepositoryTests : IAsyncDisposable
     {
         await dbContext.DisposeAsync();
         await connection.DisposeAsync();
+    }
+
+    private sealed class CommandCounter : DbCommandInterceptor
+    {
+        public int ReaderCount { get; private set; }
+
+        public void Reset() => ReaderCount = 0;
+
+        public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
+            DbCommand command,
+            CommandEventData eventData,
+            InterceptionResult<DbDataReader> result,
+            CancellationToken cancellationToken = default)
+        {
+            ReaderCount++;
+            return base.ReaderExecutingAsync(command, eventData, result, cancellationToken);
+        }
     }
 }
