@@ -17,8 +17,18 @@ on:
         options:
           - smoke
           - journeys
+          - release
           - both
         default: smoke
+      platform:
+        description: "Device platform to run"
+        required: false
+        type: choice
+        options:
+          - both
+          - android
+          - ios
+        default: both
       prove_failure:
         description: "Run the forced-assertion flow to prove failure artifacts (smoke only)"
         required: false
@@ -34,7 +44,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: mobile-device-${{ github.event.inputs.suite || github.event.schedule || 'smoke' }}-${{ github.ref }}
+  group: mobile-device-${{ github.event.inputs.suite || github.event.schedule || 'smoke' }}-${{ github.event.inputs.platform || 'both' }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -47,7 +57,8 @@ jobs:
     if: >-
       (github.event_name == 'schedule' && github.event.schedule == '0 4 * * 1-5')
       || (github.event_name == 'workflow_dispatch'
-        && (github.event.inputs.suite == 'smoke' || github.event.inputs.suite == 'both'))
+        && (github.event.inputs.suite == 'smoke' || github.event.inputs.suite == 'both')
+        && (github.event.inputs.platform == 'android' || github.event.inputs.platform == 'both'))
     runs-on: ubuntu-latest
     timeout-minutes: 90
     defaults:
@@ -123,6 +134,7 @@ jobs:
           npx expo prebuild --platform android
           cd android
           ./gradlew assembleRelease
+          ./gradlew --stop
 
       - name: Install Maestro
         working-directory: .
@@ -196,7 +208,8 @@ jobs:
     if: >-
       (github.event_name == 'schedule' && github.event.schedule == '0 4 * * 1-5')
       || (github.event_name == 'workflow_dispatch'
-        && (github.event.inputs.suite == 'smoke' || github.event.inputs.suite == 'both'))
+        && (github.event.inputs.suite == 'smoke' || github.event.inputs.suite == 'both')
+        && (github.event.inputs.platform == 'ios' || github.event.inputs.platform == 'both'))
     runs-on: macos-26
     timeout-minutes: 90
     defaults:
@@ -332,11 +345,12 @@ jobs:
           retention-days: 7
 
   mobile-android-journeys:
-    name: Mobile Android device journeys
+    name: Mobile Android extended device suite
     if: >-
       (github.event_name == 'schedule' && github.event.schedule == '0 16 * * 1-5')
       || (github.event_name == 'workflow_dispatch'
-        && (github.event.inputs.suite == 'journeys' || github.event.inputs.suite == 'both'))
+        && (github.event.inputs.suite == 'journeys' || github.event.inputs.suite == 'both')
+        && (github.event.inputs.platform == 'android' || github.event.inputs.platform == 'both'))
     runs-on: ubuntu-latest
     timeout-minutes: 90
     defaults:
@@ -412,6 +426,7 @@ jobs:
           npx expo prebuild --platform android
           cd android
           ./gradlew assembleRelease
+          ./gradlew --stop
 
       - name: Install Maestro
         working-directory: .
@@ -435,6 +450,7 @@ jobs:
             echo "job=mobile-android-journeys"
             echo "prepared_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           } > src/QueenZone.Mobile/maestro-results/harness.log
+          echo "DEVICE_SUITE_ARGS=--suite journeys" >> "$GITHUB_ENV"
 
       - name: Run Android device journeys
         uses: reactivecircus/android-emulator-runner@v2
@@ -445,7 +461,7 @@ jobs:
           force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
-          script: ./scripts/run-mobile-device-smoke.sh --platform android --suite journeys --skip-build --no-build --apk src/QueenZone.Mobile/android/app/build/outputs/apk/release/app-release.apk
+          script: ./scripts/run-mobile-device-smoke.sh --platform android $DEVICE_SUITE_ARGS --skip-build --no-build --apk src/QueenZone.Mobile/android/app/build/outputs/apk/release/app-release.apk
 
       - name: Collect leftover Android journeys logs
         if: failure()
@@ -472,12 +488,128 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  mobile-android-release:
+    name: Mobile Android P0 release suite
+    if: >-
+      github.event_name == 'workflow_dispatch'
+      && github.event.inputs.suite == 'release'
+      && (github.event.inputs.platform == 'android' || github.event.inputs.platform == 'both')
+    runs-on: [self-hosted, macOS, ARM64, queenzone]
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: src/QueenZone.Mobile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+          cache: true
+          cache-dependency-path: |
+            **/*.csproj
+            .config/dotnet-tools.json
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: src/QueenZone.Mobile/package-lock.json
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Export installed Android SDK
+        working-directory: .
+        run: |
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Library/Android/sdk}}"
+          if [ ! -d "$SDK_ROOT" ]; then
+            echo "::error::Android SDK not found at $SDK_ROOT."
+            exit 1
+          fi
+          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
+          echo "$SDK_ROOT/emulator" >> "$GITHUB_PATH"
+          echo "$SDK_ROOT/platform-tools" >> "$GITHUB_PATH"
+          echo "$SDK_ROOT/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+
+      - name: Install mobile JS
+        run: npm ci
+
+      - name: Prepare Android release diagnostics
+        working-directory: .
+        run: |
+          mkdir -p src/QueenZone.Mobile/maestro-results
+          echo "job=mobile-android-release" > src/QueenZone.Mobile/maestro-results/harness.log
+
+      - name: Build Testing web host
+        working-directory: .
+        run: |
+          unset ConnectionStrings__QueenZoneLegacy || true
+          unset ConnectionStrings__BlobStorage || true
+          unset ConnectionStrings__SqlServerTest || true
+          dotnet build src/QueenZone.Web/QueenZone.Web.csproj --configuration Release
+
+      - name: Preinstall Android NDK 27.1.12297006
+        working-directory: .
+        run: ./scripts/preinstall-android-ndk.sh
+
+      - name: Assemble Android Release smoke APK
+        env:
+          EXPO_PUBLIC_APP_ENV: development
+          EXPO_PUBLIC_API_BASE_URL: http://10.0.2.2:5098
+          EXPO_PUBLIC_SMOKE_EMBED: "1"
+          SENTRY_DISABLE_AUTO_UPLOAD: "true"
+          QUEENZONE_MOBILE_SMOKE_EMBED: "1"
+          FORCE_BUNDLING: "1"
+        run: |
+          npx expo prebuild --platform android
+          cd android
+          ./gradlew assembleRelease
+          ./gradlew --stop
+
+      - name: Install Maestro
+        working-directory: .
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/.maestro/bin:$PATH"
+          maestro --version
+
+      - name: Run Android P0 release suite
+        working-directory: .
+        run: |
+          unset ConnectionStrings__QueenZoneLegacy || true
+          unset ConnectionStrings__BlobStorage || true
+          unset ConnectionStrings__SqlServerTest || true
+          ./scripts/run-mobile-android-release-self-hosted.sh \
+            src/QueenZone.Mobile/android/app/build/outputs/apk/release/app-release.apk
+
+      - name: Upload Android release diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: mobile-android-release-${{ github.run_id }}
+          path: |
+            src/QueenZone.Mobile/maestro-results/
+          if-no-files-found: error
+          retention-days: 7
+
   mobile-ios-journeys:
-    name: Mobile iOS device journeys
+    name: Mobile iOS extended device suite
     if: >-
       (github.event_name == 'schedule' && github.event.schedule == '0 16 * * 1-5')
       || (github.event_name == 'workflow_dispatch'
-        && (github.event.inputs.suite == 'journeys' || github.event.inputs.suite == 'both'))
+        && (github.event.inputs.suite == 'journeys'
+          || github.event.inputs.suite == 'release'
+          || github.event.inputs.suite == 'both')
+        && (github.event.inputs.platform == 'ios' || github.event.inputs.platform == 'both'))
     runs-on: macos-26
     timeout-minutes: 90
     defaults:
@@ -591,9 +723,13 @@ jobs:
           unset ConnectionStrings__BlobStorage || true
           unset ConnectionStrings__SqlServerTest || true
           APP=$(ls -d src/QueenZone.Mobile/ios/build/Build/Products/Release-iphonesimulator/*.app | head -n 1)
+          SUITE="journeys"
+          if [ "${{ github.event.inputs.suite }}" = "release" ]; then
+            SUITE="release"
+          fi
           ./scripts/run-mobile-device-smoke.sh \
             --platform ios \
-            --suite journeys \
+            --suite "$SUITE" \
             --skip-build \
             --no-build \
             --app "$APP"

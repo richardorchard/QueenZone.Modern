@@ -32,6 +32,8 @@ public sealed class IndexModel(IAdminPhotoRepository adminPhotoRepository) : Adm
 
     public string? StatusMessageKind { get; private set; }
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
+
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
         Categories = await adminPhotoRepository.GetCategoriesAsync(cancellationToken);
@@ -39,6 +41,7 @@ public sealed class IndexModel(IAdminPhotoRepository adminPhotoRepository) : Adm
         StatusMessage = TempData[MessageKey] as string;
         StatusMessageKind = TempData[MessageKindKey] as string;
         ViewData["Title"] = "Photos";
+        Breadcrumbs = AdminBreadcrumbs.Section("Photos", "/admin/photos");
     }
 
     private AdminPhotoListFilter BuildFilter()
@@ -58,10 +61,13 @@ public sealed class NewModel(IAdminPhotoRepository adminPhotoRepository) : Admin
 {
     public IReadOnlyList<AdminPhotoCategory> Categories { get; private set; } = [];
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
+
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
         Categories = await adminPhotoRepository.GetCategoriesAsync(cancellationToken);
         ViewData["Title"] = "Add photo";
+        Breadcrumbs = AdminBreadcrumbs.Page("Photos", "/admin/photos", "Add photo");
     }
 }
 
@@ -140,6 +146,8 @@ public sealed class EditModel(IAdminPhotoRepository adminPhotoRepository) : Admi
 
     public string? StatusMessageKind { get; private set; }
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
+
     public async Task<IActionResult> OnGetAsync(int id, CancellationToken cancellationToken)
     {
         Photo = await adminPhotoRepository.GetByIdAsync(id, cancellationToken);
@@ -152,6 +160,7 @@ public sealed class EditModel(IAdminPhotoRepository adminPhotoRepository) : Admi
         StatusMessage = TempData[MessageKey] as string;
         StatusMessageKind = TempData[MessageKindKey] as string;
         ViewData["Title"] = $"Edit photo — {Photo.Title}";
+        Breadcrumbs = AdminBreadcrumbs.Page("Photos", "/admin/photos", "Edit photo");
         return Page();
     }
 }

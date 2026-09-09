@@ -8,6 +8,8 @@ public sealed class NewModel(IBiographyRepository biographyRepository) : AdminBi
         new AdminBiographyDraft(string.Empty, string.Empty, string.Empty, 0),
         null);
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
+
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
         var chapters = await biographyRepository.GetChaptersAsync(cancellationToken);
@@ -18,6 +20,7 @@ public sealed class NewModel(IBiographyRepository biographyRepository) : AdminBi
             new AdminBiographyDraft(string.Empty, string.Empty, string.Empty, nextSequence),
             null);
         ViewData["Title"] = "Create biography chapter";
+        Breadcrumbs = AdminBreadcrumbs.Page("Biography", "/admin/biography", "New chapter");
     }
 
     public static ChapterFormViewModel BuildForm(AdminBiographyDraft draft, IReadOnlyList<string>? errors) =>

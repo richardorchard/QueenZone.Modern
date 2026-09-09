@@ -1,0 +1,56 @@
+appId: org.queenzone.mobile
+name: Submit and track news suggestion
+---
+- launchApp:
+    clearState: true
+    clearKeychain: true
+- extendedWaitUntil:
+    visible:
+      id: home-screen
+    timeout: 45000
+- runFlow: open-smoke-auth.yaml
+- tapOn:
+    id: tab-news
+- extendedWaitUntil:
+    visible:
+      id: news-screen
+    timeout: 20000
+- tapOn:
+    id: news-suggest
+- extendedWaitUntil:
+    visible:
+      id: suggest-news-url
+    timeout: 15000
+- tapOn:
+    id: suggest-news-url
+- inputText: https://example.com/queenzone-release-check
+- tapOn:
+    id: suggest-news-title
+- inputText: Release news suggestion
+# The URL and headline are sufficient for the representative write. Submit
+# from a dismissed single-line keyboard instead of fighting the optional
+# multiline notes field on iOS.
+- pressKey: Enter
+- scrollUntilVisible:
+    element:
+      id: suggest-news-submit
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: suggest-news-submit
+- extendedWaitUntil:
+    visible:
+      id: suggest-news-success
+    timeout: 20000
+- tapOn:
+    id: suggest-news-view-submissions
+- extendedWaitUntil:
+    visible:
+      id: my-submissions-screen
+    timeout: 20000
+- tapOn:
+    id: my-submissions-tab-news
+- extendedWaitUntil:
+    visible: Release news suggestion
+    timeout: 20000
+- assertVisible: Pending

@@ -17,12 +17,15 @@ public sealed class IndexModel(
 
     public string? StatusMessageKind { get; private set; }
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
+
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
         Quotes = await quoteRepository.GetAllAsync(cancellationToken);
         StatusMessage = TempData[MessageKey] as string;
         StatusMessageKind = TempData[MessageKindKey] as string;
         ViewData["Title"] = "Quotes";
+        Breadcrumbs = AdminBreadcrumbs.Section("Quotes", "/admin/quotes");
     }
 
     public async Task<IActionResult> OnPostAsync(

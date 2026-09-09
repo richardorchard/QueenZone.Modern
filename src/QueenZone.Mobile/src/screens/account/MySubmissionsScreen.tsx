@@ -21,6 +21,7 @@ import {
 import { MemberGate } from '../../session/MemberGate';
 import { useSession } from '../../session/SessionContext';
 import { radius, space, type, useTheme, type ColorScheme } from '../../theme';
+import { testIds } from '../../test/testIds';
 import { ArchiveImage } from '../../ui/ArchiveImage';
 import { ThemedRefreshControl } from '../../ui/ThemedRefreshControl';
 
@@ -142,6 +143,7 @@ function MySubmissionsList() {
 
   return (
     <ScrollView
+      testID={testIds.mySubmissionsScreen}
       style={[styles.flex, { backgroundColor: c.surfacePage }]}
       contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + space.xxl }]}
       refreshControl={
@@ -162,6 +164,7 @@ function MySubmissionsList() {
           return (
             <Pressable
               key={item.value}
+              testID={`${testIds.mySubmissionsTabPrefix}${item.value}`}
               accessibilityRole="tab"
               accessibilityState={{ selected }}
               accessibilityLabel={item.label}

@@ -3,10 +3,8 @@
 @using QueenZone.Data
 
 <div class="admin-shell">
+  <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
   <h1>Reported messages</h1>
-  <p>
-    <a href="/admin">Back to admin</a>
-  </p>
   <p>
     Reviewing a report opens the reported message content and records who viewed it and when
     (<a href="https://github.com/richardorchard/QueenZone.Modern/blob/main/docs/decisions/0015-private-message-report-retention-and-audit.md">ADR 0015</a>).

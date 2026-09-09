@@ -19,12 +19,15 @@ public sealed class PromptSettingsModel(
 
     public IReadOnlyList<string> Errors { get; private set; } = [];
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
+
     public async Task<IActionResult> OnGetAsync(CancellationToken cancellationToken)
     {
         await LoadAsync(cancellationToken);
         StatusMessage = TempData["GuidanceMessage"] as string;
         StatusMessageKind = TempData["GuidanceMessageKind"] as string;
         ViewData["Title"] = "News agent editorial guidance";
+        Breadcrumbs = AdminBreadcrumbs.Page("AI discovery", "/admin/news-discovery", "Prompt settings");
         return Page();
     }
 
@@ -96,11 +99,13 @@ public sealed class PromptSettingsModel(
         string successMessage,
         CancellationToken cancellationToken)
     {
+        ViewData["Title"] = "News agent editorial guidance";
+        Breadcrumbs = AdminBreadcrumbs.Page("AI discovery", "/admin/news-discovery", "Prompt settings");
+
         if (confirmRequired && !confirmed)
         {
             await LoadAsync(cancellationToken);
             Errors = ["Confirm this action before continuing."];
-            ViewData["Title"] = "News agent editorial guidance";
             return Page();
         }
 
@@ -116,21 +121,18 @@ public sealed class PromptSettingsModel(
         {
             await LoadAsync(cancellationToken);
             Errors = [ex.Message];
-            ViewData["Title"] = "News agent editorial guidance";
             return Page();
         }
         catch (NewsAgentGuidanceValidationException ex)
         {
             await LoadAsync(cancellationToken);
             Errors = [ex.Message];
-            ViewData["Title"] = "News agent editorial guidance";
             return Page();
         }
         catch (InvalidOperationException ex)
         {
             await LoadAsync(cancellationToken);
             Errors = [ex.Message];
-            ViewData["Title"] = "News agent editorial guidance";
             return Page();
         }
     }

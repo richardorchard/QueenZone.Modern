@@ -25,12 +25,15 @@ public sealed class IndexModel(IAdminFreddieTributeRepository tributeRepository)
 
     public string? StatusMessageKind { get; private set; }
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
+
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
         Tributes = await tributeRepository.GetPageAsync(BuildFilter(), PageNumber, PageSize, cancellationToken);
         StatusMessage = TempData[MessageKey] as string;
         StatusMessageKind = TempData[MessageKindKey] as string;
         ViewData["Title"] = "Freddie tributes";
+        Breadcrumbs = AdminBreadcrumbs.Section("Freddie tributes", "/admin/freddie-tributes");
     }
 
     public string BuildPageQuery(int pageNumber)

@@ -15,6 +15,8 @@ public sealed class EditModel(
 
     public string? StatusMessageKind { get; private set; }
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
+
     public async Task<IActionResult> OnGetAsync(int id, CancellationToken cancellationToken)
     {
         var article = await adminNewsRepository.GetByIdAsync(id, cancellationToken);
@@ -40,6 +42,7 @@ public sealed class EditModel(
         }
 
         ViewData["Title"] = "Edit article";
+        Breadcrumbs = AdminBreadcrumbs.Page("News articles", "/admin/news", "Edit article");
         var draft = ToDraft(article);
         Form = BuildForm(
             article,

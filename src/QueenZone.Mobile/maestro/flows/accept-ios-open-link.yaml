@@ -1,13 +1,14 @@
 appId: org.queenzone.mobile
 ---
-# iOS 26 Simulator shows "Open in QueenZone?" asynchronously after simctl
-# openurl of queenzone:// on a fresh install (#1281). Its alert title is not
-# consistently exposed to XCTest, but the exact Open button is.
+# iOS shows "Open in QueenZone?" asynchronously after simctl openurl of
+# queenzone:// on a fresh install (#1281). An optional tap retains Maestro's
+# normal selector wait without failing once the scheme is already trusted.
+# The alert title is not consistently exposed to XCTest, but the exact Open
+# button is.
 - runFlow:
     when:
       platform: iOS
-      visible:
-        text: '^Open$'
     commands:
       - tapOn:
           text: '^Open$'
+          optional: true

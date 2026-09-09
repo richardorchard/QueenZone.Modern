@@ -11,6 +11,8 @@ public sealed class EditPostModel(
 {
     public TimelineFormViewModel? Form { get; private set; }
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = AdminBreadcrumbs.Page("Timeline", "/admin/timeline", "Edit event");
+
     public async Task<IActionResult> OnPostAsync(
         int id,
         [FromForm] AdminTimelineForm form,

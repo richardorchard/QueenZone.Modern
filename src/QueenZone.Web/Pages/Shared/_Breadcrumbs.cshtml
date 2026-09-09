@@ -22,5 +22,17 @@
       }
     </ol>
   </nav>
-  @Html.Raw($"""<script type="application/ld+json" nonce="{Context.GetCspNonce()}">{BreadcrumbJsonLd.Build(Model, SiteOptionsAccessor.Value.PublicBaseUrl)}</script>""")
+  // Callers that don't have a real URL for the current page (e.g. Admin
+  // edit/detail pages) pass a placeholder "#" for the trailing crumb;
+  // resolve it to the actual request path so the JSON-LD doesn't claim
+  // the current page's URL is the homepage.
+  var jsonLdItems = Model;
+  var lastCrumb = Model[Model.Count - 1];
+  if (string.IsNullOrEmpty(lastCrumb.Href) || lastCrumb.Href == "#")
+  {
+    var resolved = new List<BreadcrumbItem>(Model);
+    resolved[resolved.Count - 1] = lastCrumb with { Href = Context.Request.Path.Value ?? lastCrumb.Href };
+    jsonLdItems = resolved;
+  }
+  @Html.Raw($"""<script type="application/ld+json" nonce="{Context.GetCspNonce()}">{BreadcrumbJsonLd.Build(jsonLdItems, SiteOptionsAccessor.Value.PublicBaseUrl)}</script>""")
 }
