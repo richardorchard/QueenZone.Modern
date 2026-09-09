@@ -21,6 +21,7 @@ next free number.
 | [0014](0014-push-notification-transport-and-dispatch.md) | Push notification transport and dispatch model | Accepted |
 | [0015](0015-private-message-report-retention-and-audit.md) | Private message report retention and moderator access audit | Accepted |
 | [0016](0016-news-forum-topic-on-first-publish.md) | News-forum topic on first article publish | Accepted |
-| [0017](0017-production-region-eastus.md) | Production Azure region — `eastus` | Accepted |
+| [0017](0017-production-region-eastus.md) | Production Azure region — `eastus` | Superseded by 0020 |
 | [0018](0018-mobile-server-state-strategy.md) | Mobile server-state strategy | Accepted |
 | [0019](0019-api-versioning-convention.md) | API versioning convention (mobile / store-lag) | Accepted |
+| [0020](0020-production-region-canadaeast.md) | Production Azure region — `canadaeast` | Accepted |

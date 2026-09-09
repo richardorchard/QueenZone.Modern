@@ -43,13 +43,13 @@ variable "azure_location" {
 }
 
 variable "production_target_location" {
-  description = "Approved target region for the replacement production estate (ADR 0017)."
+  description = "Approved target region for the replacement production estate (ADR 0020)."
   type        = string
-  default     = "eastus"
+  default     = "canadaeast"
 
   validation {
-    condition     = contains(["eastus", "eastus2"], var.production_target_location)
-    error_message = "Production must migrate to eastus, with eastus2 allowed only as ADR 0017's capacity fallback."
+    condition     = var.production_target_location == "canadaeast"
+    error_message = "Production must migrate to canadaeast as approved by ADR 0020."
   }
 }
 
