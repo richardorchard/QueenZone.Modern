@@ -3364,11 +3364,39 @@ a.qz-forum-post__author-link:focus-visible {
   aspect-ratio: 3 / 2;
   margin: 0 0 1rem;
   background: var(--qz-black);
+  cursor: grab;
+}
+
+.admin-article-crop__stage:active {
+  cursor: grabbing;
 }
 
 .admin-article-crop__stage img {
   display: block;
-  max-width: 100%;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+}
+
+.admin-article-crop__stage .cropper-container {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Fixed 3:2 card: drag must reach Cropper's move layer, not the outline. */
+.admin-article-crop .cropper-crop-box,
+.admin-article-crop .cropper-face,
+.admin-article-crop .cropper-line,
+.admin-article-crop .cropper-point {
+  pointer-events: none;
+}
+
+.admin-article-crop .cropper-drag-box {
+  cursor: grab;
+}
+
+.admin-article-crop .cropper-drag-box:active {
+  cursor: grabbing;
 }
 
 .admin-article-crop__zoom {
