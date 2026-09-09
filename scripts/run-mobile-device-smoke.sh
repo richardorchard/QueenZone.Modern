@@ -549,9 +549,10 @@ set -e
 # DeviceServerDiedException across observed runs. Preserve that attempt,
 # recover ADB, reinstall the same APK, and retry once when the emulator is
 # still alive. A hierarchy timeout is not a product assert failure. If the
-# emulator process is gone, leave android-transport-death so CI can boot a
-# fresh emulator and rerun the same flows. Selector and assertion failures
-# stay single-attempt.
+# emulator process is gone, write android-transport-death so CI can boot a
+# fresh emulator and rerun the same flows. A selector miss after a live
+# in-process retry must not write that marker. Selector and assertion
+# failures stay single-attempt.
 if [ "$platform" = "android" ] \
   && [ "$maestro_status" -ne 0 ] \
   && android_transport_died; then
