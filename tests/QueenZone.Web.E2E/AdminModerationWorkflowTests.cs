@@ -483,8 +483,11 @@ public class AdminModerationWorkflowTests : RealDataPageTest
 
     /// <summary>
     /// Deletes every row this fixture created, matched by the <c>uie2e-{runId}-...</c> marker.
-    /// <c>PIC_FILES_T</c> is deleted (and its <see cref="QueenZoneDbContext.PhotoAdminAuditLogs"/>
-    /// rows) before the owning <see cref="PhotoSubmissionEntity"/>, mirroring
+    /// <c>SearchDocument</c> copies are removed by <c>SourceKey</c> (<c>news:{id}</c>,
+    /// <c>article:{slug}</c>, <c>biography:{id}</c>) so publish/reindex cannot leave an index
+    /// row after the source is gone. <c>PIC_FILES_T</c> is deleted (and its
+    /// <see cref="QueenZoneDbContext.PhotoAdminAuditLogs"/> rows) before the owning
+    /// <see cref="PhotoSubmissionEntity"/>, mirroring
     /// <c>EfContentSubmissionLiveProbeTests</c>'s self-cleaning promotion probe in
     /// <c>QueenZone.Web.Tests</c> — the same repository path <c>PhotoSubmissionPromotionService</c>
     /// uses, and the same one <c>Admin_photo_create_edit_and_hard_delete_round_trip</c> writes to
@@ -521,6 +524,10 @@ public class AdminModerationWorkflowTests : RealDataPageTest
                 await db.PhotoSubmissions.Where(s => submissionIds.Contains(s.Id)).ExecuteDeleteAsync();
             }
 
+            var articleSlugs = await db.ArticleSubmissions
+                .Where(s => s.Title.Contains(marker))
+                .Select(s => s.Slug)
+                .ToListAsync();
             await db.ArticleSubmissions.Where(s => s.Title.Contains(marker)).ExecuteDeleteAsync();
             await db.NewsSuggestions
                 .Where(s => s.Url.Contains(marker) || (s.Title != null && s.Title.Contains(marker)))
@@ -532,6 +539,17 @@ public class AdminModerationWorkflowTests : RealDataPageTest
                 await db.NewsAuditLogs.Where(a => newsIds.Contains(a.NewsId)).ExecuteDeleteAsync();
                 await db.NewsRows.Where(r => newsIds.Contains(r.NewsId)).ExecuteDeleteAsync();
             }
+
+            var biographyIds = await db.Database
+                .SqlQueryRaw<int>(
+                    "SELECT CAST(Q_BIO_ID AS int) AS [Value] FROM dbo.Q_BIO_T WHERE TITLE LIKE {0}",
+                    marker + "%")
+                .ToListAsync();
+
+            var searchSourceKeys = newsIds.Select(SearchDocumentSourceKey.ForNews)
+                .Concat(articleSlugs.Where(slug => slug.Length > 0).Select(SearchDocumentSourceKey.ForArticle))
+                .Concat(biographyIds.Select(SearchDocumentSourceKey.ForBiography));
+            await SearchDocumentTeardown.DeleteBySourceKeysAsync(db, searchSourceKeys);
 
             await db.SearchDocuments
                 .Where(d => d.Title.Contains(marker) || d.SourceKey.Contains(marker))

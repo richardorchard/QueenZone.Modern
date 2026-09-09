@@ -49,6 +49,9 @@ public sealed class EfAdminNewsRepositoryLegacyWriteProbeTests
         finally
         {
             await repository.DeleteAsync(newsId, "legacy-write-probe@queenzone.local");
+            await SearchDocumentTeardown.DeleteBySourceKeysAsync(
+                dbContext,
+                [SearchDocumentSourceKey.ForNews(newsId)]);
             Assert.Null(await repository.GetByIdAsync(newsId));
         }
     }

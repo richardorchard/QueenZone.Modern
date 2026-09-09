@@ -93,6 +93,22 @@ public sealed class EfLegacyProbeResidueTests
     }
 
     [Fact]
+    public void SearchDocument_residue_failure_names_content_type_and_source_key()
+    {
+        var leftovers = new[]
+        {
+            new SearchDocumentResidueRef("news", "news:900042"),
+            new SearchDocumentResidueRef("article", "article:probe-article-slug"),
+        };
+
+        var message = FormatSearchDocumentResidueFailure(leftovers);
+
+        Assert.Contains("Residue found in SearchDocument", message, StringComparison.Ordinal);
+        Assert.Contains("news news:900042", message, StringComparison.Ordinal);
+        Assert.Contains("article article:probe-article-slug", message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Known_probe_and_web_test_markers_are_absent_when_check_enabled()
     {
         if (!IsCheckEnabled(out var connectionString))
@@ -126,7 +142,10 @@ public sealed class EfLegacyProbeResidueTests
         Assert.False(await ArticleSubmissionResidueQuery(dbContext).AnyAsync(), "Residue found in ArticleSubmissions.");
         Assert.False(await NewsSuggestionResidueQuery(dbContext).AnyAsync(), "Residue found in NewsSuggestions.");
         Assert.False(await PhotoAdminAuditResidueQuery(dbContext).AnyAsync(), "Residue found in PhotoAdminAuditLog.");
-        Assert.False(await SearchDocumentResidueQuery(dbContext).AnyAsync(), "Residue found in SearchDocument.");
+        var searchDocumentResidue = await SearchDocumentResidueQuery(dbContext)
+            .Select(document => new SearchDocumentResidueRef(document.ContentType, document.SourceKey))
+            .ToListAsync();
+        Assert.True(searchDocumentResidue.Count == 0, FormatSearchDocumentResidueFailure(searchDocumentResidue));
         var legacyTestPhotoCount = await dbContext.Database
             .SqlQueryRaw<int>(LegacyPhotoResidueSql)
             .SingleAsync();
@@ -294,6 +313,21 @@ public sealed class EfLegacyProbeResidueTests
             || document.Url.Contains(UiTestMarker)
             || (document.Summary != null && document.Summary.Contains(UiTestMarker))
             || (document.AuthorDisplayName != null && document.AuthorDisplayName.Contains(UiTestMarker)));
+
+    internal readonly record struct SearchDocumentResidueRef(string ContentType, string SourceKey);
+
+    internal static string FormatSearchDocumentResidueFailure(IReadOnlyList<SearchDocumentResidueRef> leftovers)
+    {
+        if (leftovers.Count == 0)
+        {
+            return "Residue found in SearchDocument.";
+        }
+
+        var details = string.Join(
+            ", ",
+            leftovers.Select(item => $"{item.ContentType} {item.SourceKey}"));
+        return $"Residue found in SearchDocument: {details}.";
+    }
 
     private static void SeedUiTestResidue(QueenZoneDbContext dbContext)
     {

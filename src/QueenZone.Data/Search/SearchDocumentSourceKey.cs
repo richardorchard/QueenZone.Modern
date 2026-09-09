@@ -3,11 +3,19 @@ using System.Globalization;
 namespace QueenZone.Data;
 
 /// <summary>
-/// Parses <see cref="Entities.SearchDocumentEntity.SourceKey"/> values written by the search
-/// reindex builder (<c>news:123</c>, <c>forum-thread:4521</c>, <c>article:some-slug</c>, …).
+/// Parses and formats <see cref="Entities.SearchDocumentEntity.SourceKey"/> values written by the
+/// search reindex builder (<c>news:123</c>, <c>forum-thread:4521</c>, <c>article:some-slug</c>, …).
 /// </summary>
 public static class SearchDocumentSourceKey
 {
+    public static string ForNews(int newsId) => $"news:{newsId}";
+
+    public static string ForArticle(string slug) => $"article:{slug}";
+
+    public static string ForBiography(int chapterId) => $"biography:{chapterId}";
+
+    public static string ForForumThread(int topicId) => $"forum-thread:{topicId}";
+
     /// <summary>
     /// Returns the numeric id after the last colon when the suffix is an integer; otherwise
     /// <see langword="null"/> (slug keys such as <c>article:some-slug</c>).
