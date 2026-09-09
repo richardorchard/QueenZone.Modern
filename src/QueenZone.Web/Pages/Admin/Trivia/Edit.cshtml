@@ -6,6 +6,7 @@
 }
 
 <div class="admin-shell">
+  <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
   @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
   {
     <p class="admin-status admin-status--@Model.StatusMessageKind">@Model.StatusMessage</p>

@@ -12,6 +12,8 @@ public sealed class IndexModel(IFanPerformanceReportRepository reportRepository)
 
     public string StatusFilter { get; private set; } = FanPerformanceReportStatus.Open;
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
+
     public async Task OnGetAsync(
         string? status = FanPerformanceReportStatus.Open,
         int pageNumber = 1,
@@ -25,5 +27,6 @@ public sealed class IndexModel(IFanPerformanceReportRepository reportRepository)
             FanPerformanceReportLimits.ListPageSize,
             cancellationToken);
         ViewData["Title"] = "Fan performance reports";
+        Breadcrumbs = AdminBreadcrumbs.Section("Fan performance reports", "/admin/fan-performance-reports");
     }
 }

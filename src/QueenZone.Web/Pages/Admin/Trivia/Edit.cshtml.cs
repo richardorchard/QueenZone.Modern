@@ -11,6 +11,8 @@ public sealed class EditModel(ITriviaRepository triviaRepository) : AdminTriviaP
 
     public string? StatusMessageKind { get; private set; }
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
+
     public async Task<IActionResult> OnGetAsync(int id, CancellationToken cancellationToken)
     {
         var fact = await triviaRepository.GetByIdAsync(id, cancellationToken);
@@ -22,6 +24,7 @@ public sealed class EditModel(ITriviaRepository triviaRepository) : AdminTriviaP
         StatusMessage = TempData[MessageKey] as string;
         StatusMessageKind = TempData[MessageKindKey] as string;
         ViewData["Title"] = "Edit trivia fact";
+        Breadcrumbs = AdminBreadcrumbs.Page("Trivia", "/admin/trivia", "Edit trivia fact");
         Form = BuildForm(fact, ToDraft(fact), null);
         return Page();
     }

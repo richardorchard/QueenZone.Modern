@@ -15,6 +15,8 @@ public sealed class DetailModel(
 
     public string? StatusMessageKind { get; private set; }
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
+
     public async Task<IActionResult> OnGetAsync(Guid id, CancellationToken cancellationToken)
     {
         Submission = await photoSubmissionRepository.GetByIdAsync(id, cancellationToken);
@@ -27,6 +29,7 @@ public sealed class DetailModel(
         StatusMessage = TempData["PhotoSubmissionMessage"] as string;
         StatusMessageKind = TempData["PhotoSubmissionMessageKind"] as string;
         ViewData["Title"] = $"Review photo — {Submission.Title}";
+        Breadcrumbs = AdminBreadcrumbs.Page("Photo submissions", "/admin/photo-submissions", "Review submission");
         return Page();
     }
 }

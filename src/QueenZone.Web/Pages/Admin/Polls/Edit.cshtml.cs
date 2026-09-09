@@ -13,6 +13,8 @@ public sealed class EditModel(IHomePollRepository homePollRepository) : AdminPol
 
     public string? StatusMessageKind { get; private set; }
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
+
     public async Task<IActionResult> OnGetAsync(Guid id, CancellationToken cancellationToken)
     {
         var poll = await homePollRepository.GetByIdAsync(id, cancellationToken);
@@ -25,6 +27,7 @@ public sealed class EditModel(IHomePollRepository homePollRepository) : AdminPol
         StatusMessage = TempData[MessageKey] as string;
         StatusMessageKind = TempData[MessageKindKey] as string;
         ViewData["Title"] = "Edit poll";
+        Breadcrumbs = AdminBreadcrumbs.Page("Home polls", "/admin/polls", "Edit poll");
         Form = BuildForm(poll, ToDraft(poll), null);
         return Page();
     }

@@ -17,6 +17,8 @@ public sealed class EditDraftModel(
 
     public IReadOnlyList<string> Errors { get; private set; } = [];
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
+
     public async Task<IActionResult> OnGetAsync(int id, CancellationToken cancellationToken)
     {
         Candidate = await discoveryRepository.GetCandidateByIdAsync(id, cancellationToken);
@@ -34,6 +36,10 @@ public sealed class EditDraftModel(
 
         Form = AgentDraftForm.FromDraft(draft);
         ViewData["Title"] = $"Edit draft for candidate #{id}";
+        Breadcrumbs = AdminBreadcrumbs.Page(
+            "AI discovery", "/admin/news-discovery",
+            $"Review candidate #{id}", $"/admin/news-discovery/{id}",
+            "Edit draft");
         return Page();
     }
 
@@ -52,6 +58,10 @@ public sealed class EditDraftModel(
         {
             Form.Body = sanitizedBody;
             ViewData["Title"] = $"Edit draft for candidate #{id}";
+            Breadcrumbs = AdminBreadcrumbs.Page(
+                "AI discovery", "/admin/news-discovery",
+                $"Review candidate #{id}", $"/admin/news-discovery/{id}",
+                "Edit draft");
             return Page();
         }
 

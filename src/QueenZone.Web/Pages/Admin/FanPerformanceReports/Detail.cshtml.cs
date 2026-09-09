@@ -12,6 +12,8 @@ public sealed class DetailModel(IFanPerformanceReportRepository reportRepository
 
     public string? StatusMessageKind { get; private set; }
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
+
     public async Task<IActionResult> OnGetAsync(Guid id, CancellationToken cancellationToken)
     {
         Report = await reportRepository.GetByIdAsync(id, cancellationToken);
@@ -23,6 +25,7 @@ public sealed class DetailModel(IFanPerformanceReportRepository reportRepository
         StatusMessage = TempData["FanPerformanceReportMessage"] as string;
         StatusMessageKind = TempData["FanPerformanceReportMessageKind"] as string;
         ViewData["Title"] = "Fan performance report";
+        Breadcrumbs = AdminBreadcrumbs.Page("Fan performance reports", "/admin/fan-performance-reports", "Fan performance report");
         return Page();
     }
 }

@@ -14,8 +14,8 @@
 }
 
 <div class="admin-shell">
+  <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
   <h1>Review photo submission</h1>
-  <p><a href="/admin/photo-submissions">Back to queue</a></p>
 
   @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
   {

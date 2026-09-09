@@ -13,8 +13,8 @@
 }
 
 <div class="admin-shell">
+  <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
   <h1>Review trivia suggestion</h1>
-  <p><a href="/admin/trivia-submissions">Back to queue</a></p>
 
   @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
   {

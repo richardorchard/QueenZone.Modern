@@ -21,6 +21,8 @@ public sealed class IndexModel(
 
     public string? StatusMessageKind { get; private set; }
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
+
     [BindProperty(SupportsGet = true)]
     public int PageNumber { get; set; } = 1;
 
@@ -55,6 +57,7 @@ public sealed class IndexModel(
         StatusMessage = TempData[MessageKey] as string;
         StatusMessageKind = TempData[MessageKindKey] as string;
         ViewData["Title"] = "Trivia";
+        Breadcrumbs = AdminBreadcrumbs.Section("Trivia", "/admin/trivia");
     }
 
     public async Task<IActionResult> OnPostAsync(

@@ -9,11 +9,14 @@ public sealed class IndexModel(IFanPerformanceSubmissionRepository fanPerformanc
 
     public int PageNumber { get; private set; } = 1;
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
+
     public async Task OnGetAsync(int pageNumber = 1, CancellationToken cancellationToken = default)
     {
         PageNumber = Math.Max(1, pageNumber);
         Submissions = await fanPerformanceSubmissionRepository.GetPendingAsync(PageNumber, 50, cancellationToken);
         ViewData["Title"] = "Fan performance submissions";
+        Breadcrumbs = AdminBreadcrumbs.Section("Fan performance submissions", "/admin/fan-performance-submissions");
     }
 
     public static string FormatDuration(int? seconds)
