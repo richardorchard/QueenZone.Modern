@@ -1,0 +1,67 @@
+appId: org.queenzone.mobile
+---
+- launchApp:
+    clearState: false
+- tapOn:
+    id: tab-archive
+- extendedWaitUntil:
+    visible:
+      id: archive-hub-screen
+    timeout: 30000
+- scrollUntilVisible:
+    element: ".*Fan performances.*"
+    direction: DOWN
+    timeout: 20000
+- tapOn: ".*Fan performances.*"
+- extendedWaitUntil:
+    visible:
+      id: fan-performances-screen
+    timeout: 30000
+- takeScreenshot: 08-fan-performances
+- tapOn:
+    id: tab-archive
+- extendedWaitUntil:
+    visible:
+      id: archive-hub-screen
+    timeout: 30000
+- scrollUntilVisible:
+    element: ".*Trivia.*"
+    direction: DOWN
+    timeout: 20000
+- tapOn: ".*Trivia.*"
+- extendedWaitUntil:
+    visible:
+      id: trivia-screen
+    timeout: 30000
+- takeScreenshot: 09-trivia
+- tapOn:
+    id: tab-archive
+- extendedWaitUntil:
+    visible:
+      id: archive-hub-screen
+    timeout: 30000
+- tapOn: ".*Biography.*"
+- extendedWaitUntil:
+    visible: ".*1946.*1969.*"
+    timeout: 30000
+- takeScreenshot: 10-biography
+- tapOn:
+    id: tab-photos
+- extendedWaitUntil:
+    visible:
+      id: photos-screen
+    timeout: 30000
+- tapOn:
+    point: 75%,30%
+- extendedWaitUntil:
+    visible:
+      id: photo-category-screen
+    timeout: 30000
+- takeScreenshot: 11-photo-gallery
+- tapOn:
+    point: 20%,42%
+- extendedWaitUntil:
+    visible:
+      id: photo-viewer-screen
+    timeout: 30000
+- takeScreenshot: 12-photo-viewer

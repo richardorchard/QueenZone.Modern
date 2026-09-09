@@ -1,13 +1,15 @@
 # Final Google Play screenshots
 
-Place final release-candidate exports here using:
+The validated upload-ready phone set is in `upload-ready/` using:
 
 - `phone-01-home.png`
 - `phone-02-archive.png`
 - `phone-03-news.png`
 - `phone-04-photography.png`
-- `phone-05-history.png`
-- `phone-06-community.png`
+- `phone-05-biography.png`
+- `phone-06-discography.png`
+- `phone-07-trivia.png`
+- `phone-08-forum.png`
 
-Target 1080 × 1920, 24-bit PNG without alpha. Follow `../../screenshot-plan.md`. Do not add design mockups or screenshots containing real private member data.
+All eight files are 1080 × 1920, 24-bit PNG without alpha. The complete correctly sized capture archive is in `raw-android/phone-1080x1920/`. Follow `../../screenshot-plan.md`. Do not add design mockups or screenshots containing real private member data.
 

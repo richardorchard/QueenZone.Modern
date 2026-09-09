@@ -25,6 +25,11 @@ appId: org.queenzone.mobile
 - tapOn: Sign in
 - tapOn:
     id: sign-in-other-ways
+- scrollUntilVisible:
+    element:
+      id: sign-in-email
+    direction: DOWN
+    timeout: 20000
 - tapOn:
     id: sign-in-email
 - inputText: ${REVIEWER_EMAIL}
