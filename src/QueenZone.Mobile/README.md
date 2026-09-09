@@ -575,12 +575,14 @@ when `mobile=true` (with skip-success stubs) and then enabling branch
 protection; record the date on #872. See
 [`docs/architecture/testing-policy.md`](../../docs/architecture/testing-policy.md).
 Failures upload `maestro-results/` (screenshots, JUnit, host/app logs).
-Maestro app assertions are not retried. The harness retries one Android ADB
-transport loss only when Maestro reports an Unknown-error result plus a dead or
-offline device before any assertion. It recovers ADB, reinstalls the same APK,
-and preserves the first diagnostics. An iOS driver startup may likewise retry
-once only when no JUnit file exists; the harness reboots the Simulator and
-preserves the first driver log. The authenticated smoke flow repeats only the
+Maestro app assertions are not retried. The harness retries one Android
+device-server or emulator transport loss (`DeviceServerDied`, hierarchy
+timeout, or a vanished `emulator-5554`): it recovers ADB when the
+emulator is still alive, otherwise the hosted Android job boots a fresh
+emulator and reruns once. Failure logs name transport death versus a
+selector miss. An iOS driver startup may likewise retry once only when no
+JUnit file exists; the harness reboots the Simulator and preserves the
+first driver log. The authenticated smoke flow repeats only the
 iOS smoke-auth deep link when the profile explicitly remains signed out after
 the system Open prompt; it does not repeat failed app assertions.
 

@@ -168,6 +168,41 @@ jobs:
           fi
 
       - name: Run Android device smoke
+        id: android-smoke
+        continue-on-error: true
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          force-avd-creation: false
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: ./scripts/run-mobile-device-smoke.sh --platform android --skip-build --no-build --apk src/QueenZone.Mobile/android/app/build/outputs/apk/release/app-release.apk $PROVE_FAILURE_ARGS
+
+      # hashFiles() is evaluated at job start, so classify from the marker the
+      # script writes. Retry boots a fresh emulator; in-process ADB recovery
+      # cannot revive emulator-5554 after DeviceServerDied (#1432).
+      - name: Classify Android smoke transport death
+        id: android-smoke-classify
+        if: steps.android-smoke.outcome == 'failure'
+        working-directory: .
+        run: |
+          MARKER=src/QueenZone.Mobile/maestro-results/android-transport-death
+          if [ -f "$MARKER" ]; then
+            echo "retry=true" >> "$GITHUB_OUTPUT"
+            echo "First Android smoke attempt died on device transport. Retrying once with a fresh emulator."
+            rm -rf src/QueenZone.Mobile/maestro-results-transport-first
+            mkdir -p src/QueenZone.Mobile/maestro-results-transport-first
+            cp -a src/QueenZone.Mobile/maestro-results/. src/QueenZone.Mobile/maestro-results-transport-first/
+          else
+            echo "retry=false" >> "$GITHUB_OUTPUT"
+            echo "First Android smoke attempt was a selector or assertion miss. Not retrying."
+          fi
+
+      - name: Retry Android device smoke after transport death
+        id: android-smoke-retry
+        if: steps.android-smoke-classify.outputs.retry == 'true'
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 36
@@ -179,7 +214,10 @@ jobs:
           script: ./scripts/run-mobile-device-smoke.sh --platform android --skip-build --no-build --apk src/QueenZone.Mobile/android/app/build/outputs/apk/release/app-release.apk $PROVE_FAILURE_ARGS
 
       - name: Collect leftover Android smoke logs
-        if: failure()
+        if: >-
+          always()
+          && steps.android-smoke.outcome == 'failure'
+          && steps.android-smoke-retry.outcome != 'success'
         timeout-minutes: 2
         working-directory: .
         run: |
@@ -194,14 +232,33 @@ jobs:
           done
 
       - name: Upload Android smoke diagnostics
-        if: failure()
+        if: >-
+          always()
+          && steps.android-smoke.outcome == 'failure'
+          && steps.android-smoke-retry.outcome != 'success'
         uses: actions/upload-artifact@v7
         with:
           name: mobile-android-smoke-${{ github.run_id }}
           path: |
             src/QueenZone.Mobile/maestro-results/
+            src/QueenZone.Mobile/maestro-results-transport-first/
           if-no-files-found: error
           retention-days: 7
+
+      - name: Fail Android smoke after unrecovered failure
+        if: >-
+          always()
+          && steps.android-smoke.outcome == 'failure'
+          && steps.android-smoke-retry.outcome != 'success'
+        working-directory: .
+        run: |
+          if [ -f src/QueenZone.Mobile/maestro-results/android-transport-death ] \
+            || [ -f src/QueenZone.Mobile/maestro-results-transport-first/android-transport-death ]; then
+            echo "::error::Android smoke failed after device transport death (emulator/Maestro device server). Not a selector miss."
+          else
+            echo "::error::Android smoke failed on a selector or assertion miss."
+          fi
+          exit 1
 
   mobile-ios-smoke:
     name: Mobile iOS device smoke
@@ -453,6 +510,38 @@ jobs:
           echo "DEVICE_SUITE_ARGS=--suite journeys" >> "$GITHUB_ENV"
 
       - name: Run Android device journeys
+        id: android-journeys
+        continue-on-error: true
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          force-avd-creation: false
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: ./scripts/run-mobile-device-smoke.sh --platform android $DEVICE_SUITE_ARGS --skip-build --no-build --apk src/QueenZone.Mobile/android/app/build/outputs/apk/release/app-release.apk
+
+      - name: Classify Android journeys transport death
+        id: android-journeys-classify
+        if: steps.android-journeys.outcome == 'failure'
+        working-directory: .
+        run: |
+          MARKER=src/QueenZone.Mobile/maestro-results/android-transport-death
+          if [ -f "$MARKER" ]; then
+            echo "retry=true" >> "$GITHUB_OUTPUT"
+            echo "First Android journeys attempt died on device transport. Retrying once with a fresh emulator."
+            rm -rf src/QueenZone.Mobile/maestro-results-transport-first
+            mkdir -p src/QueenZone.Mobile/maestro-results-transport-first
+            cp -a src/QueenZone.Mobile/maestro-results/. src/QueenZone.Mobile/maestro-results-transport-first/
+          else
+            echo "retry=false" >> "$GITHUB_OUTPUT"
+            echo "First Android journeys attempt was a selector or assertion miss. Not retrying."
+          fi
+
+      - name: Retry Android device journeys after transport death
+        id: android-journeys-retry
+        if: steps.android-journeys-classify.outputs.retry == 'true'
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 36
@@ -464,7 +553,10 @@ jobs:
           script: ./scripts/run-mobile-device-smoke.sh --platform android $DEVICE_SUITE_ARGS --skip-build --no-build --apk src/QueenZone.Mobile/android/app/build/outputs/apk/release/app-release.apk
 
       - name: Collect leftover Android journeys logs
-        if: failure()
+        if: >-
+          always()
+          && steps.android-journeys.outcome == 'failure'
+          && steps.android-journeys-retry.outcome != 'success'
         timeout-minutes: 2
         working-directory: .
         run: |
@@ -479,14 +571,33 @@ jobs:
           done
 
       - name: Upload Android journeys diagnostics
-        if: failure()
+        if: >-
+          always()
+          && steps.android-journeys.outcome == 'failure'
+          && steps.android-journeys-retry.outcome != 'success'
         uses: actions/upload-artifact@v7
         with:
           name: mobile-android-journeys-${{ github.run_id }}
           path: |
             src/QueenZone.Mobile/maestro-results/
+            src/QueenZone.Mobile/maestro-results-transport-first/
           if-no-files-found: error
           retention-days: 7
+
+      - name: Fail Android journeys after unrecovered failure
+        if: >-
+          always()
+          && steps.android-journeys.outcome == 'failure'
+          && steps.android-journeys-retry.outcome != 'success'
+        working-directory: .
+        run: |
+          if [ -f src/QueenZone.Mobile/maestro-results/android-transport-death ] \
+            || [ -f src/QueenZone.Mobile/maestro-results-transport-first/android-transport-death ]; then
+            echo "::error::Android journeys failed after device transport death (emulator/Maestro device server). Not a selector miss."
+          else
+            echo "::error::Android journeys failed on a selector or assertion miss."
+          fi
+          exit 1
 
   mobile-android-release:
     name: Mobile Android P0 release suite

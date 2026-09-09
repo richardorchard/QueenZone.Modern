@@ -212,8 +212,8 @@ describe('device-smoke harness (#1281)', () => {
       workflow.indexOf('  mobile-ios-journeys:'),
     );
     assert.equal((workflow.match(/\.\/gradlew --stop/g) ?? []).length, 3);
-    assert.equal((workflow.match(/api-level: 36/g) ?? []).length, 2);
-    assert.equal((workflow.match(/-gpu swiftshader_indirect/g) ?? []).length, 2);
+    assert.equal((workflow.match(/api-level: 36/g) ?? []).length, 4);
+    assert.equal((workflow.match(/-gpu swiftshader_indirect/g) ?? []).length, 4);
     assert.match(workflow, /mobile-android-release:[\s\S]*runs-on: \[self-hosted, macOS, ARM64, queenzone\]/);
     assert.match(workflow, /mobile-android-release:[\s\S]*github\.event\.inputs\.suite == 'release'/);
     assert.match(workflow, /mobile-android-release:[\s\S]*Export installed Android SDK/);
@@ -262,19 +262,43 @@ describe('device-smoke harness (#1281)', () => {
 
   it('retries only an Android device transport failure', () => {
     const script = readRepo('run-mobile-device-smoke.sh', scriptsDir);
+    const workflow = readRepo('mobile-device-smoke.yml', workflowsDir);
     assert.match(
       script,
       /DeviceServerDiedException\|Device server died\|device offline/,
     );
+    assert.match(script, /DEADLINE_EXCEEDED\|host:transport:/);
     assert.match(script, /grep -ERq[\s\S]*"\$results_dir\/debug"/);
     assert.doesNotMatch(
       script,
       /grep -Eq 'DeviceServerDiedException\|Device server died\|device offline' "\$results_dir\/junit\.xml"/,
     );
+    assert.match(script, /android-transport-death/);
+    assert.match(script, /Maestro failing cause: Android device transport death/);
+    assert.match(script, /Maestro failing cause: selector or assertion miss/);
     assert.match(script, /debug-android-transport-first/);
     assert.match(script, /adb reconnect offline/);
     assert.match(script, /adb install -r "\$apk"/);
     assert.match(script, /Selector and assertion failures are not retried/);
+    assert.match(workflow, /Retry Android device smoke after transport death/);
+    assert.match(workflow, /Retry Android device journeys after transport death/);
+    assert.match(workflow, /android-transport-death/);
+    assert.match(workflow, /Not a selector miss/);
+    assert.doesNotMatch(workflow, /Gilfoyle|Glory11/);
+
+    const pattern = /android_transport_re="([^"]+)"/.exec(script)?.[1];
+    assert.ok(pattern, 'android_transport_re is defined');
+    const re = new RegExp(pattern);
+    assert.match(
+      "maestro.android.DeviceServerDiedException: Device server died during 'viewHierarchy' DEADLINE_EXCEEDED",
+      re,
+    );
+    assert.match(
+      "Command failed (host:transport:emulator-5554): device 'emulator-5554' not found",
+      re,
+    );
+    assert.doesNotMatch('Assertion is false: id: home-hero is visible', re);
+    assert.doesNotMatch('Unknown error', re);
   });
 
   it('clears journey state before copying the attachment fixture', () => {
