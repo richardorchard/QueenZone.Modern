@@ -21,6 +21,8 @@ public sealed class EditPostModel(
 {
     public ArticleFormViewModel? Form { get; private set; }
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
+
     public async Task<IActionResult> OnPostAsync(
         int id,
         [FromForm] AdminNewsForm form,
@@ -83,6 +85,7 @@ public sealed class EditPostModel(
             }
 
             ViewData["Title"] = "Edit article";
+            Breadcrumbs = AdminBreadcrumbs.Page("News articles", "/admin/news", "Edit article");
             Form = EditModel.BuildForm(
                 existing,
                 draft,
@@ -100,6 +103,7 @@ public sealed class EditPostModel(
         {
             var current = await adminNewsRepository.GetByIdAsync(id, cancellationToken) ?? existing;
             ViewData["Title"] = "Edit article";
+            Breadcrumbs = AdminBreadcrumbs.Page("News articles", "/admin/news", "Edit article");
             Form = EditModel.BuildForm(
                 current,
                 ToDraft(current),

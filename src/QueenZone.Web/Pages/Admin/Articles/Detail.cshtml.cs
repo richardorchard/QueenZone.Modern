@@ -25,6 +25,8 @@ public sealed class DetailModel(
 
     public string StatusMessageKind { get; private set; } = "success";
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
+
     public async Task<IActionResult> OnGetAsync(Guid id, CancellationToken cancellationToken)
     {
         var submission = await articleSubmissionRepository.GetByIdAsync(id, cancellationToken);
@@ -40,6 +42,7 @@ public sealed class DetailModel(
         StatusMessageKind = TempData["ArticleMessageKind"] as string ?? "success";
 
         ViewData["Title"] = $"Review: {submission.Title}";
+        Breadcrumbs = AdminBreadcrumbs.Page("Articles", "/admin/articles", "Review article submission");
         return Page();
     }
 

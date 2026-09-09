@@ -36,11 +36,14 @@ public sealed class IndexModel(
 
     public bool IsRunning => Job.Phase == SearchReindexJobPhase.Running;
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
+
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
         StatusMessage = TempData[MessageKey] as string;
         StatusMessageKind = TempData[MessageKindKey] as string;
         Job = reindexJobService.GetSnapshot();
+        Breadcrumbs = AdminBreadcrumbs.Section("Search index", "/admin/search");
         await LoadCountsAsync(cancellationToken);
     }
 

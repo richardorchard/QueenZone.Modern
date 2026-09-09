@@ -10,6 +10,8 @@ public sealed class EditPostModel(
 {
     public QuoteFormViewModel? Form { get; private set; }
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = AdminBreadcrumbs.Page("Quotes", "/admin/quotes", "Edit quote");
+
     public async Task<IActionResult> OnPostAsync(
         int id,
         [FromForm] AdminQuoteForm form,

@@ -5,10 +5,8 @@
   var antiforgeryToken = Antiforgery.GetAndStoreTokens(HttpContext).RequestToken ?? string.Empty;
 }
 <div class="admin-shell">
+  <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
   <h1>News agent editorial guidance</h1>
-  <p>
-    <a href="/admin/news-discovery">Back to news discovery</a>
-  </p>
 
   <p class="admin-status admin-status--info">
     The text below is the editorial guidance used by future NewsAgent runs only. Publishing does not rewrite existing candidates, AI results, or drafts.

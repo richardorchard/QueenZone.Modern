@@ -8,9 +8,12 @@ public sealed class NewModel : AdminTriviaPageModel
         new AdminTriviaDraft(string.Empty, true, null, null, null),
         null);
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
+
     public void OnGet()
     {
         ViewData["Title"] = "Add trivia fact";
+        Breadcrumbs = AdminBreadcrumbs.Page("Trivia", "/admin/trivia", "New trivia fact");
     }
 
     public static TriviaFormViewModel BuildForm(AdminTriviaDraft draft, IReadOnlyList<string>? errors) =>

@@ -9,10 +9,13 @@ public sealed class IndexModel(ITriviaFactSubmissionRepository triviaFactSubmiss
 
     public int PageNumber { get; private set; } = 1;
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
+
     public async Task OnGetAsync(int pageNumber = 1, CancellationToken cancellationToken = default)
     {
         PageNumber = Math.Max(1, pageNumber);
         Submissions = await triviaFactSubmissionRepository.GetPendingAsync(PageNumber, 50, cancellationToken);
         ViewData["Title"] = "Trivia submissions";
+        Breadcrumbs = AdminBreadcrumbs.Section("Trivia submissions", "/admin/trivia-submissions");
     }
 }

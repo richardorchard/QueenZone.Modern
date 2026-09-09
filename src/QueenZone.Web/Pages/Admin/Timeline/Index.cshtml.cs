@@ -28,6 +28,8 @@ public sealed class IndexModel(
 
     public string? StatusMessageKind { get; private set; }
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
+
     public ArchivePaginationViewModel? Pagination { get; private set; }
 
     public async Task OnGetAsync(CancellationToken cancellationToken)
@@ -36,6 +38,7 @@ public sealed class IndexModel(
         StatusMessage = TempData[MessageKey] as string;
         StatusMessageKind = TempData[MessageKindKey] as string;
         ViewData["Title"] = "Timeline";
+        Breadcrumbs = AdminBreadcrumbs.Section("Timeline", "/admin/timeline");
 
         var totalPages = ArchivePagination.GetTotalPages(Events.TotalCount, PageSize);
         Pagination = AdminTimelineRoutes.GetListPaginationViewModel(Events.Page, totalPages, Published, Q);

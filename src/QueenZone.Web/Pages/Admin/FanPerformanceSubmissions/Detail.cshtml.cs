@@ -14,6 +14,8 @@ public sealed class DetailModel(IFanPerformanceSubmissionRepository fanPerforman
 
     public string? StatusMessageKind { get; private set; }
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
+
     public async Task<IActionResult> OnGetAsync(Guid id, CancellationToken cancellationToken)
     {
         Submission = await fanPerformanceSubmissionRepository.GetByIdAsync(id, cancellationToken);
@@ -26,6 +28,7 @@ public sealed class DetailModel(IFanPerformanceSubmissionRepository fanPerforman
         StatusMessage = TempData["FanPerformanceSubmissionMessage"] as string;
         StatusMessageKind = TempData["FanPerformanceSubmissionMessageKind"] as string;
         ViewData["Title"] = $"Review fan performance — {Submission.Title}";
+        Breadcrumbs = AdminBreadcrumbs.Page("Fan performance submissions", "/admin/fan-performance-submissions", "Review submission");
         return Page();
     }
 }

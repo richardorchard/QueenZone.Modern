@@ -9,8 +9,8 @@
 }
 
 <div class="admin-shell">
+  <partial name="_Breadcrumbs" model="Model.Breadcrumbs" />
   <h1>@request.Subject</h1>
-  <p><a href="/admin/help">Back to help requests</a></p>
 
   @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
   {

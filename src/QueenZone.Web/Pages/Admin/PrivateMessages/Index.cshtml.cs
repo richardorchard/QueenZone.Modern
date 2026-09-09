@@ -11,6 +11,8 @@ public sealed class IndexModel(IPrivateMessageRepository privateMessageRepositor
 
     public string StatusFilter { get; private set; } = PrivateMessageReportStatus.Open;
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
+
     public async Task OnGetAsync(
         string? status = PrivateMessageReportStatus.Open,
         int pageNumber = 1,
@@ -20,5 +22,6 @@ public sealed class IndexModel(IPrivateMessageRepository privateMessageRepositor
         StatusFilter = string.IsNullOrWhiteSpace(status) ? PrivateMessageReportStatus.Open : status;
         List = await privateMessageRepository.ListReportsAsync(StatusFilter, PageNumber, 50, cancellationToken);
         ViewData["Title"] = "Reported messages";
+        Breadcrumbs = AdminBreadcrumbs.Section("Reported messages", "/admin/private-messages");
     }
 }

@@ -15,6 +15,8 @@ public sealed class DetailModel(
 
     public string? StatusMessageKind { get; private set; }
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
+
     public async Task<IActionResult> OnGetAsync(Guid id, CancellationToken cancellationToken)
     {
         Suggestion = await newsSuggestionRepository.GetByIdAsync(id, cancellationToken);
@@ -30,6 +32,7 @@ public sealed class DetailModel(
         StatusMessage = TempData["NewsSuggestionMessage"] as string;
         StatusMessageKind = TempData["NewsSuggestionMessageKind"] as string;
         ViewData["Title"] = $"Review suggestion — {Suggestion.Title ?? Suggestion.Url}";
+        Breadcrumbs = AdminBreadcrumbs.Page("News suggestions", "/admin/news-suggestions", "Review news suggestion");
         return Page();
     }
 }

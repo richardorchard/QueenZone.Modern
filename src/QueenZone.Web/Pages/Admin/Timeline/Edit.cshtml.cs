@@ -11,6 +11,8 @@ public sealed class EditModel(IAdminQueenHistoryRepository historyRepository) : 
 
     public string? StatusMessageKind { get; private set; }
 
+    public IReadOnlyList<BreadcrumbItem> Breadcrumbs { get; private set; } = [];
+
     public async Task<IActionResult> OnGetAsync(int id, CancellationToken cancellationToken)
     {
         var historyEvent = await historyRepository.GetByIdAsync(id, cancellationToken);
@@ -22,6 +24,7 @@ public sealed class EditModel(IAdminQueenHistoryRepository historyRepository) : 
         StatusMessage = TempData[MessageKey] as string;
         StatusMessageKind = TempData[MessageKindKey] as string;
         ViewData["Title"] = "Edit timeline event";
+        Breadcrumbs = AdminBreadcrumbs.Page("Timeline", "/admin/timeline", "Edit event");
         Form = BuildForm(historyEvent, ToDraft(historyEvent), null);
         return Page();
     }
