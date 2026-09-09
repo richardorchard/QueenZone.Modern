@@ -1,5 +1,5 @@
 {
-  "auditDate": "2026-08-12",
+  "auditDate": "2026-09-09",
   "issue": 624,
   "storageAccount": "queenzone",
   "storageAccountId": "/subscriptions/610e3b3a-028d-4f1b-ac1d-a5567a4f8b9d/resourceGroups/Queenzone-RG/providers/Microsoft.Storage/storageAccounts/queenzone",
@@ -28,11 +28,13 @@
     { "name": "roger-taylor", "publicAccess": "blob", "opentofuTreatment": "import" },
     { "name": "songfiles", "publicAccess": null, "desiredPublicAccess": null, "opentofuTreatment": "import", "neverPublic": true, "notes": "Live 2026-08-12 was public blob. Private (None) since 2026-08-16 ARM apply after #702. App streams via /fan-performances/{id}/audio." },
     { "name": "special-events", "publicAccess": "blob", "opentofuTreatment": "import" },
-    { "name": "test", "publicAccess": "blob", "opentofuTreatment": "defer" },
+    { "name": "test", "publicAccess": "blob", "opentofuTreatment": "import", "notes": "Stage 2 inventory found 2,320 blobs totalling 4,110,472,406 bytes. Preserve during migration; any later deletion requires separate review." },
+    { "name": "ugc-articles", "publicAccess": null, "opentofuTreatment": "import", "neverPublic": true, "notes": "Live source container confirmed during #1272 Stage 2 inventory." },
     { "name": "ugc-avatars", "publicAccess": null, "opentofuTreatment": "import", "neverPublic": true, "relatedIssues": [583, 584] },
     { "name": "ugc-forum", "publicAccess": null, "opentofuTreatment": "import", "neverPublic": true, "relatedIssues": [583, 584] },
+    { "name": "ugc-photos", "publicAccess": null, "opentofuTreatment": "import", "neverPublic": true, "notes": "Live source container confirmed during #1272 Stage 2 inventory." },
     { "name": "us-convention-2001", "publicAccess": "blob", "opentofuTreatment": "import" }
   ],
-  "documentedButMissing": ["ugc-photos", "ugc-articles"],
+  "documentedButMissing": [],
   "relatedIssues": [177, 583, 584]
 }
