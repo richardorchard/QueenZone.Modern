@@ -112,19 +112,20 @@ describe('rewriteLoopbackForAndroid', () => {
 });
 
 describe('resolveMarketingVersion', () => {
-  it('uses the committed 0.1 prefix and local unsigned default', () => {
-    assert.equal(marketingVersionPrefix, '0.1');
-    assert.equal(resolveMarketingVersion(), '0.1.0');
-    assert.equal(resolveMarketingVersion({}), '0.1.0');
-    assert.equal(resolveMarketingVersion({ prefix: '0.1' }), '0.1.0');
-    assert.equal(resolveMarketingVersion({ prefix: '0.1', runNumber: '' }), '0.1.0');
-    assert.equal(resolveMarketingVersion({ prefix: '0.1', runNumber: '   ' }), '0.1.0');
+  it('uses the committed 1.0 prefix and local unsigned default', () => {
+    assert.equal(marketingVersionPrefix, '1.0');
+    assert.equal(resolveMarketingVersion(), '1.0.0');
+    assert.equal(resolveMarketingVersion({}), '1.0.0');
+    assert.equal(resolveMarketingVersion({ prefix: '1.0' }), '1.0.0');
+    assert.equal(resolveMarketingVersion({ prefix: '1.0', runNumber: '' }), '1.0.0');
+    assert.equal(resolveMarketingVersion({ prefix: '1.0', runNumber: '   ' }), '1.0.0');
   });
 
   it('appends the publish run number', () => {
-    assert.equal(resolveMarketingVersion({ prefix: '0.1', runNumber: '847' }), '0.1.847');
-    assert.equal(resolveMarketingVersion({ prefix: '0.1', runNumber: 214 }), '0.1.214');
-    assert.equal(resolveMarketingVersion({ prefix: '0.1', runNumber: '007' }), '0.1.7');
+    assert.equal(resolveMarketingVersion({ runNumber: '847' }), '1.0.847');
+    assert.equal(resolveMarketingVersion({ prefix: '1.0', runNumber: '847' }), '1.0.847');
+    assert.equal(resolveMarketingVersion({ prefix: '1.0', runNumber: 214 }), '1.0.214');
+    assert.equal(resolveMarketingVersion({ prefix: '1.0', runNumber: '007' }), '1.0.7');
   });
 
   it('rejects prefixes that are not N.N and non-positive run numbers', () => {

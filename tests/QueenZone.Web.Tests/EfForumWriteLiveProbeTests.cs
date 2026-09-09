@@ -128,6 +128,9 @@ public sealed class EfForumWriteLiveProbeTests
                 await cleanup.ModernForumThreads
                     .Where(t => t.Id == thread.Id)
                     .ExecuteDeleteAsync();
+                await SearchDocumentTeardown.DeleteBySourceKeysAsync(
+                    cleanup,
+                    [SearchDocumentSourceKey.ForForumThread(legacyTopicId)]);
             }
         }
 
