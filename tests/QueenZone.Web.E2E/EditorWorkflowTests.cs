@@ -140,9 +140,9 @@ public class EditorWorkflowTests : E2EPageTest
         var stage = Page.Locator("[data-article-image-stage]");
         var box = await stage.BoundingBoxAsync();
         Assert.That(box, Is.Not.Null);
-        await Page.Mouse.Move(box!.X + box.Width * 0.55, box.Y + box.Height * 0.55);
+        await Page.Mouse.MoveAsync(box!.X + box.Width * 0.55f, box.Y + box.Height * 0.55f);
         await Page.Mouse.DownAsync();
-        await Page.Mouse.Move(box.X + box.Width * 0.2, box.Y + box.Height * 0.2, new() { Steps = 12 });
+        await Page.Mouse.MoveAsync(box.X + box.Width * 0.2f, box.Y + box.Height * 0.2f, new() { Steps = 12 });
         await Page.Mouse.UpAsync();
 
         var after = await ReadStageCropAsync();
