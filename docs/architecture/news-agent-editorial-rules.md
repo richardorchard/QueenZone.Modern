@@ -65,6 +65,7 @@ Also in scope for future registry entries: official YouTube/community posts when
 | `ultimate-classic-rock` | https://ultimateclassicrock.com/ |
 | `music-news` | https://www.music-news.com/ |
 | `gold-radio` | https://www.goldradiouk.com/ |
+| `planet-rock` | https://www.hellorayo.co.uk/planet-rock |
 | `bbc-entertainment` | https://www.bbc.co.uk/news/entertainment_and_arts |
 | `udiscover-music` | https://www.udiscovermusic.com/news/ |
 | `official-charts` | https://www.officialcharts.com/news/ |
@@ -76,6 +77,8 @@ Also in scope for future registry entries: official YouTube/community posts when
 | `google-news-freddie-auctions` | https://news.google.com/ |
 | `google-news-wwry-musical` | https://news.google.com/ |
 | `google-news-john-deacon` | https://news.google.com/ |
+
+`planet-rock` is Secondary and seeded `enabled: true` (AllowlistedPage on the HelloRayo rock-news listing). It is not on the Gold Radio disabled watchlist.
 
 ### Seeded but disabled by default
 
