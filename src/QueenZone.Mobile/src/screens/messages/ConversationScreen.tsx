@@ -171,6 +171,7 @@ function ConversationThread({ navigation, route }: Props) {
 
   return (
     <KeyboardAvoidingView
+      testID={testIds.conversationScreen}
       style={[styles.flex, { backgroundColor: c.surfacePage }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? headerHeight : 0}

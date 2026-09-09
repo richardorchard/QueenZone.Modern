@@ -112,6 +112,7 @@ export function SuggestNewsScreen({ navigation }: Props) {
           </Text>
           <Button
             label="View my submissions"
+            testID={testIds.suggestNewsViewSubmissions}
             onPress={() => {
               share.acknowledge();
               navigation.navigate('MySubmissions');

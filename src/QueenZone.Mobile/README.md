@@ -553,6 +553,9 @@ on that bake because `appEnv` is development and `smokeEmbed` is set.
 
 # On-demand journeys (#1071); smoke.yaml stays 9 flows
 ./scripts/run-mobile-device-smoke.sh --platform android --suite journeys
+
+# Manual P0 release acceptance: member messaging, forum writes, news submission
+./scripts/run-mobile-device-smoke.sh --platform android --suite release
 ```
 
 Authenticated smoke injects the contract-host access token through
@@ -587,6 +590,18 @@ journeys` / `Mobile iOS device journeys`. Dispatch with `suite=journeys`
 (or `both`), or wait for the weekday 16:00 UTC slot. Do not add those
 names to branch protection until soak. `smoke.yaml` stays exactly the
 9 #872 flows.
+
+The manual P0 release suite (`maestro/release.yaml`, #1411) is a third,
+independent layer. Dispatch `suite=release` against a fresh Testing host. It
+runs on Android and iOS (`platform=both`, the default), or one selected platform
+for focused diagnostics. Android P0 acceptance uses the repository's ARM64
+self-hosted Mac and a dedicated hardware-rendered emulator on port 5556; repeated
+GitHub-hosted Linux emulator-process exits made that environment unsuitable for
+this longer release suite. Its three isolated flows authenticate with the
+Testing-only token and verify private-message compose/reply/archive/unarchive,
+forum topic creation and reply, and a news suggestion appearing under My
+submissions. It does not exercise real OAuth, SecureStore restoration, signed
+store artifacts, or production data; those are separate release checks (#1412).
 
 The unsigned jobs are PR compile checks only. Separate manual workflows
 publish installable builds: [`publish-ios-testflight.yml`](../../.github/workflows/publish-ios-testflight.yml)

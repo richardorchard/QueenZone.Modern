@@ -106,6 +106,7 @@ export const ConversationComposer = memo(function ConversationComposer({
           REPLYING TO {correspondentName.toUpperCase()}
         </Text>
         <Pressable
+          testID={testIds.conversationArchive}
           accessibilityRole="button"
           accessibilityLabel="Archive conversation"
           accessibilityState={{ disabled: archiving || archiveDisabled, busy: archiving }}
@@ -120,6 +121,7 @@ export const ConversationComposer = memo(function ConversationComposer({
         </Pressable>
       </View>
       <TextInput
+        testID={testIds.conversationReply}
         value={draft}
         onChangeText={setDraft}
         placeholder="Write a reply"
@@ -144,6 +146,7 @@ export const ConversationComposer = memo(function ConversationComposer({
       ) : null}
       <Button
         label="Send reply"
+        testID={testIds.conversationReplySubmit}
         onPress={() => {
           void submit();
         }}

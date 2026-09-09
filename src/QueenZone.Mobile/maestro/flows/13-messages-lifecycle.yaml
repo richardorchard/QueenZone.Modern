@@ -1,0 +1,85 @@
+appId: org.queenzone.mobile
+name: Private message lifecycle
+---
+- launchApp:
+    clearState: true
+    clearKeychain: true
+- extendedWaitUntil:
+    visible:
+      id: home-screen
+    timeout: 45000
+- runFlow: open-smoke-auth.yaml
+- tapOn:
+    id: home-messages
+- extendedWaitUntil:
+    visible:
+      id: inbox-screen
+    timeout: 20000
+- tapOn:
+    id: inbox-compose
+- extendedWaitUntil:
+    visible:
+      id: compose-message-recipient
+    timeout: 15000
+- tapOn:
+    id: compose-message-recipient
+- inputText: contract other
+- extendedWaitUntil:
+    visible:
+      id: compose-message-recipient-22222222-2222-2222-2222-222222222222
+    timeout: 15000
+- tapOn:
+    id: compose-message-recipient-22222222-2222-2222-2222-222222222222
+- tapOn:
+    id: compose-message-body
+- inputText: Release message lifecycle
+- hideKeyboard
+# Maestro's iOS keyboard dismissal can land on the newly revealed action.
+# Tap only when the compose action is still present, then assert navigation.
+- runFlow:
+    when:
+      visible:
+        id: compose-message-submit
+    commands:
+      - tapOn:
+          id: compose-message-submit
+- extendedWaitUntil:
+    visible:
+      id: conversation-screen
+    timeout: 20000
+- assertVisible: Release message lifecycle
+- tapOn:
+    id: conversation-reply
+- inputText: Release reply lifecycle
+- hideKeyboard
+- runFlow:
+    when:
+      visible:
+        id: conversation-reply-submit
+    commands:
+      - tapOn:
+          id: conversation-reply-submit
+- extendedWaitUntil:
+    visible: Release reply lifecycle
+    timeout: 20000
+- tapOn:
+    id: conversation-archive
+- tapOn:
+    text: '^Archive$'
+- extendedWaitUntil:
+    visible:
+      id: inbox-screen
+    timeout: 20000
+- tapOn:
+    id: inbox-archived
+- extendedWaitUntil:
+    visible:
+      id: archived-screen
+    timeout: 15000
+- assertVisible:
+    text: '^Contract Other.*'
+- tapOn:
+    text: '^Unarchive$'
+- extendedWaitUntil:
+    visible: You have no archived conversations.
+    timeout: 15000

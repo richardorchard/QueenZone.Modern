@@ -11,6 +11,7 @@
 #   ./scripts/run-mobile-device-smoke.sh --platform android --skip-build --apk path/to/app-release.apk
 #   ./scripts/run-mobile-device-smoke.sh --platform android --prove-failure
 #   ./scripts/run-mobile-device-smoke.sh --platform android --suite journeys
+#   ./scripts/run-mobile-device-smoke.sh --platform android --suite release
 #
 # Maestro selector and assertion failures are not retried. One Android device
 # transport failure or pre-flow iOS driver-startup failure may retry after
@@ -96,8 +97,8 @@ if [ "$platform" != "android" ] && [ "$platform" != "ios" ]; then
   exit 2
 fi
 
-if [ "$suite" != "smoke" ] && [ "$suite" != "journeys" ]; then
-  echo "--suite smoke|journeys is required (default smoke)." >&2
+if [ "$suite" != "smoke" ] && [ "$suite" != "journeys" ] && [ "$suite" != "release" ]; then
+  echo "--suite smoke|journeys|release is required (default smoke)." >&2
   exit 2
 fi
 
@@ -449,10 +450,17 @@ if [ "$prove_failure" = true ]; then
 elif [ "$suite" = "journeys" ]; then
   flow="src/QueenZone.Mobile/maestro/journeys.yaml"
   echo "Running on-demand Maestro journeys (#1071)."
+elif [ "$suite" = "release" ]; then
+  flow="src/QueenZone.Mobile/maestro/release.yaml"
+  echo "Running the P0 Maestro release suite (#1411)."
 fi
 
 echo "Running Maestro ($flow). Selector and assertion failures are not retried."
-maestro_args=(
+maestro_args=()
+if [ -n "${MAESTRO_TARGET_DEVICE:-}" ]; then
+  maestro_args+=(--device "$MAESTRO_TARGET_DEVICE")
+fi
+maestro_args+=(
   test "$flow"
   --format junit
   --output "$results_dir/junit.xml"
@@ -486,7 +494,6 @@ set -e
 if [ "$platform" = "android" ] \
   && [ "$maestro_status" -ne 0 ] \
   && [ -d "$results_dir/debug" ] \
-  && grep -Eq 'DeviceServerDiedException|Device server died|device offline' "$results_dir/junit.xml" \
   && grep -ERq 'DeviceServerDiedException|Device server died|device offline' "$results_dir/debug"; then
   echo "Maestro lost the Android device transport; recovering ADB and retrying once."
   if [ -d "$results_dir/debug" ]; then

@@ -27,6 +27,43 @@ describe('Maestro device flows (#1281)', () => {
     assert.doesNotMatch(smoke, /10-forum-attach|11-news-discussion|12-masthead-unread/);
   });
 
+  it('keeps the P0 release suite separate and independently resets each write journey', () => {
+    const release = readMaestro('release.yaml');
+    assert.match(release, /flows\/13-messages-lifecycle\.yaml/);
+    assert.match(release, /flows\/14-forum-create-reply\.yaml/);
+    assert.match(release, /flows\/15-news-suggestion\.yaml/);
+
+    for (const flow of [
+      'flows/13-messages-lifecycle.yaml',
+      'flows/14-forum-create-reply.yaml',
+      'flows/15-news-suggestion.yaml',
+    ]) {
+      const content = readMaestro(flow);
+      assert.match(content, /launchApp:[\s\S]*clearState: true[\s\S]*clearKeychain: true/);
+      assert.match(content, /id: home-screen[\s\S]*runFlow: open-smoke-auth\.yaml/);
+      assert.doesNotMatch(content, /retry:/);
+    }
+  });
+
+  it('covers message, forum, and submission outcomes through stable selectors', () => {
+    const messages = readMaestro('flows/13-messages-lifecycle.yaml');
+    assert.match(messages, /id: compose-message-recipient/);
+    assert.match(messages, /id: conversation-reply-submit/);
+    assert.match(messages, /id: conversation-archive/);
+    assert.match(messages, /text: '\^Unarchive\$'/);
+
+    const forum = readMaestro('flows/14-forum-create-reply.yaml');
+    assert.match(forum, /id: forum-composer-title/);
+    assert.match(forum, /id: forum-composer-submit/);
+    assert.match(forum, /text: Release forum reply/);
+
+    const suggestion = readMaestro('flows/15-news-suggestion.yaml');
+    assert.match(suggestion, /id: suggest-news-success/);
+    assert.match(suggestion, /id: suggest-news-view-submissions/);
+    assert.match(suggestion, /id: my-submissions-tab-news/);
+    assert.match(suggestion, /visible: Release news suggestion/);
+  });
+
   it('keeps the #1247 journeys shape and waits for chrome before smoke-auth', () => {
     const attach = readMaestro('flows/10-forum-attach.yaml');
     assert.match(attach, /launchApp:/);
@@ -112,7 +149,8 @@ describe('Maestro device flows (#1281)', () => {
     assert.match(openAuth, /openLink: \$\{SMOKE_AUTH_URL\}/);
     assert.match(openAuth, /accept-ios-open-link\.yaml/);
     assert.match(accept, /platform: iOS/);
-    assert.match(accept, /visible:\s+text: '\^Open\$'/);
+    assert.match(accept, /text: '\^Open\$'[\s\S]*optional: true/);
+    assert.doesNotMatch(accept, /visible:\s+text: '\^Open\$'/);
     assert.doesNotMatch(accept, /Open in \.\*QueenZone/);
     assert.match(accept, /\^Open\$/);
 
@@ -153,6 +191,51 @@ describe('Maestro device flows (#1281)', () => {
 });
 
 describe('device-smoke harness (#1281)', () => {
+  it('routes suite=release through the harness and both device jobs', () => {
+    const script = readRepo('run-mobile-device-smoke.sh', scriptsDir);
+    const workflow = readRepo('mobile-device-smoke.yml', workflowsDir);
+    assert.match(script, /smoke\|journeys\|release/);
+    assert.match(script, /maestro\/release\.yaml/);
+    assert.match(workflow, /- release/);
+    assert.equal(workflow.match(/github\.event\.inputs\.suite == 'release'/g)?.length, 2);
+    assert.match(workflow, /mobile-android-release:[\s\S]*run-mobile-android-release-self-hosted\.sh/);
+    assert.match(workflow, /SUITE="release"/);
+    assert.match(workflow, /platform:[\s\S]*- both[\s\S]*- android[\s\S]*- ios/);
+    assert.equal(workflow.match(/github\.event\.inputs\.platform == 'android'/g)?.length, 3);
+    assert.equal(workflow.match(/github\.event\.inputs\.platform == 'ios'/g)?.length, 2);
+  });
+
+  it('releases Gradle memory and isolates hosted from P0 Android runners', () => {
+    const workflow = readRepo('mobile-device-smoke.yml', workflowsDir);
+    const releaseJob = workflow.slice(
+      workflow.indexOf('  mobile-android-release:'),
+      workflow.indexOf('  mobile-ios-journeys:'),
+    );
+    assert.equal((workflow.match(/\.\/gradlew --stop/g) ?? []).length, 3);
+    assert.equal((workflow.match(/api-level: 36/g) ?? []).length, 2);
+    assert.equal((workflow.match(/-gpu swiftshader_indirect/g) ?? []).length, 2);
+    assert.match(workflow, /mobile-android-release:[\s\S]*runs-on: \[self-hosted, macOS, ARM64, queenzone\]/);
+    assert.match(workflow, /mobile-android-release:[\s\S]*github\.event\.inputs\.suite == 'release'/);
+    assert.match(workflow, /mobile-android-release:[\s\S]*Export installed Android SDK/);
+    assert.match(workflow, /ANDROID_HOME=\$SDK_ROOT/);
+    assert.doesNotMatch(releaseJob, /actions\/cache/);
+  });
+
+  it('boots and targets a dedicated hardware-rendered Android release emulator', () => {
+    const runner = readRepo('run-mobile-android-release-self-hosted.sh', scriptsDir);
+    const script = readRepo('run-mobile-device-smoke.sh', scriptsDir);
+    assert.match(runner, /ANDROID_RELEASE_AVD:-QueenZone_CI_API_36/);
+    assert.match(runner, /ANDROID_RELEASE_EMULATOR_PORT:-5556/);
+    assert.match(runner, /Another Android emulator is active/);
+    assert.match(runner, /rm -rf "\$results_dir"/);
+    assert.match(runner, /> "\$results_dir\/harness\.log"/);
+    assert.match(runner, /avdmanager.*create avd/);
+    assert.match(runner, /-gpu host/);
+    assert.match(runner, /MAESTRO_TARGET_DEVICE="\$serial"/);
+    assert.match(runner, /--suite release/);
+    assert.match(script, /--device "\$MAESTRO_TARGET_DEVICE"/);
+  });
+
   it('prepends the Maestro install dir before probing PATH', () => {
     const script = readRepo('run-mobile-device-smoke.sh', scriptsDir);
     assert.match(script, /HOME\}\/\.maestro\/bin/);
@@ -184,6 +267,10 @@ describe('device-smoke harness (#1281)', () => {
       /DeviceServerDiedException\|Device server died\|device offline/,
     );
     assert.match(script, /grep -ERq[\s\S]*"\$results_dir\/debug"/);
+    assert.doesNotMatch(
+      script,
+      /grep -Eq 'DeviceServerDiedException\|Device server died\|device offline' "\$results_dir\/junit\.xml"/,
+    );
     assert.match(script, /debug-android-transport-first/);
     assert.match(script, /adb reconnect offline/);
     assert.match(script, /adb install -r "\$apk"/);
