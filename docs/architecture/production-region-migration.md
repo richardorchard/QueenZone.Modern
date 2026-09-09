@@ -5,7 +5,7 @@ Phase 7 of [epic #1264](https://github.com/richardorchard/QueenZone.Modern/issue
 
 ## Target and safety boundary
 
-ADR 0017 approves `eastus` for production. The App Service, SQL server and
+ADR 0020 approves `canadaeast` for production. The App Service, SQL server and
 database, and Blob Storage move together. The existing `Queenzone-RG`
 resource group remains; its own `australiaeast` location is metadata and does
 not constrain child-resource locations.
@@ -26,6 +26,82 @@ Never combine the build, data-copy, cutover, and retirement stages into one
 apply. Each gate must leave the old production path intact until the new path
 has passed its checks. Never run `tofu destroy` against either estate.
 
+## Completed one-time cleanup: failed East US candidate
+
+The first Stage 1 apply on **7 September 2026** created only these East US
+resources before Azure rejected the App Service and SQL server:
+
+- `module.azure_data_target.azapi_resource.storage_account` —
+  `queenzoneprod`;
+- `module.azure_web_target.azurerm_application_insights.production` —
+  `queenzone-prod-ai`;
+- `module.azure_web_target.azurerm_log_analytics_workspace.production` —
+  `queenzone-prod-law`.
+
+On **9 September 2026**, verification found no containers in the Storage
+account and no telemetry records in Application Insights. No target App
+Service plan, web app, SQL server, or database exists. Microsoft then
+confirmed that the East US regions were unavailable for the subscription,
+and ADR 0020 changed the target to Canada East.
+
+These three resource names had to be released before the Canada East
+create-only plan could succeed. Their `prevent_destroy` lifecycle rules
+correctly blocked a location replacement. Do not weaken or remove those rules.
+
+The explicitly approved cleanup completed on **9 September 2026**. It was
+cleanup of the empty failed candidate, not retirement of the live Australia
+East estate:
+
+1. Recheck the exact locations, Storage container count, and telemetry count.
+2. Snapshot the remote production state and record the snapshot identifier.
+3. Remove only the three state addresses listed above with reviewed
+   `tofu state rm` commands.
+4. Delete `queenzone-prod-ai`, force-delete `queenzone-prod-law` so its name
+   is released immediately, delete `queenzoneprod`, then remove the orphaned
+   `Failure Anomalies` smart detector rule.
+5. Confirm all four Azure resources and the three state addresses are absent.
+6. Run the Canada East capacity preflight and a fresh production plan.
+
+The state backup snapshot is
+`2026-09-09T04:24:43.6156940Z`. Post-cleanup checks found zero matching target
+resources, zero target state addresses, and confirmed that `queenzoneprod`
+was available for reuse. The next plan must contain Canada East creates only.
+Any update, replacement, or delete blocks the apply.
+
+The following records the exact state operation that was executed once from
+`infra/environments/production`. Do not rerun it:
+
+```powershell
+tofu state rm `
+  'module.azure_data_target.azapi_resource.storage_account' `
+  'module.azure_web_target.azurerm_application_insights.production' `
+  'module.azure_web_target.azurerm_log_analytics_workspace.production'
+```
+
+The following records the exact Azure cleanup. Do not rerun it:
+
+```powershell
+az monitor app-insights component delete `
+  --resource-group Queenzone-RG `
+  --app queenzone-prod-ai
+
+az monitor log-analytics workspace delete `
+  --resource-group Queenzone-RG `
+  --workspace-name queenzone-prod-law `
+  --force true `
+  --yes
+
+az storage account delete `
+  --resource-group Queenzone-RG `
+  --name queenzoneprod `
+  --yes
+
+az resource delete `
+  --resource-group Queenzone-RG `
+  --name 'Failure Anomalies - queenzone-prod-ai' `
+  --resource-type Microsoft.AlertsManagement/smartDetectorAlertRules
+```
+
 ## Stage 1: build the parallel target
 
 The production apply plan runs `Test-AzureMigrationTargetCapacity.ps1` before
@@ -34,11 +110,10 @@ not yet exist, the check fails closed unless the requested App Service SKU has
 enough regional capacity and Azure SQL reports logical-server provisioning as
 available for the subscription.
 
-On **7 September 2026**, the first eastus apply stopped with B1 capacity at
+On **7 September 2026**, the first `eastus` apply stopped with B1 capacity at
 `0/0` and Azure SQL status `Visible` with `ProvisioningDisabled`. It created
-only the target Storage account, Log Analytics workspace, and Application
-Insights component. Request B1 quota of at least one instance and an Azure SQL
-regional provisioning exception before retrying.
+only the three resources covered by the one-time cleanup above. Microsoft
+later declined access to both East US regions. Do not retry that target.
 
 The initial configuration keeps the imported `module.azure_web` and
 `module.azure_data` unchanged. `module.azure_web_target` and
@@ -56,7 +131,7 @@ Required evidence before approval:
 - the production remote plan reports creates only;
 - the plan contains no update, replacement, or delete;
 - the SQL password is shown only as `(write-only attribute)`;
-- target resources use `eastus` and the names above.
+- target resources use `canadaeast` and the names above.
 
 Merge does not apply immediately. Review the `opentofu-apply.yml` plan summary,
 then approve the protected `opentofu-apply` environment only when it still

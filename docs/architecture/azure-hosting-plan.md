@@ -38,7 +38,7 @@ Optional later:
 
 ## Region
 
-Production's target Azure region is **`eastus`** (moving from the current `australiaeast`), decided in [ADR 0017](../decisions/0017-production-region-eastus.md) as part of [epic #1264](https://github.com/richardorchard/QueenZone.Modern/issues/1264). The dev environment stays in `australiaeast`. See that ADR for the reasoning and for confirmation that the SQL server and storage account move alongside the App Service.
+Production's target Azure region is **`canadaeast`** (moving from the current `australiaeast`), decided in [ADR 0020](../decisions/0020-production-region-canadaeast.md) after Microsoft declined access to both East US regions. The dev environment stays in `australiaeast`. See that ADR for the latency basis and for confirmation that the SQL server and storage account move alongside the App Service.
 
 ## Scale and cost model (single instance)
 

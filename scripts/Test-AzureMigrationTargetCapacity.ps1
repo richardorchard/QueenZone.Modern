@@ -2,7 +2,7 @@
 param(
     [string]$SubscriptionId = $env:ARM_SUBSCRIPTION_ID,
     [string]$ResourceGroupName = "Queenzone-RG",
-    [string]$Location = "eastus",
+    [string]$Location = "canadaeast",
     [string]$ServicePlanName = "ASP-Queenzone-Prod",
     [string]$ServicePlanSku = "B1",
     [int]$ServicePlanWorkers = 1,
@@ -22,7 +22,12 @@ function Assert-AppServiceCapacity {
 
     $usage = @($UsageResponse.value | Where-Object { $_.name.value -eq $Sku }) | Select-Object -First 1
     if ($null -eq $usage) {
-        throw "Azure did not return an App Service quota entry for SKU '$Sku'."
+        $usage = @($UsageResponse.value | Where-Object {
+                $_.name.value -eq "*" -and $_.name.localizedValue -eq "Total Regional VMs"
+            }) | Select-Object -First 1
+    }
+    if ($null -eq $usage) {
+        throw "Azure did not return an App Service quota entry for SKU '$Sku' or the Total Regional VMs allowance."
     }
 
     $available = [int64]$usage.limit - [int64]$usage.currentValue
@@ -55,6 +60,17 @@ if ($SelfTest) {
                 })
         }) -Sku "B1" -Workers 1
     Assert-SqlCapacity -Capabilities ([pscustomobject]@{ status = "Available"; reason = $null })
+
+    Assert-AppServiceCapacity -UsageResponse ([pscustomobject]@{
+            value = @([pscustomobject]@{
+                    name         = [pscustomobject]@{
+                        value          = "*"
+                        localizedValue = "Total Regional VMs"
+                    }
+                    currentValue = 0
+                    limit        = 30
+                })
+        }) -Sku "B1" -Workers 1
 
     $capacityRejected = $false
     try {

@@ -12,7 +12,7 @@ Use [`scripts/Test-OpenTofu.ps1`](../../../scripts/Test-OpenTofu.ps1) for local 
 
 ## Phase 7 staged migration
 
-Issue #1272 adds an `eastus` candidate alongside the imported
+Issue #1272 adds a `canadaeast` candidate alongside the imported
 `australiaeast` estate. The first stage creates only the replacement web,
 telemetry, SQL-server, Storage, and container resources. It does not create
 the destination database, bind production hostnames, change Cloudflare DNS,

@@ -2,7 +2,8 @@
 
 ## Status
 
-Accepted.
+Superseded by [ADR 0020](0020-production-region-canadaeast.md) after Microsoft
+confirmed that the East US regions were unavailable for this subscription.
 
 ## Context
 

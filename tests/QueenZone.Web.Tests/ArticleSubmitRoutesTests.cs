@@ -93,6 +93,9 @@ public sealed partial class ArticleSubmitRoutesTests : IClassFixture<WebApplicat
         Assert.Contains("Choose from gallery", body);
         Assert.Contains("data-aspect-width=\"3\"", body);
         Assert.Contains("data-aspect-height=\"2\"", body);
+        Assert.Contains("data-article-image-dialog", body);
+        Assert.Contains("Drag the photo to position it. Zoom to tighten the crop.", body);
+        Assert.Contains("/js/admin/article-image-crop.js", body);
         Assert.Contains("data-container=\"ugc-articles\"", body);
         Assert.Contains("action=\"/admin/articles/editor\"", body);
         Assert.Contains("Author", body);
