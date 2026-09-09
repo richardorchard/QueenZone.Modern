@@ -1,0 +1,73 @@
+appId: org.queenzone.mobile
+---
+- launchApp:
+    clearState: true
+- runFlow:
+    when:
+      visible: Not now
+    commands:
+      - tapOn: Not now
+- runFlow:
+    when:
+      visible: Never
+    commands:
+      - tapOn: Never
+- extendedWaitUntil:
+    visible:
+      id: home-screen
+    timeout: 30000
+- tapOn:
+    id: home-profile
+- extendedWaitUntil:
+    visible:
+      id: profile-signed-out
+    timeout: 60000
+- tapOn: Sign in
+- tapOn:
+    id: sign-in-other-ways
+- tapOn:
+    id: sign-in-email
+- inputText: ${REVIEWER_EMAIL}
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: sign-in-password
+    direction: DOWN
+    timeout: 20000
+- tapOn:
+    id: sign-in-password
+- inputText: ${REVIEWER_PASSWORD}
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: sign-in-password-submit
+    direction: DOWN
+    timeout: 20000
+- tapOn:
+    id: sign-in-password-submit
+- runFlow:
+    when:
+      visible: Not now
+    commands:
+      - tapOn: Not now
+- runFlow:
+    when:
+      visible: Never
+    commands:
+      - tapOn: Never
+- extendedWaitUntil:
+    visible:
+      id: profile-signed-in
+    timeout: 30000
+- tapOn:
+    id: profile-messages
+- extendedWaitUntil:
+    visible:
+      id: inbox-screen
+    timeout: 30000
+- tapOn: Archived
+- extendedWaitUntil:
+    visible:
+      id: archived-screen
+    timeout: 30000
+- takeScreenshot: 13-private-messages
