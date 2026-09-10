@@ -231,7 +231,7 @@ kept as a reference for the next time a change ripples this widely.
   differs. Before treating an `azapi_resource` "N to change" as a real
   change, check whether `body` is in the diff's unchanged-attributes-hidden
   count — if so, it's this artifact, not a real change.
-- **The `queenzone` storage account's custom domain and its Cloudflare proxy
+- **The `queenzoneprod` storage account's custom domain and its Cloudflare proxy
   fight each other.** Azure only verifies a storage account's `customDomain`
   CNAME at the moment of a PUT to that resource (which `azapi_resource`
   issues on *any* drift, not just custom-domain changes), but
@@ -239,7 +239,7 @@ kept as a reference for the next time a change ripples this widely.
   Any `opentofu-apply` that touches this storage account while the record is
   proxied will fail domain verification. To force a change through: un-proxy
   (grey-cloud) `cdn.queenzone.org` in the Cloudflare dashboard, wait for DNS
-  to resolve directly to `queenzone.blob.core.windows.net` (verify with
+  to resolve directly to `queenzoneprod.blob.core.windows.net` (verify with
   `nslookup cdn.queenzone.org 1.1.1.1` — it should NOT return Cloudflare
   anycast IPs), apply, then re-proxy. Once bound, the verification doesn't
   need to happen again until the next PUT to this resource.

@@ -236,8 +236,8 @@ Public archive media is served from Azure Blob Storage through two Cloudflare ho
 ```text
 Photos/images:  https://cdn.queenzone.org/{container}/{blob}
                 Cloudflare straight proxy (no Worker)
-                Azure Storage custom domain: cdn.queenzone.org on account queenzone
-                Origin: https://queenzone.blob.core.windows.net
+                Azure Storage custom domain: cdn.queenzone.org on account queenzoneprod
+                Origin: https://queenzoneprod.blob.core.windows.net
 
 Legacy attachments CDN:
                 https://cdn2.queenzone.org/{container}/{blob}
@@ -255,7 +255,7 @@ DNS shape:
 ```text
 Type: CNAME
 Name: cdn
-Target: queenzone.blob.core.windows.net
+Target: queenzoneprod.blob.core.windows.net
 Proxy status: Proxied
 TTL: Auto
 ```
@@ -266,7 +266,7 @@ DNS hostname is **`cdn2.queenzone.org`**. The Cloudflare Worker **script** is st
 
 Live Worker behaviour (published 2026-08-16):
 
-- Accepts `GET` / `HEAD` only; rewrites path to `https://queenzone.blob.core.windows.net`
+- Accepts `GET` / `HEAD` only; rewrites path to `https://queenzoneprod.blob.core.windows.net`
 - Returns **404** for `/songfiles` and `/songfiles/*` (fan audio is app-proxied; #177)
 - Adds `Access-Control-Allow-Origin: *`
 - Adds `X-Content-Type-Options: nosniff`
@@ -287,7 +287,7 @@ Live as of 2026-08-16 (after #702 deployed):
 
 ### Azure storage requirements
 
-- Account `queenzone` keeps blob public access enabled for legacy public gallery containers.
+- Account `queenzoneprod` keeps blob public access enabled for legacy public gallery containers.
 - Public archive containers must remain public where visitor access is expected.
 - `databasebackup`, `ugc-avatars`, `ugc-forum`, and `songfiles` are private.
 - Legacy `attachments` remain public blob access (out of scope for #177).
@@ -297,7 +297,7 @@ Live as of 2026-08-16 (after #702 deployed):
 ```powershell
 # Anonymous CDN and raw blob URLs must fail (403/404).
 curl.exe -I https://cdn2.queenzone.org/songfiles/2014417798057369.mp3
-curl.exe -I https://queenzone.blob.core.windows.net/songfiles/2014417798057369.mp3
+curl.exe -I https://queenzoneprod.blob.core.windows.net/songfiles/2014417798057369.mp3
 
 # Signed-in member playback: open /fan-performances, sign in, play a row.
 # Expect 200 from /fan-performances/{id}/audio with audio/mpeg and no Location
