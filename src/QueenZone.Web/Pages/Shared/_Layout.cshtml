@@ -64,12 +64,22 @@
   <partial name="_PwaHead" />
   <link rel="preload" href="/design-system/fonts/inter-latin-400-700.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/design-system/fonts/cormorant-garamond-latin-300-700.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="/design-system/tokens/fonts.css" asp-append-version="true">
-  <link rel="stylesheet" href="/design-system/tokens/colors.css" asp-append-version="true">
-  <link rel="stylesheet" href="/design-system/tokens/typography.css" asp-append-version="true">
-  <link rel="stylesheet" href="/design-system/tokens/spacing.css" asp-append-version="true">
-  <link rel="stylesheet" href="/design-system/tokens/base.css" asp-append-version="true">
-  <link rel="stylesheet" href="/css/site.css" asp-append-version="true">
+  <environment include="Development">
+    <link rel="stylesheet" href="/design-system/tokens/fonts.css" asp-append-version="true">
+    <link rel="stylesheet" href="/design-system/tokens/colors.css" asp-append-version="true">
+    <link rel="stylesheet" href="/design-system/tokens/typography.css" asp-append-version="true">
+    <link rel="stylesheet" href="/design-system/tokens/spacing.css" asp-append-version="true">
+    <link rel="stylesheet" href="/design-system/tokens/base.css" asp-append-version="true">
+    <link rel="stylesheet" href="/css/site.css" asp-append-version="true">
+  </environment>
+  <environment exclude="Development">
+    <link rel="stylesheet" href="/design-system/tokens/fonts.min.css" asp-append-version="true">
+    <link rel="stylesheet" href="/design-system/tokens/colors.min.css" asp-append-version="true">
+    <link rel="stylesheet" href="/design-system/tokens/typography.min.css" asp-append-version="true">
+    <link rel="stylesheet" href="/design-system/tokens/spacing.min.css" asp-append-version="true">
+    <link rel="stylesheet" href="/design-system/tokens/base.min.css" asp-append-version="true">
+    <link rel="stylesheet" href="/css/site.min.css" asp-append-version="true">
+  </environment>
 @await RenderSectionAsync("Head", required: false)
 </head>
 <body>

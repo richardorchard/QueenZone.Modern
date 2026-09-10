@@ -41,6 +41,25 @@
     <Using Include="QueenZone.Search.Shared" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Authored CSS that gets a minified "*.min.css" sibling generated at publish time.
+         See the MinifyCss target below and src/QueenZone.Tools/MinifyCssCommand.cs. -->
+    <CssToMinify Include="wwwroot\css\site.css" />
+    <CssToMinify Include="wwwroot\design-system\tokens\fonts.css" />
+    <CssToMinify Include="wwwroot\design-system\tokens\colors.css" />
+    <CssToMinify Include="wwwroot\design-system\tokens\typography.css" />
+    <CssToMinify Include="wwwroot\design-system\tokens\spacing.css" />
+    <CssToMinify Include="wwwroot\design-system\tokens\base.css" />
+  </ItemGroup>
+
+  <!-- Runs after the publish output (including wwwroot) has been copied to $(PublishDir), so it
+       minifies the already-published copies in place and writes "*.min.css" siblings there. This
+       avoids fighting the Static Web Assets pipeline's own timing for discovering wwwroot content,
+       and keeps generated files out of the source tree entirely. -->
+  <Target Name="MinifyCss" AfterTargets="Publish">
+    <Exec Command="dotnet run --project &quot;$(RepositoryRoot)\src\QueenZone.Tools\QueenZone.Tools.csproj&quot; -c Release -- minify-css @(CssToMinify -> '&quot;$(PublishDir)%(Identity)&quot;', ' ')" />
+  </Target>
+
   <Target Name="SetBuildMetadata" BeforeTargets="GetAssemblyVersion;GetAssemblyAttributes;GenerateAssemblyInfo">
     <Exec Command="git rev-parse --short HEAD" ConsoleToMSBuild="true" IgnoreExitCode="true" StandardOutputImportance="low" WorkingDirectory="$(RepositoryRoot)">
       <Output TaskParameter="ConsoleOutput" PropertyName="GitCommitShort" />
