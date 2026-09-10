@@ -48,6 +48,11 @@ internal static class ToolsApp
             return await DevSnapshotCommand.RunAsync(args[1..]);
         }
 
+        if (args.Length > 0 && string.Equals(args[0], "minify-css", StringComparison.OrdinalIgnoreCase))
+        {
+            return await MinifyCssCommand.RunAsync(args[1..]);
+        }
+
         if (args.Length > 0 && string.Equals(args[0], "import-quotes", StringComparison.OrdinalIgnoreCase))
         {
             return await RunImportQuotesAsync(args);
@@ -200,6 +205,7 @@ internal static class ToolsApp
         Console.Error.WriteLine("  dotnet run --project src/QueenZone.Tools -- convert-legacy-bbcode [options]");
         Console.Error.WriteLine("  dotnet run --project src/QueenZone.Tools -- create-reviewer-account --email <email> --password <password> --display-name <name> --connection-string <connection-string>");
         Console.Error.WriteLine("  dotnet run --project src/QueenZone.Tools -- dev-snapshot <copy|verify> --config <path> [--manifest <path>] [--summary <path>]");
+        Console.Error.WriteLine("  dotnet run --project src/QueenZone.Tools -- minify-css <path.css> [more paths...]");
         Console.Error.WriteLine();
         Console.Error.WriteLine("Connection string can also be supplied with ConnectionStrings__QueenZoneLegacy.");
     }
