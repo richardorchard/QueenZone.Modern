@@ -68,8 +68,9 @@ consume:
 00000000-0000-0000-0000-000000000000 > ENVIRONMENT_VARIABLE_NAME
 ```
 
-Store these mapping blocks as GitHub repository variables. The left-hand side must be the Bitwarden secret ID, not
-the secret name.
+Store these mapping blocks as the named GitHub repository or environment variables. The left-hand side must be the
+Bitwarden secret ID, not the secret name. Environment-specific mappings deliberately expose only the credentials
+needed by that trust boundary.
 
 ### `BITWARDEN_APP_SERVICE_DEPLOY_SECRETS`
 
@@ -82,17 +83,41 @@ via repository-level token/mapping for the SQL Express probe password only), and
 mirror with Integrated Security (issue #1377 Option B). See
 [`docs/architecture/github-environments.md`](architecture/github-environments.md):
 
+Repository mapping (nightly mirror probes plus shared fallbacks):
+
 ```yaml
-743274c8-1837-4abd-b223-b4980080709f > AZURE_WEBAPP_PUBLISH_PROFILE
-d631aa7c-4e7e-4d2d-b3ea-b494002d1b83 > QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING
+a4e79219-d353-4730-ab3b-b4c10048fd97 > AZURE_WEBAPP_PUBLISH_PROFILE
+14cd027a-7185-44fb-ab7f-b4c100488980 > QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING
 51484e1f-4393-41e9-8435-b49a00381ec2 > QUEENZONE_SQL_EXPRESS_PROBE_PASSWORD
 b6a94e02-3243-411f-8e32-b4af00ce2522 > MOBILE_AUTH_SIGNING_KEY
 ```
 
-`QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING` maps to the same underlying Bitwarden secret as the
-`ConnectionStrings__QueenZoneLegacy` value used for local dev and Azure App Service settings (see `AGENTS.md`).
-Updating that Bitwarden secret updates both; it does **not** update the live App Service runtime connection string,
-which is configured separately in Azure App Service settings.
+`prod-release` mapping:
+
+```yaml
+a4e79219-d353-4730-ab3b-b4c10048fd97 > AZURE_WEBAPP_PUBLISH_PROFILE_CANADA_EAST
+14cd027a-7185-44fb-ab7f-b4c100488980 > QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING_CANADA_EAST
+b6a94e02-3243-411f-8e32-b4af00ce2522 > MOBILE_AUTH_SIGNING_KEY
+```
+
+`prod-deploy` mapping:
+
+```yaml
+b6a94e02-3243-411f-8e32-b4af00ce2522 > MOBILE_AUTH_SIGNING_KEY
+```
+
+`prod-data-read` mapping:
+
+```yaml
+a4e79219-d353-4730-ab3b-b4c10048fd97 > AZURE_WEBAPP_PUBLISH_PROFILE
+14cd027a-7185-44fb-ab7f-b4c100488980 > QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING
+```
+
+The migration aliases map to the Canada East Bitwarden secret
+`ConnectionStrings__QueenZoneLegacyCanadaEast`. The live App Service retains the
+canonical setting name `ConnectionStrings__QueenZoneLegacy`, but its value is
+configured separately in Azure. Updating Bitwarden does **not** update that live
+App Service setting automatically.
 
 `QUEENZONE_SQL_EXPRESS_PROBE_PASSWORD` is the password for the `queenzone_probe` SQL login created by
 `scripts/Enable-SqlExpressRemoteAccess.ps1` on the Windows self-hosted runner. It authenticates
@@ -282,8 +307,9 @@ For this migration:
 - `AZURE_WEBAPP_PUBLISH_PROFILE` was regenerated fresh from Azure (`az webapp deployment list-publishing-profiles
   --name queenzone-prod --resource-group Queenzone-RG --xml`) and written into Bitwarden, since the old GitHub secret
   value could not be recovered.
-- `QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING` reused the existing `ConnectionStrings__QueenZoneLegacy` Bitwarden
-  secret, which already held the same connection string for local dev.
+- The original Bitwarden migration reused `ConnectionStrings__QueenZoneLegacy`. After the #1272 cutover on
+  **10 September 2026**, the GitHub mappings above moved to the Canada East publish profile and
+  `ConnectionStrings__QueenZoneLegacyCanadaEast` secret. The Australia East credentials are rollback-only.
 
 The old raw GitHub Actions secrets (`AZURE_WEBAPP_PUBLISH_PROFILE`, `QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING`)
 were removed once the deploy workflow (`deploy-app-service.yml` at the time, since renamed to `deploy.yml`) was

@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted. Supersedes [ADR 0017](0017-production-region-eastus.md).
+Accepted and implemented on **10 September 2026**. Supersedes [ADR 0017](0017-production-region-eastus.md). Stages 1–4 of #1272 are complete; the stopped Australia East estate remains only for the observation and rollback window before Stage 5 retirement.
 
 ## Context
 
@@ -44,8 +44,9 @@ Australia East would add cross-region latency to every database and Blob
 Storage operation and undermine the purpose of the move.
 
 The dev environment remains in `australiaeast` for the maintainer's local
-feedback loop. Production stays in Australia East until the Canada East
-candidate has passed the staged copy, deployment, smoke-test, and cutover gates.
+feedback loop. The production cutover was gated: Australia East remained live
+until the Canada East candidate passed the staged copy, deployment, smoke-test,
+and cutover checks.
 
 There is no automatic fallback region. If Canada East fails provisioning or
 post-launch telemetry disproves the audience assumption, stop and record a new
@@ -65,8 +66,8 @@ Tradeoffs:
 - Australian production access becomes about 200 ms slower per origin
   round-trip than Australia East.
 - The audience assumption remains unverified until launch telemetry exists.
-- The three empty East US resources must be removed safely before their names
-  can be reused in Canada East.
+- The three empty East US resources had to be removed safely before their names
+  could be reused in Canada East; that cleanup completed on **9 September 2026**.
 
 ## Related
 
