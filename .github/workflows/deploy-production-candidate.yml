@@ -1,0 +1,147 @@
+name: Deploy production migration candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      ci_run_id:
+        description: Successful ci.yml run that built the package currently deployed to production
+        required: true
+        type: string
+      build_version:
+        description: Full CI head SHA embedded in the artifact build stamp
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: deploy-production-migration-candidate
+  cancel-in-progress: false
+
+jobs:
+  validate-artifact:
+    name: Validate production build provenance
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Validate CI run and artifact
+        id: validate
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CI_RUN_ID: ${{ inputs.ci_run_id }}
+          BUILD_VERSION: ${{ inputs.build_version }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if ! [[ "$CI_RUN_ID" =~ ^[0-9]+$ ]]; then
+            echo "::error::ci_run_id must contain digits only."
+            exit 1
+          fi
+          if ! [[ "$BUILD_VERSION" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::build_version must be a full lowercase commit SHA."
+            exit 1
+          fi
+
+          run_json=$(gh api "repos/${REPOSITORY}/actions/runs/${CI_RUN_ID}")
+          conclusion=$(jq -r '.conclusion' <<<"$run_json")
+          event=$(jq -r '.event' <<<"$run_json")
+          head_sha=$(jq -r '.head_sha' <<<"$run_json")
+          workflow_path=$(jq -r '.path' <<<"$run_json")
+          if [ "$conclusion" != "success" ] || [ "$event" != "pull_request" ] || [ "$workflow_path" != ".github/workflows/ci.yml" ]; then
+            echo "::error::The selected run must be a successful ci.yml pull_request run."
+            exit 1
+          fi
+          if [ "$head_sha" != "$BUILD_VERSION" ]; then
+            echo "::error::build_version does not match the selected CI run head SHA."
+            exit 1
+          fi
+
+          echo "Validated successful CI run ${CI_RUN_ID} for build ${BUILD_VERSION:0:7}."
+
+  deploy:
+    name: Deploy Canada East candidate
+    runs-on: ubuntu-latest
+    needs: validate-artifact
+    environment:
+      name: prod-release
+      url: https://queenzone-prod.azurewebsites.net
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Fetch source and candidate publish profiles
+        id: bitwarden-secrets
+        uses: bitwarden/sm-action@v3.0.1
+        with:
+          access_token: ${{ secrets.BITWARDEN_SECRETS_MANAGER_ACCESS_TOKEN }}
+          secrets: ${{ vars.BITWARDEN_APP_SERVICE_DEPLOY_SECRETS }}
+
+      - name: Validate candidate publish profile
+        env:
+          SOURCE_PROFILE: ${{ steps.bitwarden-secrets.outputs.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          CANDIDATE_PROFILE: ${{ steps.bitwarden-secrets.outputs.AZURE_WEBAPP_PUBLISH_PROFILE_CANDIDATE }}
+        run: |
+          set -euo pipefail
+          if [[ "$SOURCE_PROFILE" != *'queenzone-dev.scm.azurewebsites.net'* ]]; then
+            echo "::error::Source publish profile is missing or belongs to another App Service."
+            exit 1
+          fi
+          if [[ "$CANDIDATE_PROFILE" != *'queenzone-prod.scm.azurewebsites.net'* ]]; then
+            echo "::error::Candidate publish profile is missing or belongs to another App Service."
+            exit 1
+          fi
+
+      - name: Verify and snapshot the exact running production package
+        env:
+          AZURE_WEBAPP_PUBLISH_PROFILE: ${{ steps.bitwarden-secrets.outputs.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          BUILD_VERSION: ${{ inputs.build_version }}
+        run: |
+          set -euo pipefail
+          short="${BUILD_VERSION:0:7}"
+          if ! curl --fail --silent --show-error --location https://www.queenzone.org/ \
+            | grep -q "data-build-version=\"${short}\""; then
+            echo "::error::The live Australia East app is not serving the requested build stamp ${short}."
+            exit 1
+          fi
+          python3 ./scripts/Invoke-AppServiceKudu.py --download-wwwroot production.zip
+          if [ ! -s production.zip ]; then
+            echo "::error::The production package snapshot is empty."
+            exit 1
+          fi
+
+      - name: Deploy exact production artifact
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: queenzone-prod
+          publish-profile: ${{ steps.bitwarden-secrets.outputs.AZURE_WEBAPP_PUBLISH_PROFILE_CANDIDATE }}
+          package: production.zip
+
+      - name: Recycle candidate App Service
+        env:
+          AZURE_WEBAPP_PUBLISH_PROFILE: ${{ steps.bitwarden-secrets.outputs.AZURE_WEBAPP_PUBLISH_PROFILE_CANDIDATE }}
+        run: python3 ./scripts/Invoke-AppServiceKudu.py --restart
+
+      - name: Warm candidate and verify build stamp
+        run: |
+          bash ./scripts/Invoke-PostDeploySmoke.sh \
+            --base-url https://queenzone-prod.azurewebsites.net \
+            --warmup-only \
+            --expect-build-version "${{ inputs.build_version }}"
+
+  smoke:
+    name: Smoke Canada East candidate
+    runs-on: ubuntu-latest
+    needs: deploy
+    timeout-minutes: 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Candidate route and dependency smoke
+        run: |
+          bash ./scripts/Invoke-PostDeploySmoke.sh \
+            --base-url https://queenzone-prod.azurewebsites.net \
+            --expect-build-version "${{ inputs.build_version }}"
