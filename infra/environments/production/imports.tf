@@ -6,6 +6,7 @@ locals {
   azure_sql_base_id       = "${local.azure_resource_group_id}/providers/Microsoft.Sql"
   azure_storage_base_id   = "${local.azure_resource_group_id}/providers/Microsoft.Storage"
   mobile_build_storage_id = "${local.azure_storage_base_id}/storageAccounts/queenzonemobilebuilds"
+  target_sql_database_id  = "${local.azure_sql_base_id}/servers/queenzone-prod-sql/databases/queenzone-db"
   azure_data_containers = toset([
     "album-or-single-covers", "attachments", "avatars", "brian-may",
     "css", "databasebackup", "fan-art", "fan-pics", "forum",
@@ -96,6 +97,16 @@ import {
 import {
   to = module.azure_data.azurerm_mssql_database_extended_auditing_policy.production[0]
   id = "${local.azure_sql_base_id}/servers/queenzone-sql-server/databases/queenzone-db/extendedAuditingSettings/Default"
+}
+
+import {
+  to = module.azure_data_target.azurerm_mssql_database.production[0]
+  id = local.target_sql_database_id
+}
+
+import {
+  to = module.azure_data_target.azurerm_mssql_database_extended_auditing_policy.production[0]
+  id = "${local.target_sql_database_id}/extendedAuditingSettings/Default"
 }
 
 import {
