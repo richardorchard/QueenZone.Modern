@@ -207,6 +207,13 @@ $env:RUN_MEMBER_ACCOUNT_PROBE = "true"
 powershell -File .\scripts\Probe-MemberAccounts.ps1
 ```
 
+When a change touches the member public activity feed (`EfMemberPublicActivityRepository`, `/members/{id}`, `/following`) or the timestamp mapping of any source it reads, prefer the read-only activity probe. The SQLite unit tests cannot cover production ordering here — SQLite has no `ORDER BY` for `DateTimeOffset`, so it sorts client-side while SQL Server pages the `UNION ALL` server-side:
+
+```powershell
+$env:RUN_MEMBER_ACTIVITY_PROBE = "true"
+powershell -File .\scripts\Probe-MemberActivity.ps1
+```
+
 When a change touches admin URL ingestion, the news-agent run-request queue, or the local `process-news-requests` runner, prefer the opt-in URL ingestion probe after the EF migration is applied:
 
 ```powershell

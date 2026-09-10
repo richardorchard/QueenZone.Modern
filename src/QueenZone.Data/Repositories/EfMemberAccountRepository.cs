@@ -15,6 +15,24 @@ public sealed class EfMemberAccountRepository(QueenZoneDbContext dbContext) : IM
             .AsNoTracking()
             .SingleOrDefaultAsync(account => account.Id == id, cancellationToken);
 
+    public async Task<IReadOnlySet<Guid>> ListActiveMemberIdsAsync(
+        IReadOnlyCollection<Guid> memberIds,
+        CancellationToken cancellationToken = default)
+    {
+        var ids = memberIds.Distinct().ToList();
+        if (ids.Count == 0)
+        {
+            return new HashSet<Guid>();
+        }
+
+        var active = await dbContext.MemberAccounts
+            .AsNoTracking()
+            .Where(account => ids.Contains(account.Id) && account.DeletionRequestedAt == null)
+            .Select(account => account.Id)
+            .ToListAsync(cancellationToken);
+        return active.ToHashSet();
+    }
+
     public async Task<MemberAccount?> FindByExternalLoginAsync(string provider, string providerKey, CancellationToken cancellationToken = default)
     {
         var login = await dbContext.MemberExternalLogins

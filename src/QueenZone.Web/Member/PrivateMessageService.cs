@@ -319,6 +319,15 @@ public sealed partial class PrivateMessageService(
         CancellationToken cancellationToken = default) =>
         privateMessageRepository.IsBlockedAsync(blockerMemberId, blockedMemberId, cancellationToken);
 
+    public Task<IReadOnlySet<Guid>> ListBlockedMemberIdsAsync(
+        Guid blockerMemberId,
+        IReadOnlyCollection<Guid> candidateMemberIds,
+        CancellationToken cancellationToken = default) =>
+        privateMessageRepository.ListBlockedMemberIdsAsync(
+            blockerMemberId,
+            candidateMemberIds,
+            cancellationToken);
+
     public Task<bool> IsMessagingBlockedAsync(
         Guid memberA,
         Guid memberB,

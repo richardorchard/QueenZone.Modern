@@ -138,6 +138,12 @@ public sealed class PrivateMessageReportPurgeHostedServiceTests
             CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
+        public Task<IReadOnlySet<Guid>> ListBlockedMemberIdsAsync(
+            Guid blockerMemberId,
+            IReadOnlyCollection<Guid> candidateMemberIds,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         public Task<PrivateConversationDetail?> GetConversationAsync(
             Guid conversationId,
             Guid memberId,

@@ -104,6 +104,31 @@ public sealed class EfPrivateMessageRepositoryTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task ListBlockedMemberIdsAsync_ReturnsOnlyBlockedCandidates()
+    {
+        await repository.BlockAsync(aliceId, bobId, DateTimeOffset.Parse("2026-08-05T10:05:00Z"));
+
+        var blocked = await repository.ListBlockedMemberIdsAsync(aliceId, [bobId, carolId]);
+
+        Assert.Equal([bobId], blocked);
+    }
+
+    [Fact]
+    public async Task ListBlockedMemberIdsAsync_IsDirectional()
+    {
+        await repository.BlockAsync(aliceId, bobId, DateTimeOffset.Parse("2026-08-05T10:05:00Z"));
+
+        // Bob has not blocked Alice, so the reverse lookup stays empty.
+        Assert.Empty(await repository.ListBlockedMemberIdsAsync(bobId, [aliceId, carolId]));
+    }
+
+    [Fact]
+    public async Task ListBlockedMemberIdsAsync_EmptyInput_DoesNotQuery()
+    {
+        Assert.Empty(await repository.ListBlockedMemberIdsAsync(aliceId, []));
+    }
+
+    [Fact]
     public async Task UnreadCount_AndMarkRead_ArePerParticipant()
     {
         var result = await repository.SendNewOrExistingAsync(

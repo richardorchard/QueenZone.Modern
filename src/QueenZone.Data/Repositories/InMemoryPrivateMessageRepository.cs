@@ -469,6 +469,23 @@ public sealed class InMemoryPrivateMessageRepository : IPrivateMessageRepository
         }
     }
 
+    public Task<IReadOnlySet<Guid>> ListBlockedMemberIdsAsync(
+        Guid blockerMemberId,
+        IReadOnlyCollection<Guid> candidateMemberIds,
+        CancellationToken cancellationToken = default)
+    {
+        var candidates = candidateMemberIds.ToHashSet();
+        lock (sync)
+        {
+            IReadOnlySet<Guid> blocked = blocks
+                .Where(b => b.BlockerMemberId == blockerMemberId
+                    && candidates.Contains(b.BlockedMemberId))
+                .Select(b => b.BlockedMemberId)
+                .ToHashSet();
+            return Task.FromResult(blocked);
+        }
+    }
+
     public Task<bool> IsMessagingBlockedAsync(
         Guid memberA,
         Guid memberB,

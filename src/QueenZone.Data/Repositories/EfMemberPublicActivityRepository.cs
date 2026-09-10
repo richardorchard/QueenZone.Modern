@@ -1,7 +1,19 @@
 using Microsoft.EntityFrameworkCore;
+using QueenZone.Data.Entities;
 
 namespace QueenZone.Data;
 
+/// <summary>
+/// Reads a member (or followed-member) public contribution feed across four sources.
+/// </summary>
+/// <remarks>
+/// The three submission sources store <c>datetimeoffset</c> and share one UNION ALL query.
+/// Forum posts store <c>datetime2</c> (<c>ModernForumPost.PostedAt</c>), and EF Core cannot
+/// translate a <c>DateTime</c> to <c>DateTimeOffset</c> conversion inside a set operation, so
+/// they stay a second query merged in memory. Folding all four into a single UNION ALL needs a
+/// value converter on <c>PostedAt</c> — deliberately out of scope here because that column also
+/// carries the perf-critical forum read path.
+/// </remarks>
 public sealed class EfMemberPublicActivityRepository(QueenZoneDbContext dbContext)
     : IMemberPublicActivityRepository
 {
@@ -27,157 +39,232 @@ public sealed class EfMemberPublicActivityRepository(QueenZoneDbContext dbContex
         }
 
         var take = (int)Math.Min((long)page * pageSize, int.MaxValue);
-        var isSqlite = dbContext.Database.ProviderName?.Contains("Sqlite", StringComparison.OrdinalIgnoreCase) == true;
+        var forumPosts = BuildForumQuery(authorIds);
+        var submissionsQuery = BuildSubmissionsQuery(authorIds);
 
-        var forumRows = await dbContext.ModernForumPosts
-            .AsNoTracking()
-            .Where(post => post.AuthorMemberId != null
-                && authorIds.Contains(post.AuthorMemberId.Value)
-                && post.Thread != null
-                && !post.IsHidden)
-            .OrderByDescending(post => post.PostedAt)
-            .Take(take)
-            .Select(post => new
+        // Five round trips (two counts, two pages, names) rather than the previous nine. Both
+        // sources are ordered and truncated in the database — the SQLite branch this replaced
+        // fetched every matching row with no Take at all.
+        var totalCount = await forumPosts.CountAsync(cancellationToken)
+            + await submissionsQuery.CountAsync(cancellationToken);
+        if (totalCount == 0)
+        {
+            return new MemberPublicActivityPage([], 0, page, pageSize);
+        }
+
+        // Ordered on the entity before projecting, so the sort and Take stay server-side.
+        var forumRows = (await forumPosts
+                .OrderByDescending(post => post.PostedAt)
+                .Take(take)
+                .Select(post => new
+                {
+                    post.LegacyPostId,
+                    post.LegacyThreadTopicId,
+                    ThreadTitle = post.Thread!.Title,
+                    post.BodyHtml,
+                    post.PostedAt,
+                    AuthorId = post.AuthorMemberId!.Value,
+                    post.AuthorDisplayName,
+                })
+                .ToListAsync(cancellationToken))
+            .Select(row => new FeedRow
             {
-                post.LegacyPostId,
-                post.LegacyThreadTopicId,
-                ThreadTitle = post.Thread!.Title,
-                post.BodyHtml,
-                post.PostedAt,
-                AuthorId = post.AuthorMemberId!.Value,
-                post.AuthorDisplayName,
+                Type = MemberPublicActivityType.ForumPost,
+                Title = row.ThreadTitle,
+                Summary = row.BodyHtml,
+                PublishedAt = ToOffset(row.PostedAt),
+                ContentId = row.LegacyPostId,
+                ParentId = row.LegacyThreadTopicId,
+                AuthorId = row.AuthorId,
+                AuthorDisplayName = row.AuthorDisplayName,
             })
-            .ToListAsync(cancellationToken);
+            .ToList();
 
-        var articleQuery = dbContext.ArticleSubmissions
-            .AsNoTracking()
-            .Where(article => authorIds.Contains(article.AuthorMemberId)
-                && article.Status == ArticleSubmissionStatus.Published
-                && article.PublishedAt != null)
-            .Select(article => new
-            {
-                article.Title,
-                article.Slug,
-                article.Excerpt,
-                PublishedAt = article.PublishedAt!.Value,
-                article.AuthorMemberId,
-            });
-        var articleRows = isSqlite
-            ? await articleQuery.ToListAsync(cancellationToken)
-            : await articleQuery.OrderByDescending(article => article.PublishedAt)
+        // SQLite cannot ORDER BY a DateTimeOffset, so the test provider sorts and truncates the
+        // union client-side. SQL Server — the production provider — does both in the database.
+        var submissionRows = IsSqliteDatabase()
+            ? (await submissionsQuery.ToListAsync(cancellationToken))
+                .OrderByDescending(row => row.PublishedAt)
+                .Take(take)
+                .ToList()
+            : await submissionsQuery
+                .OrderByDescending(row => row.PublishedAt)
                 .Take(take)
                 .ToListAsync(cancellationToken);
 
-        var newsQuery = dbContext.NewsSuggestions
-            .AsNoTracking()
-            .Where(news => authorIds.Contains(news.SubmitterMemberId)
-                && news.Status == NewsSuggestionStatus.Promoted
-                && news.PromotedNewsId != null)
-            .Select(news => new
-            {
-                NewsId = news.PromotedNewsId!.Value,
-                news.Title,
-                news.Notes,
-                PublishedAt = news.ReviewedAt ?? news.SubmittedAt,
-                news.SubmitterMemberId,
-            });
-        var newsRows = isSqlite
-            ? await newsQuery.ToListAsync(cancellationToken)
-            : await newsQuery.OrderByDescending(news => news.PublishedAt)
-                .Take(take)
-                .ToListAsync(cancellationToken);
-
-        var photoQuery = dbContext.PhotoSubmissions
-            .AsNoTracking()
-            .Where(photo => authorIds.Contains(photo.SubmitterMemberId)
-                && photo.Status == PhotoSubmissionStatus.Approved)
-            .Select(photo => new
-            {
-                photo.Title,
-                photo.Description,
-                photo.ApprovedCategory,
-                PublishedAt = photo.ReviewedAt ?? photo.SubmittedAt,
-                photo.SubmitterMemberId,
-            });
-        var photoRows = isSqlite
-            ? await photoQuery.ToListAsync(cancellationToken)
-            : await photoQuery.OrderByDescending(photo => photo.PublishedAt)
-                .Take(take)
-                .ToListAsync(cancellationToken);
-
-        var totalCount = await dbContext.ModernForumPosts.CountAsync(
-                post => post.AuthorMemberId != null
-                    && authorIds.Contains(post.AuthorMemberId.Value)
-                    && post.Thread != null
-                    && !post.IsHidden,
-                cancellationToken)
-            + await dbContext.ArticleSubmissions.CountAsync(
-                article => authorIds.Contains(article.AuthorMemberId)
-                    && article.Status == ArticleSubmissionStatus.Published
-                    && article.PublishedAt != null,
-                cancellationToken)
-            + await dbContext.NewsSuggestions.CountAsync(
-                news => authorIds.Contains(news.SubmitterMemberId)
-                    && news.Status == NewsSuggestionStatus.Promoted
-                    && news.PromotedNewsId != null,
-                cancellationToken)
-            + await dbContext.PhotoSubmissions.CountAsync(
-                photo => authorIds.Contains(photo.SubmitterMemberId)
-                    && photo.Status == PhotoSubmissionStatus.Approved,
-                cancellationToken);
-
-        var names = await dbContext.MemberAccounts
-            .AsNoTracking()
-            .Where(member => authorIds.Contains(member.Id))
-            .Select(member => new { member.Id, member.DisplayName })
-            .ToDictionaryAsync(member => member.Id, member => member.DisplayName, cancellationToken);
-
-        string? NameFor(Guid authorId, string? fallback = null) =>
-            names.TryGetValue(authorId, out var displayName) ? displayName : fallback;
-
-        var items = forumRows.Select(row => new MemberPublicActivityItem(
-                MemberPublicActivityType.ForumPost,
-                row.ThreadTitle,
-                row.BodyHtml,
-                ToOffset(row.PostedAt),
-                row.LegacyPostId,
-                row.LegacyThreadTopicId,
-                NewsSlug.Slugify(row.ThreadTitle),
-                AuthorId: row.AuthorId,
-                AuthorDisplayName: NameFor(row.AuthorId, row.AuthorDisplayName)))
-            .Concat(articleRows.Select(row => new MemberPublicActivityItem(
-                MemberPublicActivityType.Article,
-                row.Title,
-                row.Excerpt,
-                row.PublishedAt,
-                Slug: row.Slug,
-                AuthorId: row.AuthorMemberId,
-                AuthorDisplayName: NameFor(row.AuthorMemberId))))
-            .Concat(newsRows.Select(row => new MemberPublicActivityItem(
-                MemberPublicActivityType.News,
-                string.IsNullOrWhiteSpace(row.Title) ? "News contribution" : row.Title,
-                row.Notes,
-                row.PublishedAt,
-                ContentId: row.NewsId,
-                Slug: NewsSlug.Slugify(row.Title ?? "news"),
-                AuthorId: row.SubmitterMemberId,
-                AuthorDisplayName: NameFor(row.SubmitterMemberId))))
-            .Concat(photoRows.Select(row => new MemberPublicActivityItem(
-                MemberPublicActivityType.Photo,
-                row.Title,
-                row.Description,
-                row.PublishedAt,
-                Category: row.ApprovedCategory,
-                AuthorId: row.SubmitterMemberId,
-                AuthorDisplayName: NameFor(row.SubmitterMemberId))))
-            .OrderByDescending(item => item.PublishedAt)
+        // Type and Title break ties so paging stays stable across requests. The previous sort
+        // ordered on PublishedAt alone, leaving same-timestamp rows free to swap between pages.
+        var pageRows = forumRows
+            .Concat(submissionRows)
+            .OrderByDescending(row => row.PublishedAt)
+            .ThenByDescending(row => row.Type, StringComparer.Ordinal)
+            .ThenBy(row => row.Title, StringComparer.Ordinal)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
+            .ToList();
+
+        var names = await LoadAuthorNamesAsync(pageRows, cancellationToken);
+
+        var items = pageRows
+            .Select(row => new MemberPublicActivityItem(
+                row.Type,
+                BuildTitle(row),
+                row.Summary,
+                row.PublishedAt,
+                ContentId: row.ContentId,
+                ParentId: row.ParentId,
+                Slug: BuildSlug(row),
+                Category: row.Category,
+                AuthorId: row.AuthorId,
+                AuthorDisplayName: names.TryGetValue(row.AuthorId, out var displayName)
+                    ? displayName
+                    : row.AuthorDisplayName))
             .ToList();
 
         return new MemberPublicActivityPage(items, totalCount, page, pageSize);
     }
 
+    private bool IsSqliteDatabase() =>
+        dbContext.Database.ProviderName?.Contains("Sqlite", StringComparison.OrdinalIgnoreCase) == true;
+
+    private IQueryable<ModernForumPostEntity> BuildForumQuery(IReadOnlyList<Guid> authorIds) =>
+        dbContext.ModernForumPosts
+            .AsNoTracking()
+            .Where(post => post.AuthorMemberId != null
+                && authorIds.Contains(post.AuthorMemberId.Value)
+                && post.Thread != null
+                && !post.IsHidden);
+
+    /// <summary>
+    /// <c>PostedAt</c> is stored without an offset, so it is pinned to UTC explicitly rather than
+    /// via the implicit <see cref="DateTimeOffset"/> conversion, which would read an Unspecified
+    /// kind as local time and shift the timestamp.
+    /// </summary>
     private static DateTimeOffset ToOffset(DateTime? value) =>
         new(DateTime.SpecifyKind(value ?? DateTime.MinValue, DateTimeKind.Utc));
+
+    /// <summary>
+    /// Articles, promoted news and approved photos all store <c>datetimeoffset</c>, so EF Core
+    /// translates this Concat chain to a single UNION ALL that both SQL Server and the SQLite
+    /// test provider order and truncate server-side.
+    /// </summary>
+    private IQueryable<FeedRow> BuildSubmissionsQuery(IReadOnlyList<Guid> authorIds)
+    {
+        var articles = dbContext.ArticleSubmissions
+            .AsNoTracking()
+            .Where(article => authorIds.Contains(article.AuthorMemberId)
+                && article.Status == ArticleSubmissionStatus.Published
+                && article.PublishedAt != null)
+            .Select(article => new FeedRow
+            {
+                Type = MemberPublicActivityType.Article,
+                Title = article.Title,
+                Summary = article.Excerpt,
+                PublishedAt = article.PublishedAt!.Value,
+                ContentId = null,
+                ParentId = null,
+                Slug = article.Slug,
+                Category = null,
+                AuthorId = article.AuthorMemberId,
+                AuthorDisplayName = null,
+            });
+
+        var news = dbContext.NewsSuggestions
+            .AsNoTracking()
+            .Where(suggestion => authorIds.Contains(suggestion.SubmitterMemberId)
+                && suggestion.Status == NewsSuggestionStatus.Promoted
+                && suggestion.PromotedNewsId != null)
+            .Select(suggestion => new FeedRow
+            {
+                Type = MemberPublicActivityType.News,
+                Title = suggestion.Title,
+                Summary = suggestion.Notes,
+                PublishedAt = suggestion.ReviewedAt ?? suggestion.SubmittedAt,
+                ContentId = suggestion.PromotedNewsId!.Value,
+                ParentId = null,
+                Slug = null,
+                Category = null,
+                AuthorId = suggestion.SubmitterMemberId,
+                AuthorDisplayName = null,
+            });
+
+        var photos = dbContext.PhotoSubmissions
+            .AsNoTracking()
+            .Where(photo => authorIds.Contains(photo.SubmitterMemberId)
+                && photo.Status == PhotoSubmissionStatus.Approved)
+            .Select(photo => new FeedRow
+            {
+                Type = MemberPublicActivityType.Photo,
+                Title = photo.Title,
+                Summary = photo.Description,
+                PublishedAt = photo.ReviewedAt ?? photo.SubmittedAt,
+                ContentId = null,
+                ParentId = null,
+                Slug = null,
+                Category = photo.ApprovedCategory,
+                AuthorId = photo.SubmitterMemberId,
+                AuthorDisplayName = null,
+            });
+
+        return articles.Concat(news).Concat(photos);
+    }
+
+    private async Task<Dictionary<Guid, string>> LoadAuthorNamesAsync(
+        IReadOnlyList<FeedRow> rows,
+        CancellationToken cancellationToken)
+    {
+        var authorIds = rows.Select(row => row.AuthorId).Distinct().ToList();
+        if (authorIds.Count == 0)
+        {
+            return [];
+        }
+
+        return await dbContext.MemberAccounts
+            .AsNoTracking()
+            .Where(member => authorIds.Contains(member.Id))
+            .Select(member => new { member.Id, member.DisplayName })
+            .ToDictionaryAsync(member => member.Id, member => member.DisplayName, cancellationToken);
+    }
+
+    /// <summary>Promoted news suggestions may carry no title; every other source has one.</summary>
+    private static string BuildTitle(FeedRow row) =>
+        row.Type == MemberPublicActivityType.News && string.IsNullOrWhiteSpace(row.Title)
+            ? "News contribution"
+            : row.Title ?? string.Empty;
+
+    /// <summary>
+    /// Article slugs are stored; forum and news slugs stay derived from the title as before.
+    /// </summary>
+    private static string? BuildSlug(FeedRow row) => row.Type switch
+    {
+        MemberPublicActivityType.Article => row.Slug,
+        MemberPublicActivityType.ForumPost => NewsSlug.Slugify(row.Title ?? string.Empty),
+        MemberPublicActivityType.News => NewsSlug.Slugify(row.Title ?? "news"),
+        _ => null,
+    };
+
+    /// <summary>Common projection shape for both source queries.</summary>
+    private sealed class FeedRow
+    {
+        public string Type { get; set; } = string.Empty;
+
+        /// <summary>Nullable because promoted news suggestions may carry no title.</summary>
+        public string? Title { get; set; }
+
+        public string? Summary { get; set; }
+
+        public DateTimeOffset PublishedAt { get; set; }
+
+        public int? ContentId { get; set; }
+
+        public int? ParentId { get; set; }
+
+        public string? Slug { get; set; }
+
+        public string? Category { get; set; }
+
+        public Guid AuthorId { get; set; }
+
+        public string? AuthorDisplayName { get; set; }
+    }
 }

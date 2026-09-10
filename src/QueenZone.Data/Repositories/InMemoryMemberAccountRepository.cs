@@ -29,6 +29,21 @@ public sealed class InMemoryMemberAccountRepository : IMemberAccountRepository
         }
     }
 
+    public Task<IReadOnlySet<Guid>> ListActiveMemberIdsAsync(
+        IReadOnlyCollection<Guid> memberIds,
+        CancellationToken cancellationToken = default)
+    {
+        var ids = memberIds.ToHashSet();
+        lock (gate)
+        {
+            IReadOnlySet<Guid> active = accounts
+                .Where(a => ids.Contains(a.Id) && a.DeletionRequestedAt is null)
+                .Select(a => a.Id)
+                .ToHashSet();
+            return Task.FromResult(active);
+        }
+    }
+
     public Task<MemberAccount?> FindByExternalLoginAsync(string provider, string providerKey, CancellationToken cancellationToken = default)
     {
         lock (gate)

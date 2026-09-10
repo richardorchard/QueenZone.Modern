@@ -194,6 +194,12 @@ public sealed class PrivateMessageRateLimiterTests
             CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
+        public virtual Task<IReadOnlySet<Guid>> ListBlockedMemberIdsAsync(
+            Guid blockerMemberId,
+            IReadOnlyCollection<Guid> candidateMemberIds,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         public virtual Task<int> CountUnreadConversationsAsync(
             Guid memberId,
             CancellationToken cancellationToken = default) =>

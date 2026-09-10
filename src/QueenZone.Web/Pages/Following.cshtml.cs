@@ -84,6 +84,11 @@ public sealed class FollowingModel(
         return Page();
     }
 
+    /// <summary>
+    /// Two batch queries rather than two per followed member. The follow list is unbounded, so
+    /// the previous per-member loop scaled its query count with how many people the viewer
+    /// follows.
+    /// </summary>
     private async Task<IReadOnlyList<Guid>> FilterVisibleAuthorIdsAsync(
         Guid viewerMemberId,
         IReadOnlyList<Guid> followedIds,
@@ -94,24 +99,18 @@ public sealed class FollowingModel(
             return [];
         }
 
-        var visible = new List<Guid>(followedIds.Count);
-        foreach (var followedId in followedIds)
-        {
-            if (await privateMessageService.HasBlockedAsync(viewerMemberId, followedId, cancellationToken))
-            {
-                continue;
-            }
+        var blocked = await privateMessageService.ListBlockedMemberIdsAsync(
+            viewerMemberId,
+            followedIds,
+            cancellationToken);
+        var active = await memberAccountRepository.ListActiveMemberIdsAsync(
+            followedIds,
+            cancellationToken);
 
-            var member = await memberAccountRepository.FindByIdAsync(followedId, cancellationToken);
-            if (member is null || member.DeletionRequestedAt is not null)
-            {
-                continue;
-            }
-
-            visible.Add(followedId);
-        }
-
-        return visible;
+        // Preserve the follow-list order the loop produced.
+        return followedIds
+            .Where(id => !blocked.Contains(id) && active.Contains(id))
+            .ToList();
     }
 
     private async Task<Guid?> GetCurrentMemberIdAsync()
