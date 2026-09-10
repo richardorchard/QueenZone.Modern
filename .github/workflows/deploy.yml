@@ -209,10 +209,10 @@ jobs:
 
       - name: Apply database migrations
         env:
-          ConnectionStrings__QueenZoneLegacy: ${{ steps.bitwarden-secrets.outputs.QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING }}
+          ConnectionStrings__QueenZoneLegacy: ${{ steps.bitwarden-secrets.outputs.QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING_CANADA_EAST }}
         run: |
           if [ -z "$ConnectionStrings__QueenZoneLegacy" ]; then
-            echo "::error::QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING is not configured. Check the Bitwarden secret and BITWARDEN_APP_SERVICE_DEPLOY_SECRETS mapping before deploying."
+            echo "::error::QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING_CANADA_EAST is not configured. Check the Bitwarden secret and BITWARDEN_APP_SERVICE_DEPLOY_SECRETS mapping before deploying."
             exit 1
           fi
 
@@ -229,7 +229,7 @@ jobs:
   # WEBSITE_WARMUP_PATH is still ARM-owned here (Kudu POST /api/settings
   # cannot persist ARM Application Settings — it returns 204 but does not
   # take effect, #660/#664), through a dedicated OIDC identity scoped to
-  # Website Contributor on queenzone-dev only (#666), never through
+  # Website Contributor on queenzone-prod only (#666/#1272), never through
   # scripts/Invoke-AppServiceKudu.py.
   #
   # WEBSITE_WARMUP_PATH points at /health, not /warmup. Azure's own container
@@ -238,7 +238,7 @@ jobs:
   # runs dependency checks and primes public caches, so it is a deploy-time
   # readiness gate rather than the platform's container-liveness gate.
   # Pointing the platform probe at /warmup crash-looped
-  # queenzone-dev for over an hour on the first #666 rollout. /health stays
+  # the former production app for over an hour on the first #666 rollout. /health stays
   # cheap (no dependency I/O) so it can't blow the platform's tight budget.
   # WEBSITE_WARMUP_STATUSES stays unset: App Service pings can carry an internal
   # link-local Host header, and the old ASP.NET Core host filter rejected that
@@ -302,13 +302,13 @@ jobs:
             "WEBSITE_WARMUP_PATH=/health" | sort)
 
           current=$(az webapp config appsettings list \
-            --name queenzone-dev \
+            --name queenzone-prod \
             --resource-group Queenzone-RG \
             --query "[?name=='WEBSITE_WARMUP_PATH'].[join('=', [name, value])]" \
             -o tsv | tr -d '\r' | sort)
 
           strict_warmup_status=$(az webapp config appsettings list \
-            --name queenzone-dev \
+            --name queenzone-prod \
             --resource-group Queenzone-RG \
             --query "[?name=='WEBSITE_WARMUP_STATUSES'].value | [0]" \
             -o tsv | tr -d '\r')
@@ -316,13 +316,13 @@ jobs:
           # Kept absent by design (see comment above): a stale WEBSITE_RUN_FROM_PACKAGE=1
           # from before this removal must not linger and re-enable the read-only mount.
           run_from_package=$(az webapp config appsettings list \
-            --name queenzone-dev \
+            --name queenzone-prod \
             --resource-group Queenzone-RG \
             --query "[?name=='WEBSITE_RUN_FROM_PACKAGE'].value | [0]" \
             -o tsv | tr -d '\r')
 
           current_mobile_auth_signing_key=$(az webapp config appsettings list \
-            --name queenzone-dev \
+            --name queenzone-prod \
             --resource-group Queenzone-RG \
             --query "[?name=='MobileAuth__SigningKey'].value | [0]" \
             -o tsv | tr -d '\r')
@@ -330,7 +330,7 @@ jobs:
           changed=false
           if [ -n "$strict_warmup_status" ]; then
             az webapp config appsettings delete \
-              --name queenzone-dev \
+              --name queenzone-prod \
               --resource-group Queenzone-RG \
               --setting-names WEBSITE_WARMUP_STATUSES \
               --output none
@@ -339,7 +339,7 @@ jobs:
 
           if [ -n "$run_from_package" ]; then
             az webapp config appsettings delete \
-              --name queenzone-dev \
+              --name queenzone-prod \
               --resource-group Queenzone-RG \
               --setting-names WEBSITE_RUN_FROM_PACKAGE \
               --output none
@@ -348,7 +348,7 @@ jobs:
 
           if [ "$current" != "$desired" ]; then
             az webapp config appsettings set \
-              --name queenzone-dev \
+              --name queenzone-prod \
               --resource-group Queenzone-RG \
               --settings WEBSITE_WARMUP_PATH=/health \
               --output none
@@ -357,7 +357,7 @@ jobs:
 
           if [ "$current_mobile_auth_signing_key" != "$MOBILE_AUTH_SIGNING_KEY" ]; then
             az webapp config appsettings set \
-              --name queenzone-dev \
+              --name queenzone-prod \
               --resource-group Queenzone-RG \
               --settings "MobileAuth__SigningKey=$MOBILE_AUTH_SIGNING_KEY" \
               --output none
@@ -453,8 +453,8 @@ jobs:
       - name: Deploy
         uses: azure/webapps-deploy@v3
         with:
-          app-name: queenzone-dev
-          publish-profile: ${{ steps.bitwarden-secrets.outputs.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          app-name: queenzone-prod
+          publish-profile: ${{ steps.bitwarden-secrets.outputs.AZURE_WEBAPP_PUBLISH_PROFILE_CANADA_EAST }}
           package: publish
 
       # An explicit Kudu restart after the zip push is required for a worker
@@ -463,7 +463,7 @@ jobs:
       # stamp check as the strict readiness gate regardless of extract mode.
       - name: Recycle App Service
         env:
-          AZURE_WEBAPP_PUBLISH_PROFILE: ${{ steps.bitwarden-secrets.outputs.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          AZURE_WEBAPP_PUBLISH_PROFILE: ${{ steps.bitwarden-secrets.outputs.AZURE_WEBAPP_PUBLISH_PROFILE_CANADA_EAST }}
         run: python3 ./scripts/Invoke-AppServiceKudu.py --restart
 
       - name: Warm up custom domain

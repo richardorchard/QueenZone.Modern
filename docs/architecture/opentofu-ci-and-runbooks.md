@@ -136,7 +136,7 @@ configuration" means differs by resource class:
 `opentofu-apply.yml`'s `post-apply-smoke` job runs
 [`scripts/Test-OpenTofuPostApplySmoke.ps1`](../../scripts/Test-OpenTofuPostApplySmoke.ps1)
 after every apply: the general route suite (`Smoke-LiveSite.ps1`), a direct
-Azure origin check (`GET /health` on `queenzone-dev.azurewebsites.net` must
+Azure origin check (`GET /health` on `queenzone-prod.azurewebsites.net` must
 return 403), `/health/ready` reachability, the `cdn2.queenzone.org/songfiles/*`
 → 404 contract, and a Cloudflare-proxy reachability check on
 `cdn.queenzone.org`. Application Insights freshness is checked best-effort

@@ -28,8 +28,8 @@
 [CmdletBinding()]
 param(
     [string]$BaseUrl = "https://www.queenzone.org",
-    [string]$DirectOriginUrl = "https://queenzone-dev.azurewebsites.net",
-    [string]$ApplicationInsightsName = "queenzone-dev-ai",
+    [string]$DirectOriginUrl = "https://queenzone-prod.azurewebsites.net",
+    [string]$ApplicationInsightsName = "queenzone-prod-ai",
     [string]$ResourceGroup = "Queenzone-RG"
 )
 
