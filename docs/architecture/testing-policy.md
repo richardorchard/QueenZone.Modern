@@ -171,6 +171,8 @@ For photo and article submission lifecycles (including photo-submission promotio
 
 For member account create + external login, use `scripts/Probe-MemberAccounts.ps1` with `RUN_MEMBER_ACCOUNT_PROBE=true`.
 
+For the member public activity feed (`/members/{id}`, `/following`), use `scripts/Probe-MemberActivity.ps1` with `RUN_MEMBER_ACTIVITY_PROBE=true`. This one is **read-only** — it seeds nothing and deletes nothing. It exists because the SQLite unit tests cannot cover the production ordering: SQLite cannot `ORDER BY` a `DateTimeOffset`, so it takes a client-side sort branch while SQL Server orders and pages the `UNION ALL` over `ArticleSubmissions` / `NewsSuggestions` / `PhotoSubmissions` server-side. Run it when changing that repository or the timestamp mapping of any source it reads.
+
 For admin URL ingestion and run-request queue checks, use the same SQL Express mirror with `scripts/Probe-NewsAgentUrlIngestion.ps1` and `RUN_NEWS_AGENT_URL_INGESTION_PROBE=true`. Default mode exercises SQL queue, claim, and completion. Pass `-Full` to fetch a public URL and triage through the local worker stack; an optional `OPENROUTER_API_KEY` enables AI triage. Both modes delete their requests, heartbeats, and related discovery records before returning. The full mode never publishes.
 
 ### Migration And Content Validation
