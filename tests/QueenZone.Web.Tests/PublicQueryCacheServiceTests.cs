@@ -440,6 +440,266 @@ public sealed class PublicQueryCacheServiceTests
         Assert.Equal(1, liveActivityQuery.CallCount);
     }
 
+    [Fact]
+    public async Task NewsArchivePagesAndFilteredCountsAreCachedUntilInvalidated()
+    {
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var newsRepository = new CountingNewsRepository();
+        var service = CreateService(memoryCache, newsRepository: newsRepository);
+        var decade = new NewsArchiveFilter(2010);
+        var year = new NewsArchiveFilter(null, 2008);
+
+        var firstPage = await service.GetNewsArchivePageAsync(1, 20);
+        var secondPage = await service.GetNewsArchivePageAsync(1, 20);
+        var otherPage = await service.GetNewsArchivePageAsync(2, 20);
+        var decadePage = await service.GetNewsArchivePageAsync(1, 20, decade);
+        await service.GetNewsPublishedCountAsync();
+        await service.GetNewsPublishedCountAsync();
+        await service.GetNewsPublishedCountAsync(decade);
+        await service.GetNewsPublishedCountAsync(decade);
+        await service.GetNewsPublishedCountAsync(year);
+        await service.GetNewsPublishedCountAsync(NewsArchiveFilter.None);
+
+        Assert.Same(firstPage, secondPage);
+        Assert.NotSame(firstPage, otherPage);
+        Assert.NotSame(firstPage, decadePage);
+        Assert.Equal(3, newsRepository.ArchivePageCallCount);
+        Assert.Equal(3, newsRepository.PublishedCountCallCount);
+
+        service.InvalidateNewsCache();
+
+        _ = await service.GetNewsArchivePageAsync(1, 20);
+        _ = await service.GetNewsArchivePageAsync(2, 20);
+        _ = await service.GetNewsArchivePageAsync(1, 20, decade);
+        _ = await service.GetNewsPublishedCountAsync();
+        _ = await service.GetNewsPublishedCountAsync(decade);
+        _ = await service.GetNewsPublishedCountAsync(year);
+
+        Assert.Equal(6, newsRepository.ArchivePageCallCount);
+        Assert.Equal(6, newsRepository.PublishedCountCallCount);
+    }
+
+    [Fact]
+    public async Task ArticleArchiveLatestAndCountShareArticleVersionInvalidation()
+    {
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var articlesRepository = new CountingArticlesRepository();
+        var service = CreateService(memoryCache, articlesRepository: articlesRepository);
+
+        var firstArchive = await service.GetArticlesArchivePageAsync(1, 12);
+        var secondArchive = await service.GetArticlesArchivePageAsync(1, 12);
+        var otherArchive = await service.GetArticlesArchivePageAsync(2, 12);
+        var firstLatest = await service.GetLatestArticlesAsync(3);
+        var secondLatest = await service.GetLatestArticlesAsync(3);
+        await service.GetArticlePublishedCountAsync();
+        await service.GetArticlePublishedCountAsync();
+
+        Assert.Same(firstArchive, secondArchive);
+        Assert.NotSame(firstArchive, otherArchive);
+        Assert.Same(firstLatest, secondLatest);
+        Assert.Equal(2, articlesRepository.ArchivePageCallCount);
+        Assert.Equal(1, articlesRepository.LatestCallCount);
+        Assert.Equal(1, articlesRepository.PublishedCountCallCount);
+
+        service.InvalidateArticlesCache();
+
+        _ = await service.GetArticlesArchivePageAsync(1, 12);
+        _ = await service.GetArticlesArchivePageAsync(2, 12);
+        _ = await service.GetLatestArticlesAsync(3);
+        _ = await service.GetArticlePublishedCountAsync();
+
+        Assert.Equal(4, articlesRepository.ArchivePageCallCount);
+        Assert.Equal(2, articlesRepository.LatestCallCount);
+        Assert.Equal(2, articlesRepository.PublishedCountCallCount);
+    }
+
+    [Fact]
+    public async Task AllPublishedHistoryEventsAreCachedUntilInvalidated()
+    {
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var historyRepository = new CountingQueenHistoryRepository();
+        var service = CreateService(memoryCache, historyRepository: historyRepository);
+
+        var first = await service.GetAllPublishedHistoryEventsAsync();
+        var second = await service.GetAllPublishedHistoryEventsAsync();
+
+        Assert.Same(first, second);
+        Assert.Equal(1, historyRepository.AllPublishedCallCount);
+
+        service.InvalidateHistoryCache();
+
+        var third = await service.GetAllPublishedHistoryEventsAsync();
+
+        Assert.NotSame(first, third);
+        Assert.Equal(2, historyRepository.AllPublishedCallCount);
+    }
+
+    [Fact]
+    public async Task RandomQuotePicksFromCachedPublishedPool()
+    {
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var quoteRepository = new CountingQuoteRepository(
+            new QuoteItem(1, "Published one", "Freddie", DateTime.UtcNow, true),
+            new QuoteItem(2, "Published two", "Brian", DateTime.UtcNow, true),
+            new QuoteItem(3, "Draft", "Roger", DateTime.UtcNow, false));
+        var service = CreateService(memoryCache, quoteRepository: quoteRepository);
+
+        var first = await service.GetRandomPublishedQuoteAsync();
+        var second = await service.GetRandomPublishedQuoteAsync();
+
+        Assert.NotNull(first);
+        Assert.NotNull(second);
+        Assert.True(first!.IsPublished);
+        Assert.True(second!.IsPublished);
+        Assert.Contains(first.Id, new[] { 1, 2 });
+        Assert.Contains(second.Id, new[] { 1, 2 });
+        Assert.Equal(1, quoteRepository.AllCallCount);
+
+        service.InvalidateQuotesCache();
+        _ = await service.GetRandomPublishedQuoteAsync();
+
+        Assert.Equal(2, quoteRepository.AllCallCount);
+    }
+
+    [Fact]
+    public async Task RandomQuoteReturnsNullWhenPublishedPoolIsEmpty()
+    {
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var quoteRepository = new CountingQuoteRepository(
+            new QuoteItem(3, "Draft", "Roger", DateTime.UtcNow, false));
+        var service = CreateService(memoryCache, quoteRepository: quoteRepository);
+
+        Assert.Null(await service.GetRandomPublishedQuoteAsync());
+        Assert.Null(await service.GetRandomPublishedQuoteAsync());
+        Assert.Equal(1, quoteRepository.AllCallCount);
+    }
+
+    [Fact]
+    public async Task Concurrent_random_quote_cold_hits_load_published_pool_once()
+    {
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var quoteRepository = new SlowCountingQuoteRepository(
+            TimeSpan.FromMilliseconds(100),
+            new QuoteItem(1, "Published one", "Freddie", DateTime.UtcNow, true),
+            new QuoteItem(2, "Published two", "Brian", DateTime.UtcNow, true));
+        var service = CreateService(memoryCache, quoteRepository: quoteRepository);
+
+        var tasks = Enumerable.Range(0, 12)
+            .Select(_ => service.GetRandomPublishedQuoteAsync())
+            .ToArray();
+        await Task.WhenAll(tasks);
+
+        Assert.Equal(1, quoteRepository.AllCallCount);
+        Assert.All(tasks, t => Assert.NotNull(t.Result));
+    }
+
+    [Fact]
+    public async Task RandomTriviaPicksFromCachedPublishedPool()
+    {
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var triviaRepository = new CountingTriviaRepository(
+            new TriviaFactItem(1, "Published one", DateTime.UtcNow, true),
+            new TriviaFactItem(2, "Published two", DateTime.UtcNow, true),
+            new TriviaFactItem(3, "Draft", DateTime.UtcNow, false));
+        var service = CreateService(memoryCache, triviaRepository: triviaRepository);
+
+        var first = await service.GetRandomPublishedTriviaAsync();
+        var second = await service.GetRandomPublishedTriviaAsync();
+
+        Assert.NotNull(first);
+        Assert.NotNull(second);
+        Assert.True(first!.IsPublished);
+        Assert.True(second!.IsPublished);
+        Assert.Equal(1, triviaRepository.AllCallCount);
+
+        service.InvalidateTriviaCache();
+        _ = await service.GetRandomPublishedTriviaAsync();
+
+        Assert.Equal(2, triviaRepository.AllCallCount);
+    }
+
+    [Fact]
+    public async Task BiographyChaptersAreCachedUntilInvalidated()
+    {
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var biographyRepository = new CountingBiographyRepository();
+        var service = CreateService(memoryCache, biographyRepository: biographyRepository);
+
+        var first = await service.GetBiographyChaptersAsync();
+        var second = await service.GetBiographyChaptersAsync();
+
+        Assert.Same(first, second);
+        Assert.Equal(1, biographyRepository.ChaptersCallCount);
+
+        service.InvalidateBiographyCache();
+
+        var third = await service.GetBiographyChaptersAsync();
+
+        Assert.NotSame(first, third);
+        Assert.Equal(2, biographyRepository.ChaptersCallCount);
+    }
+
+    [Fact]
+    public async Task DiscographyAlbumsAreCachedUntilInvalidated()
+    {
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var discographyRepository = new CountingDiscographyRepository();
+        var service = CreateService(memoryCache, discographyRepository: discographyRepository);
+
+        var first = await service.GetDiscographyAlbumsAsync();
+        var second = await service.GetDiscographyAlbumsAsync();
+
+        Assert.Same(first, second);
+        Assert.Equal(1, discographyRepository.AlbumsCallCount);
+
+        service.InvalidateDiscographyCache();
+
+        var third = await service.GetDiscographyAlbumsAsync();
+
+        Assert.NotSame(first, third);
+        Assert.Equal(2, discographyRepository.AlbumsCallCount);
+    }
+
+    [Fact]
+    public async Task CatalogInvalidation_does_not_evict_unrelated_families()
+    {
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var newsRepository = new CountingNewsRepository();
+        var quoteRepository = new CountingQuoteRepository(
+            new QuoteItem(1, "Published", "Freddie", DateTime.UtcNow, true));
+        var triviaRepository = new CountingTriviaRepository(
+            new TriviaFactItem(1, "Published", DateTime.UtcNow, true));
+        var biographyRepository = new CountingBiographyRepository();
+        var discographyRepository = new CountingDiscographyRepository();
+        var service = CreateService(
+            memoryCache,
+            newsRepository: newsRepository,
+            quoteRepository: quoteRepository,
+            triviaRepository: triviaRepository,
+            biographyRepository: biographyRepository,
+            discographyRepository: discographyRepository);
+
+        await service.GetLatestNewsAsync(5);
+        await service.GetRandomPublishedQuoteAsync();
+        await service.GetRandomPublishedTriviaAsync();
+        await service.GetBiographyChaptersAsync();
+        await service.GetDiscographyAlbumsAsync();
+
+        service.InvalidateQuotesCache();
+
+        await service.GetLatestNewsAsync(5);
+        await service.GetRandomPublishedQuoteAsync();
+        await service.GetRandomPublishedTriviaAsync();
+        await service.GetBiographyChaptersAsync();
+        await service.GetDiscographyAlbumsAsync();
+
+        Assert.Equal(1, newsRepository.LatestCallCount);
+        Assert.Equal(2, quoteRepository.AllCallCount);
+        Assert.Equal(1, triviaRepository.AllCallCount);
+        Assert.Equal(1, biographyRepository.ChaptersCallCount);
+        Assert.Equal(1, discographyRepository.AlbumsCallCount);
+    }
+
     private static ServiceProvider CreateWarmupProvider(PublicQueryCacheService cache)
     {
         var services = new ServiceCollection();
@@ -456,6 +716,10 @@ public sealed class PublicQueryCacheServiceTests
         IPhotoRepository? photoRepository = null,
         ILiveActivityQueryService? liveActivityQuery = null,
         IFanPerformanceRepository? fanPerformanceRepository = null,
+        IQuoteRepository? quoteRepository = null,
+        ITriviaRepository? triviaRepository = null,
+        IBiographyRepository? biographyRepository = null,
+        IDiscographyRepository? discographyRepository = null,
         PublicQueryCacheOptions? options = null) =>
         new(
             memoryCache,
@@ -466,7 +730,11 @@ public sealed class PublicQueryCacheServiceTests
             historyRepository ?? new CountingQueenHistoryRepository(),
             photoRepository ?? new CountingPhotoRepository(),
             liveActivityQuery ?? new CountingLiveActivityQueryService(),
-            fanPerformanceRepository ?? new CountingFanPerformanceRepository());
+            fanPerformanceRepository ?? new CountingFanPerformanceRepository(),
+            quoteRepository ?? new CountingQuoteRepository(),
+            triviaRepository ?? new CountingTriviaRepository(),
+            biographyRepository ?? new CountingBiographyRepository(),
+            discographyRepository ?? new CountingDiscographyRepository());
 
     private class CountingLiveActivityQueryService : ILiveActivityQueryService
     {
@@ -533,6 +801,8 @@ public sealed class PublicQueryCacheServiceTests
 
         public int PublishedCountCallCount { get; private set; }
 
+        public int ArchivePageCallCount { get; private set; }
+
         public virtual Task<IReadOnlyList<NewsItem>> GetLatestAsync(int count, CancellationToken cancellationToken = default)
         {
             LatestCallCount++;
@@ -557,8 +827,19 @@ public sealed class PublicQueryCacheServiceTests
             int page,
             int pageSize,
             NewsArchiveFilter filter = default,
-            CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<NewsItem>>([]);
+            CancellationToken cancellationToken = default)
+        {
+            ArchivePageCallCount++;
+            var item = new NewsItem(
+                page,
+                $"Cached archive {page}:{pageSize}:{filter.DecadeStartYear}:{filter.Year}",
+                "Cached news excerpt.",
+                "Cached news body.",
+                new DateTime(2026, 7, 6, 0, 0, 0, DateTimeKind.Utc),
+                null,
+                true);
+            return Task.FromResult<IReadOnlyList<NewsItem>>([item]);
+        }
 
         public Task<NewsArchiveYearRange> GetArchiveYearRangeAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult(new NewsArchiveYearRange(null, null));
@@ -592,17 +873,29 @@ public sealed class PublicQueryCacheServiceTests
 
         public int PublishedCountCallCount { get; private set; }
 
+        public int LatestCallCount { get; private set; }
+
+        public int ArchivePageCallCount { get; private set; }
+
         public virtual Task<int> GetPublishedCountAsync(CancellationToken cancellationToken = default)
         {
             PublishedCountCallCount++;
             return Task.FromResult(1);
         }
 
-        public virtual Task<IReadOnlyList<ArticleItem>> GetLatestAsync(int count, CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<ArticleItem>>([item]);
+        public virtual Task<IReadOnlyList<ArticleItem>> GetLatestAsync(int count, CancellationToken cancellationToken = default)
+        {
+            LatestCallCount++;
+            return Task.FromResult<IReadOnlyList<ArticleItem>>([item]);
+        }
 
-        public Task<IReadOnlyList<ArticleItem>> GetArchivePageAsync(int page, int pageSize, CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<ArticleItem>>([item]);
+        public Task<IReadOnlyList<ArticleItem>> GetArchivePageAsync(int page, int pageSize, CancellationToken cancellationToken = default)
+        {
+            ArchivePageCallCount++;
+            return Task.FromResult<IReadOnlyList<ArticleItem>>([
+                item with { Id = page, Title = $"Cached article page {page}:{pageSize}" }
+            ]);
+        }
 
         public Task<ArticleItem?> GetByIdAsync(int id, CancellationToken cancellationToken = default) =>
             Task.FromResult<ArticleItem?>(id == item.Id ? item : null);
@@ -688,6 +981,8 @@ public sealed class PublicQueryCacheServiceTests
 
         public int AroundThisDayCallCount { get; private set; }
 
+        public int AllPublishedCallCount { get; private set; }
+
         public virtual Task<IReadOnlyList<QueenHistoryEvent>> GetOnThisDayAsync(DateOnly date, int count, CancellationToken cancellationToken = default)
         {
             OnThisDayCallCount++;
@@ -705,8 +1000,11 @@ public sealed class PublicQueryCacheServiceTests
                 [CreateEvent($"around-this-day:{date:yyyy-MM-dd}:{dayWindow}:{count}")]);
         }
 
-        public Task<IReadOnlyList<QueenHistoryEvent>> GetAllPublishedAsync(CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<QueenHistoryEvent>>([CreateEvent("all-published")]);
+        public Task<IReadOnlyList<QueenHistoryEvent>> GetAllPublishedAsync(CancellationToken cancellationToken = default)
+        {
+            AllPublishedCallCount++;
+            return Task.FromResult<IReadOnlyList<QueenHistoryEvent>>([CreateEvent("all-published")]);
+        }
 
         private static QueenHistoryEvent CreateEvent(string title) =>
             new(
@@ -819,6 +1117,121 @@ public sealed class PublicQueryCacheServiceTests
         public Task<IReadOnlyList<PhotoSitemapCategory>> GetPublishedSitemapCategoriesAsync(
             CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
+    }
+
+    private class CountingQuoteRepository(params QuoteItem[] quotes) : IQuoteRepository
+    {
+        public int AllCallCount { get; private set; }
+
+        public virtual Task<IReadOnlyList<QuoteItem>> GetAllAsync(CancellationToken cancellationToken = default)
+        {
+            AllCallCount++;
+            return Task.FromResult<IReadOnlyList<QuoteItem>>(quotes);
+        }
+
+        public Task<QuoteItem?> GetByIdAsync(int id, CancellationToken cancellationToken = default) =>
+            Task.FromResult(quotes.FirstOrDefault(quote => quote.Id == id));
+
+        public Task<QuoteItem?> GetRandomPublishedAsync(CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<int> CreateAsync(AdminQuoteDraft draft, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task UpdateAsync(int id, AdminQuoteDraft draft, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task DeleteAsync(int id, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task SetPublishedAsync(int id, bool isPublished, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+    }
+
+    private sealed class SlowCountingQuoteRepository(TimeSpan delay, params QuoteItem[] quotes)
+        : CountingQuoteRepository(quotes)
+    {
+        public override async Task<IReadOnlyList<QuoteItem>> GetAllAsync(CancellationToken cancellationToken = default)
+        {
+            await Task.Delay(delay, cancellationToken);
+            return await base.GetAllAsync(cancellationToken);
+        }
+    }
+
+    private sealed class CountingTriviaRepository(params TriviaFactItem[] facts) : ITriviaRepository
+    {
+        public int AllCallCount { get; private set; }
+
+        public Task<IReadOnlyList<TriviaFactItem>> GetAllAsync(CancellationToken cancellationToken = default)
+        {
+            AllCallCount++;
+            return Task.FromResult<IReadOnlyList<TriviaFactItem>>(facts);
+        }
+
+        public Task<TriviaFactItem?> GetByIdAsync(int id, CancellationToken cancellationToken = default) =>
+            Task.FromResult(facts.FirstOrDefault(fact => fact.Id == id));
+
+        public Task<TriviaFactItem?> GetRandomPublishedAsync(CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<int> CreateAsync(AdminTriviaDraft draft, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task UpdateAsync(int id, AdminTriviaDraft draft, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task DeleteAsync(int id, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task SetPublishedAsync(int id, bool isPublished, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+    }
+
+    private sealed class CountingBiographyRepository : IBiographyRepository
+    {
+        private readonly BiographyChapterItem chapter = new(
+            1,
+            "Cached chapter",
+            "Cached summary.",
+            "Cached body.",
+            1,
+            new DateTime(2026, 7, 6, 0, 0, 0, DateTimeKind.Utc));
+
+        public int ChaptersCallCount { get; private set; }
+
+        public Task<IReadOnlyList<BiographyChapterItem>> GetChaptersAsync(CancellationToken cancellationToken = default)
+        {
+            ChaptersCallCount++;
+            return Task.FromResult<IReadOnlyList<BiographyChapterItem>>([chapter]);
+        }
+
+        public Task<BiographyChapterItem?> GetByIdAsync(int id, CancellationToken cancellationToken = default) =>
+            Task.FromResult<BiographyChapterItem?>(id == chapter.Id ? chapter : null);
+
+        public Task<BiographyChapterNav> GetAdjacentChaptersAsync(int id, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new BiographyChapterNav(null, null));
+
+        public Task<int> CreateAsync(AdminBiographyDraft draft, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task UpdateAsync(int id, AdminBiographyDraft draft, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+    }
+
+    private sealed class CountingDiscographyRepository : IDiscographyRepository
+    {
+        private readonly AlbumSummary album = new(1, "Cached album", "cached-album", 1975, null);
+
+        public int AlbumsCallCount { get; private set; }
+
+        public Task<IReadOnlyList<AlbumSummary>> GetAlbumsAsync(CancellationToken cancellationToken = default)
+        {
+            AlbumsCallCount++;
+            return Task.FromResult<IReadOnlyList<AlbumSummary>>([album]);
+        }
+
+        public Task<AlbumDetail?> GetAlbumByIdAsync(int albumId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<AlbumDetail?>(null);
     }
 
     private sealed class ConcurrentEntryGate(int expected)

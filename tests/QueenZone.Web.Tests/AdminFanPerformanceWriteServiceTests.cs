@@ -166,7 +166,11 @@ public sealed class AdminFanPerformanceWriteServiceTests
             new InMemoryQueenHistoryRepository(SampleQueenHistoryData.CreateSeedEvents()),
             new InMemoryPhotoRepository(new SharedPhotoStore(SamplePhotoData.CreateSeedCategories())),
             new StubLiveActivityQueryService(),
-            fanPerformanceRepository);
+            fanPerformanceRepository,
+            new InMemoryQuoteRepository(SampleQuoteData.CreateSeedQuotes()),
+            new InMemoryTriviaRepository(SampleTriviaData.CreateSeedFacts()),
+            new InMemoryBiographyRepository(SampleBiographyData.CreateSeedChapters()),
+            new InMemoryDiscographyRepository(SampleDiscographyData.CreateSeedAlbums()));
 
     private static CoreSitemapService CreateSitemapService(IOutputCacheStore outputCache, IMemoryCache cache) =>
         new(

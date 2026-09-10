@@ -6,6 +6,7 @@ namespace QueenZone.Web.Pages.Admin.Quotes;
 
 public sealed class EditPostModel(
     IQuoteRepository quoteRepository,
+    PublicQueryCacheService publicQueryCache,
     IOutputCacheStore outputCacheStore) : AdminQuotePageModel
 {
     public QuoteFormViewModel? Form { get; private set; }
@@ -33,7 +34,7 @@ public sealed class EditPostModel(
         }
 
         await quoteRepository.UpdateAsync(id, draft, cancellationToken);
-        await IndexModel.InvalidatePublicHomeCacheAsync(outputCacheStore, cancellationToken);
+        await IndexModel.InvalidatePublicHomeCacheAsync(publicQueryCache, outputCacheStore, cancellationToken);
 
         TempData[MessageKey] = "Saved quote.";
         TempData[MessageKindKey] = "success";

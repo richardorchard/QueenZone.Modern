@@ -7,6 +7,7 @@ namespace QueenZone.Web.Pages.Admin.Biography;
 
 public sealed class EditPostModel(
     IBiographyRepository biographyRepository,
+    PublicQueryCacheService publicQueryCache,
     CoreSitemapService coreSitemapService,
     IOutputCacheStore outputCacheStore,
     UgcHtml ugcHtml) : AdminBiographyPageModel
@@ -38,6 +39,7 @@ public sealed class EditPostModel(
 
         await biographyRepository.UpdateAsync(id, draft, cancellationToken);
         await IndexModel.InvalidatePublicBiographyCachesAsync(
+            publicQueryCache,
             coreSitemapService,
             outputCacheStore,
             cancellationToken);

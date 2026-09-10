@@ -7,6 +7,7 @@ namespace QueenZone.Web.Pages.Admin.Quotes;
 
 public sealed class IndexModel(
     IQuoteRepository quoteRepository,
+    PublicQueryCacheService publicQueryCache,
     IOutputCacheStore outputCacheStore) : AdminQuotePageModel
 {
     public IReadOnlyList<QuoteItem> Quotes { get; private set; } = [];
@@ -42,7 +43,7 @@ public sealed class IndexModel(
         }
 
         var id = await quoteRepository.CreateAsync(draft, cancellationToken);
-        await InvalidatePublicHomeCacheAsync(outputCacheStore, cancellationToken);
+        await InvalidatePublicHomeCacheAsync(publicQueryCache, outputCacheStore, cancellationToken);
         TempData[MessageKey] = $"Added quote from {draft.WhoSaid}.";
         TempData[MessageKindKey] = "success";
         return Redirect("/admin/quotes");
@@ -51,7 +52,7 @@ public sealed class IndexModel(
     public async Task<IActionResult> OnPostDeleteAsync(int id, CancellationToken cancellationToken)
     {
         await quoteRepository.DeleteAsync(id, cancellationToken);
-        await InvalidatePublicHomeCacheAsync(outputCacheStore, cancellationToken);
+        await InvalidatePublicHomeCacheAsync(publicQueryCache, outputCacheStore, cancellationToken);
         TempData[MessageKey] = "Deleted quote.";
         TempData[MessageKindKey] = "success";
         return Redirect("/admin/quotes");
@@ -63,16 +64,18 @@ public sealed class IndexModel(
         CancellationToken cancellationToken)
     {
         await quoteRepository.SetPublishedAsync(id, !isPublished, cancellationToken);
-        await InvalidatePublicHomeCacheAsync(outputCacheStore, cancellationToken);
+        await InvalidatePublicHomeCacheAsync(publicQueryCache, outputCacheStore, cancellationToken);
         TempData[MessageKey] = !isPublished ? "Quote published." : "Quote unpublished.";
         TempData[MessageKindKey] = "success";
         return Redirect("/admin/quotes");
     }
 
     internal static async Task InvalidatePublicHomeCacheAsync(
+        PublicQueryCacheService publicQueryCache,
         IOutputCacheStore outputCacheStore,
         CancellationToken cancellationToken)
     {
+        publicQueryCache.InvalidateQuotesCache();
         await outputCacheStore.EvictByTagAsync(PublicOutputCachePolicies.PublicHtmlTag, cancellationToken);
     }
 }
