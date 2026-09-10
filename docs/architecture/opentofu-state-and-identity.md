@@ -70,10 +70,16 @@ Create two Cloudflare API tokens. Restrict both to account `f93121b2086286e79a7a
 
 | Token | Account permissions | Zone permissions |
 | --- | --- | --- |
-| Plan | Workers Scripts Read | Zone Read, DNS Read, Zone Settings Read, SSL and Certificates Read, Workers Routes Read |
-| Apply | Workers Scripts Edit | Zone Read, DNS Edit, Zone Settings Edit, SSL and Certificates Edit, Workers Routes Edit |
+| Plan | Workers Scripts Read | Zone Read, DNS Read, Zone Settings Read, SSL and Certificates Read, Workers Routes Read, Zone WAF Read, Cache Rules Read |
+| Apply | Workers Scripts Edit | Zone Read, DNS Edit, Zone Settings Edit, SSL and Certificates Edit, Workers Routes Edit, Zone WAF Edit, Cache Rules Edit |
 
 Add only permissions required by an observed provider denial. Do not grant account-wide zone edit, billing, member, token-management, or unrelated Workers permissions.
+
+The zone WAF and cache-rule permissions are required for the managed
+`cloudflare_ruleset` resources. The plan token first required `Zone WAF Read`
+and `Cache Rules Read` after the crawler and archive-cache rulesets were applied
+on 2026-09-09; without them, provider refresh fails with `403 Forbidden` before
+an otherwise safe plan can complete.
 
 Store the values in the `Queenzone Development` Bitwarden Secrets Manager project as `CLOUDFLARE_API_TOKEN_TOFU_PLAN` and `CLOUDFLARE_API_TOKEN_TOFU_APPLY`. GitHub later retrieves them through its existing Bitwarden Secrets Manager action into the matching protected environment. OpenTofu reads `CLOUDFLARE_API_TOKEN` from the process environment; the value must never appear in HCL, `.tfvars`, workflow output, plans, or state.
 
