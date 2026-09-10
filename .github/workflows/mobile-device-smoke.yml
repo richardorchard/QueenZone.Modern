@@ -50,6 +50,11 @@ concurrency:
 env:
   SIXLABORS_LICENSE_KEY: ${{ secrets.SIXLABORS_LICENSE_KEY }}
   SMOKE_PORT: "5098"
+  # Hosted ubuntu-latest is 4 vCPU / 16 GB. Default emulator-runner (2 cores,
+  # implicit ~2G RAM, force-avd-creation false) lost ADB twice on #1454:
+  # retry reused the crashed AVD and appended another hw.cpu.ncore. Leave one
+  # host core for Maestro + the Testing contract host. Self-hosted P0 release
+  # keeps its own AVD and is not this QEMU path.
 
 jobs:
   mobile-android-smoke:
@@ -175,14 +180,18 @@ jobs:
           api-level: 36
           target: google_apis
           arch: x86_64
-          force-avd-creation: false
-          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          cores: 3
+          ram-size: 4096M
+          heap-size: 512M
+          force-avd-creation: true
+          emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           script: ./scripts/run-mobile-device-smoke.sh --platform android --skip-build --no-build --apk src/QueenZone.Mobile/android/app/build/outputs/apk/release/app-release.apk $PROVE_FAILURE_ARGS
 
       # hashFiles() is evaluated at job start, so classify from the marker the
-      # script writes. Retry boots a fresh emulator; in-process ADB recovery
-      # cannot revive emulator-5554 after DeviceServerDied (#1432).
+      # script writes. Retry boots a new AVD (test-retry, force create); do not
+      # add a third identical attempt. In-process ADB recovery cannot revive
+      # emulator-5554 after DeviceServerDied (#1432 / #1454).
       - name: Classify Android smoke transport death
         id: android-smoke-classify
         if: steps.android-smoke.outcome == 'failure'
@@ -212,8 +221,12 @@ jobs:
           api-level: 36
           target: google_apis
           arch: x86_64
-          force-avd-creation: false
-          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          cores: 3
+          ram-size: 4096M
+          heap-size: 512M
+          avd-name: test-retry
+          force-avd-creation: true
+          emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           script: ./scripts/run-mobile-device-smoke.sh --platform android --skip-build --no-build --apk src/QueenZone.Mobile/android/app/build/outputs/apk/release/app-release.apk $PROVE_FAILURE_ARGS
 
@@ -229,7 +242,10 @@ jobs:
           if [ ! -s src/QueenZone.Mobile/maestro-results/harness.log ]; then
             echo "assemble failed before the smoke script wrote harness.log" > src/QueenZone.Mobile/maestro-results/harness.log
           fi
-          timeout 30 adb logcat -d > src/QueenZone.Mobile/maestro-results/logcat.txt 2>/dev/null || true
+          ./scripts/run-mobile-device-smoke.sh --dump-android-host --results-dir src/QueenZone.Mobile/maestro-results
+          if [ ! -s src/QueenZone.Mobile/maestro-results/logcat.txt ]; then
+            timeout 30 adb logcat -d > src/QueenZone.Mobile/maestro-results/logcat.txt 2>/dev/null || true
+          fi
           for f in "$HOME"/.android/*.log "$HOME"/.android/avd/*/*.log; do
             [ -f "$f" ] || continue
             cp "$f" "src/QueenZone.Mobile/maestro-results/$(basename "$f")" || true
@@ -521,8 +537,11 @@ jobs:
           api-level: 36
           target: google_apis
           arch: x86_64
-          force-avd-creation: false
-          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          cores: 3
+          ram-size: 4096M
+          heap-size: 512M
+          force-avd-creation: true
+          emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           script: ./scripts/run-mobile-device-smoke.sh --platform android $DEVICE_SUITE_ARGS --skip-build --no-build --apk src/QueenZone.Mobile/android/app/build/outputs/apk/release/app-release.apk
 
@@ -553,8 +572,12 @@ jobs:
           api-level: 36
           target: google_apis
           arch: x86_64
-          force-avd-creation: false
-          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          cores: 3
+          ram-size: 4096M
+          heap-size: 512M
+          avd-name: test-retry
+          force-avd-creation: true
+          emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           script: ./scripts/run-mobile-device-smoke.sh --platform android $DEVICE_SUITE_ARGS --skip-build --no-build --apk src/QueenZone.Mobile/android/app/build/outputs/apk/release/app-release.apk
 
@@ -570,7 +593,10 @@ jobs:
           if [ ! -s src/QueenZone.Mobile/maestro-results/harness.log ]; then
             echo "assemble failed before the smoke script wrote harness.log" > src/QueenZone.Mobile/maestro-results/harness.log
           fi
-          timeout 30 adb logcat -d > src/QueenZone.Mobile/maestro-results/logcat.txt 2>/dev/null || true
+          ./scripts/run-mobile-device-smoke.sh --dump-android-host --results-dir src/QueenZone.Mobile/maestro-results
+          if [ ! -s src/QueenZone.Mobile/maestro-results/logcat.txt ]; then
+            timeout 30 adb logcat -d > src/QueenZone.Mobile/maestro-results/logcat.txt 2>/dev/null || true
+          fi
           for f in "$HOME"/.android/*.log "$HOME"/.android/avd/*/*.log; do
             [ -f "$f" ] || continue
             cp "$f" "src/QueenZone.Mobile/maestro-results/$(basename "$f")" || true
