@@ -185,6 +185,20 @@ Grant the existing production deploy identity Website Contributor on
 same verified build that production runs. Do not change `deploy.yml`'s default
 target yet.
 
+Use `scripts/Prepare-ProductionMigrationCandidate.ps1 -PlanOnly` to validate
+the inputs without writes, then run it without `-PlanOnly` for the secret-safe
+settings clone, endpoint overrides, role assignment, and Bitwarden candidate
+secrets. It sends App Service settings to Azure Resource Manager in memory and
+prints names and counts only. Then dispatch
+`deploy-production-candidate.yml` from `main` with the successful `ci.yml` run
+ID and full build SHA recorded by the latest successful production deploy. The
+workflow fails closed unless that CI run succeeded, came from a pull request,
+and its head SHA matches the requested build version. Because CI publish
+artifacts have short retention, the workflow also requires the Australia East
+app to serve that build stamp, then downloads its exact deployed `wwwroot`
+package through Kudu and deploys that snapshot unchanged. The normal production
+deploy workflow remains pointed at the Australia East app.
+
 Before DNS changes, test the candidate hostname directly:
 
 - `/health`, `/health/ready`, `/`, `/news`, and representative archive pages;

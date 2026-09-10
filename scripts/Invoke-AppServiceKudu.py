@@ -10,6 +10,7 @@ azure/login instead (#666); this script is restart/cleanup only.
 Supported actions:
   --delete-setting NAME   DELETE /api/settings/{NAME} (404 is success)
   --restart               POST /api/app/restart (fallback /api/restart)
+  --download-wwwroot PATH Download the exact deployed wwwroot as a zip
 
 Reads AZURE_WEBAPP_PUBLISH_PROFILE. Never prints the profile, username,
 or password.
@@ -20,6 +21,7 @@ from __future__ import annotations
 import argparse
 import base64
 import os
+import shutil
 import sys
 import urllib.error
 import urllib.request
@@ -62,18 +64,42 @@ def kudu_request(user: str, password: str, host: str, method: str, path: str) ->
         return exc.code
 
 
+def download_wwwroot(user: str, password: str, host: str, destination: str) -> None:
+    token = base64.b64encode(f"{user}:{password}".encode("utf-8")).decode("ascii")
+    request = urllib.request.Request(
+        f"https://{host}/api/zip/site/wwwroot/",
+        method="GET",
+        headers={"Authorization": f"Basic {token}"},
+    )
+    temporary = f"{destination}.partial"
+    try:
+        with urllib.request.urlopen(request, timeout=180) as response:
+            if response.status != 200:
+                raise RuntimeError(f"Kudu wwwroot download returned HTTP {response.status}.")
+            with open(temporary, "wb") as output:
+                shutil.copyfileobj(response, output)
+        os.replace(temporary, destination)
+    finally:
+        if os.path.exists(temporary):
+            os.remove(temporary)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--delete-setting", action="append", default=[])
     parser.add_argument("--restart", action="store_true")
+    parser.add_argument("--download-wwwroot")
     parser.add_argument("--self-test", action="store_true")
     args = parser.parse_args()
 
     if args.self_test:
         return _self_test()
 
-    if not args.delete_setting and not args.restart:
-        print("::error::Specify --delete-setting and/or --restart.", file=sys.stderr)
+    if not args.delete_setting and not args.restart and not args.download_wwwroot:
+        print(
+            "::error::Specify --delete-setting, --restart, and/or --download-wwwroot.",
+            file=sys.stderr,
+        )
         return 2
 
     xml_text = os.environ.get("AZURE_WEBAPP_PUBLISH_PROFILE", "").strip()
@@ -82,6 +108,10 @@ def main() -> int:
         return 1
 
     user, password, host = parse_msdeploy_profile(xml_text)
+
+    if args.download_wwwroot:
+        download_wwwroot(user, password, host, args.download_wwwroot)
+        print(f"Downloaded deployed wwwroot to {args.download_wwwroot}.")
 
     for name in args.delete_setting:
         if not name or "/" in name or "\\" in name:
