@@ -118,6 +118,15 @@ public interface IPrivateMessageRepository
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// The subset of <paramref name="candidateMemberIds"/> that <paramref name="blockerMemberId"/>
+    /// has blocked. Batch form of <see cref="IsBlockedAsync"/> for callers filtering a list.
+    /// </summary>
+    Task<IReadOnlySet<Guid>> ListBlockedMemberIdsAsync(
+        Guid blockerMemberId,
+        IReadOnlyCollection<Guid> candidateMemberIds,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// True when either member has blocked the other for private messaging.
     /// </summary>
     Task<bool> IsMessagingBlockedAsync(

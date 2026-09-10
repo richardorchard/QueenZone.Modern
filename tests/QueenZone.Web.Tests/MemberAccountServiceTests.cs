@@ -890,6 +890,11 @@ public sealed class MemberAccountServiceTests
         public Task<MemberAccount?> FindByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
             inner.FindByIdAsync(id, cancellationToken);
 
+        public Task<IReadOnlySet<Guid>> ListActiveMemberIdsAsync(
+            IReadOnlyCollection<Guid> memberIds,
+            CancellationToken cancellationToken = default) =>
+            inner.ListActiveMemberIdsAsync(memberIds, cancellationToken);
+
         public Task<MemberAccount?> FindByExternalLoginAsync(string provider, string providerKey, CancellationToken cancellationToken = default) =>
             inner.FindByExternalLoginAsync(provider, providerKey, cancellationToken);
 

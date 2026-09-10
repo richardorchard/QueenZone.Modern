@@ -850,6 +850,26 @@ public sealed class EfPrivateMessageRepository(QueenZoneDbContext dbContext) : I
                 b => b.BlockerMemberId == blockerMemberId && b.BlockedMemberId == blockedMemberId,
                 cancellationToken);
 
+    public async Task<IReadOnlySet<Guid>> ListBlockedMemberIdsAsync(
+        Guid blockerMemberId,
+        IReadOnlyCollection<Guid> candidateMemberIds,
+        CancellationToken cancellationToken = default)
+    {
+        var candidates = candidateMemberIds.Distinct().ToList();
+        if (candidates.Count == 0)
+        {
+            return new HashSet<Guid>();
+        }
+
+        var blocked = await dbContext.MemberMessageBlocks
+            .AsNoTracking()
+            .Where(b => b.BlockerMemberId == blockerMemberId
+                && candidates.Contains(b.BlockedMemberId))
+            .Select(b => b.BlockedMemberId)
+            .ToListAsync(cancellationToken);
+        return blocked.ToHashSet();
+    }
+
     public Task<bool> IsMessagingBlockedAsync(
         Guid memberA,
         Guid memberB,

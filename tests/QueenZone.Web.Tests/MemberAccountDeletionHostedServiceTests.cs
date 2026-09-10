@@ -145,6 +145,11 @@ public sealed class MemberAccountDeletionHostedServiceTests
         public Task<MemberAccount?> FindByEmailAsync(string email, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
+        public Task<IReadOnlySet<Guid>> ListActiveMemberIdsAsync(
+            IReadOnlyCollection<Guid> memberIds,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         public Task<MemberAccount?> FindByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 

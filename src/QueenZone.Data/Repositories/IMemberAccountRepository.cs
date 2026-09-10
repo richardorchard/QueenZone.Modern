@@ -8,6 +8,14 @@ public interface IMemberAccountRepository
 
     Task<MemberAccount?> FindByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// The subset of <paramref name="memberIds"/> that exist and have not requested deletion.
+    /// Batch form of <see cref="FindByIdAsync"/> for callers filtering a list of member ids.
+    /// </summary>
+    Task<IReadOnlySet<Guid>> ListActiveMemberIdsAsync(
+        IReadOnlyCollection<Guid> memberIds,
+        CancellationToken cancellationToken = default);
+
     Task<MemberAccount?> FindByExternalLoginAsync(string provider, string providerKey, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<string>> ListExternalProvidersAsync(Guid memberAccountId, CancellationToken cancellationToken = default);
