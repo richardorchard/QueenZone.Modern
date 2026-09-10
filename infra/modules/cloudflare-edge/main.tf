@@ -221,7 +221,7 @@ resource "cloudflare_dns_record" "cdn" {
   zone_id = var.zone_id
   name    = "cdn.queenzone.org"
   type    = "CNAME"
-  content = "queenzone.blob.core.windows.net"
+  content = "queenzoneprod.blob.core.windows.net"
   ttl     = 1
   proxied = true
   comment = "Straight proxy to Azure Blob; no Worker route"
@@ -236,7 +236,7 @@ resource "cloudflare_dns_record" "cdn2" {
   zone_id = var.zone_id
   name    = "cdn2.queenzone.org"
   type    = "CNAME"
-  content = "queenzone.blob.core.windows.net"
+  content = "queenzoneprod.blob.core.windows.net"
   ttl     = 1
   proxied = true
   comment = "Worker route cdn2.queenzone.org/* fronts this record"
@@ -266,7 +266,7 @@ resource "cloudflare_dns_record" "asverify_cdn" {
   zone_id = var.zone_id
   name    = "asverify.cdn.queenzone.org"
   type    = "CNAME"
-  content = "asverify.queenzone.blob.core.windows.net"
+  content = "asverify.queenzoneprod.blob.core.windows.net"
   ttl     = 1
   proxied = false
   comment = "Azure Storage custom-domain verification"

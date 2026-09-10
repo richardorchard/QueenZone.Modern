@@ -69,7 +69,7 @@ module "azure_data_target" {
   sql_server_name                            = "queenzone-prod-sql"
   sql_database_name                          = "queenzone-db"
   storage_account_name                       = "queenzoneprod"
-  storage_custom_domain_name                 = null
+  storage_custom_domain_name                 = "cdn.queenzone.org"
   blob_service_is_preexisting                = false
   create_sql_server_with_write_only_password = true
   sql_server_administrator_password_wo       = var.target_sql_admin_password

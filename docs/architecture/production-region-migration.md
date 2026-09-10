@@ -223,6 +223,13 @@ records to `queenzone-prod.azurewebsites.net`, then disable direct candidate
 ingress by restoring the Cloudflare-only default deny rule. Update
 `deploy.yml` and its deploy identity/publish-profile mappings to the new app.
 
+Move public media with the application data. Pre-stage
+`asverify.cdn.queenzone.org` against `queenzoneprod`, register
+`cdn.queenzone.org` as that account's custom domain, then repoint the `cdn` and
+`cdn2` CNAMEs and the `pictures-queenzone-org` Worker origin to
+`queenzoneprod.blob.core.windows.net`. Leaving those origins on `queenzone`
+would make newly uploaded Canada East blobs return 404 through the public CDN.
+
 For the Canada East cutover, use the Cloudflare Origin CA certificate covering
 the apex and `www` that is stored in Bitwarden and uploaded to the target App
 Service webspace. Its non-secret Azure thumbprint is

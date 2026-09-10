@@ -54,9 +54,9 @@ Current public media delivery configuration:
 ```text
 Public base URL: https://cdn.queenzone.org
 CDN: Cloudflare (straight CDN proxy, no Worker)
-Azure storage account: queenzone
+Azure storage account: queenzoneprod
 Azure storage custom domain: cdn.queenzone.org
-Azure blob endpoint: https://queenzone.blob.core.windows.net
+Azure blob endpoint: https://queenzoneprod.blob.core.windows.net
 URL shape: https://cdn.queenzone.org/{container}/{blob}
 ```
 
