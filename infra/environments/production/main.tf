@@ -39,10 +39,9 @@ module "azure_data" {
   location            = var.azure_location
 }
 
-# Phase 7 (#1272), build-new stage. These resources intentionally coexist
-# with the imported australiaeast estate. No custom hostname, DNS record, or
-# existing resource changes in this stage. The copied database is added to
-# management only after Azure creates it from the verified source copy.
+# Phase 7 (#1272), parallel-candidate stage. These resources intentionally
+# coexist with the imported australiaeast estate. No custom hostname, DNS
+# record, or existing resource changes occur until the later cutover stage.
 module "azure_web_target" {
   source = "../../modules/azure-web"
 
@@ -72,7 +71,9 @@ module "azure_data_target" {
   blob_service_is_preexisting                = false
   create_sql_server_with_write_only_password = true
   sql_server_administrator_password_wo       = var.target_sql_admin_password
-  manage_sql_database                        = false
+  # The copied database was admitted only after exact source/target row-count
+  # verification. Its declarative imports are in imports.tf.
+  manage_sql_database = true
 }
 
 # azure-data can also attach a database to an existing logical server for the
