@@ -67,9 +67,9 @@ Read the TODO in [specific file] and the GitHub issue first.
 
 ## Production Debugging (Azure)
 
-App Service: `queenzone-dev` in resource group `Queenzone-RG` (Australia East).
+App Service: `queenzone-prod` in resource group `Queenzone-RG` (Canada East).
 
-Public hostnames: `queenzone.org`, `www.queenzone.org`, `queenzone-dev.azurewebsites.net`.
+Public hostnames: `queenzone.org`, `www.queenzone.org`, `queenzone-prod.azurewebsites.net`.
 
 ### Bitwarden Secrets Manager
 
@@ -108,7 +108,7 @@ Full runbook: [`docs/architecture/entra-admin-auth.md`](architecture/entra-admin
 ```powershell
 # Confirm AzureAd settings exist (lengths only — do not dump secrets)
 az webapp config appsettings list `
-  --name queenzone-dev `
+  --name queenzone-prod `
   --resource-group Queenzone-RG `
   --query "[?starts_with(name, 'AzureAd')].{name:name, length:length(value)}" `
   -o table
@@ -121,19 +121,19 @@ Requires `az login` as a user with access to subscription **Base Thinking**.
 Live log stream:
 
 ```powershell
-az webapp log tail --name queenzone-dev --resource-group Queenzone-RG
+az webapp log tail --name queenzone-prod --resource-group Queenzone-RG
 ```
 
 Download recent logs:
 
 ```powershell
-az webapp log download --name queenzone-dev --resource-group Queenzone-RG --log-file appservice-logs.zip
+az webapp log download --name queenzone-prod --resource-group Queenzone-RG --log-file appservice-logs.zip
 ```
 
 Quick health checks:
 
 ```powershell
-az webapp show --name queenzone-dev --resource-group Queenzone-RG --query "{hostNames:hostNames, state:state}"
+az webapp show --name queenzone-prod --resource-group Queenzone-RG --query "{hostNames:hostNames, state:state}"
 Invoke-WebRequest -Uri https://www.queenzone.org/health -UseBasicParsing | Select-Object StatusCode
 Invoke-WebRequest -Uri https://www.queenzone.org/warmup -UseBasicParsing | Select-Object StatusCode
 ```

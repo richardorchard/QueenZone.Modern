@@ -33,8 +33,8 @@ succeeded after the resource-group bootstrap. Azure confirmed B1, one worker,
 Always On, .NET 10 and HTTPS-only. The default Azure hostname returned HTTP 200
 with its welcome page; a fresh remote-state plan returned no changes.
 
-Production's `queenzone-dev` App Service remains separate. Phase 2 provisioned
-an empty `queenzone-dev-db` database on the existing
+Production's Canada East `queenzone-prod` App Service remains separate. Phase 2 provisioned
+an empty `queenzone-dev-db` database on the Australia East
 `queenzone-sql-server` and the separate `queenzonedev` storage account in
 the dev state. They are not imports and contain no production data. While
 separate work completes the legacy database baseline, dev runs the deployed
@@ -71,8 +71,8 @@ Live state matches the product decision in [`hosting-scale-and-cache.md`](hostin
 
 | Item | Live value |
 | --- | --- |
-| App Service plan | `ASP-Queenzone`, **B1 / Basic**, capacity **1**, Linux |
-| App Service | `queenzone-dev`, Always On **on**, workers **1**, no deployment slots |
+| App Service plan | `ASP-Queenzone-Prod`, **B1 / Basic**, capacity **1**, Linux |
+| App Service | `queenzone-prod`, Always On **on**, workers **1**, no deployment slots |
 | Redis / Front Door / Azure CDN | **None** in `Queenzone-RG` or subscription QueenZone resources |
 | Azure SQL | `queenzone-db` on Basic (5 DTU), max size 2 GB, LRS short-term backup |
 | Storage | `queenzoneprod`, Standard_LRS, Hot |
@@ -108,20 +108,23 @@ Treatments:
 | Resource | ID (sanitised path) | Treatment | Notes / outage risk |
 | --- | --- | --- | --- |
 | Resource group `Queenzone-RG` | `/subscriptions/…/resourceGroups/Queenzone-RG` | import | australiaeast; container for the stack |
-| Plan `ASP-Queenzone` | `…/Microsoft.Web/serverFarms/ASP-Queenzone` | import | **Never recreate** while site is live; SKU must stay B1×1 |
-| Site `queenzone-dev` | `…/Microsoft.Web/sites/queenzone-dev` | import | System-assigned MI `2924c429-8228-430a-ae74-c514a18a7d0e`; Linux `DOTNETCORE\|10.0` |
-| Hostname bindings `queenzone.org`, `www.queenzone.org` | `…/sites/queenzone-dev/hostNameBindings/…` | import | SNI certs bound; breaking bindings = public TLS outage |
+| Plan `ASP-Queenzone-Prod` | `…/Microsoft.Web/serverFarms/ASP-Queenzone-Prod` | manage | Canada East live plan; SKU must stay B1×1 |
+| Site `queenzone-prod` | `…/Microsoft.Web/sites/queenzone-prod` | manage | Canada East live application; Cloudflare-only ingress |
+| Hostname bindings `queenzone.org`, `www.queenzone.org` | `…/sites/queenzone-prod/hostNameBindings/…` | manage | SNI certs bound; breaking bindings = public TLS outage |
+| Plan `ASP-Queenzone` / site `queenzone-dev` | Australia East resource paths | import | Stopped rollback estate; retain through #1272 observation, then remove from state before manual retirement |
 | Certificates `queenzone.org`, `www.queenzone.org` | `…/Microsoft.Web/certificates/…` | import or defer | GeoTrust TLS RSA CA G1, expire **2026-12-29**; confirm renew path before encoding as managed vs uploaded |
 | Access restrictions (Cloudflare IPv4/IPv6 allow + deny all) | site `ipSecurityRestrictions` | import | Mis-order or drop = either open origin or lock out Cloudflare |
 | SCM access restrictions | site `scmIpSecurityRestrictions` | import | Currently **Allow all**; keep separate from main site rules (deploy path) |
 | App settings (names only) | site config | outside → [ADR 0008](../decisions/0008-app-service-settings-ownership.md) | Names re-listed 2026-08-24. Secret **values** stay in Azure/Bitwarden, never state. `deploy.yml` ARM-owns three non-secret deploy keys outside OpenTofu (see [App Service settings](#app-service-application-setting-names-values-not-recorded)). #622's site resource must omit/`ignore_changes` on `app_settings`/`connection_string` |
-| SQL server `queenzone-sql-server` | `…/Microsoft.Sql/servers/queenzone-sql-server` | import | Public network enabled; AAD admin present; SQL auth still used by app |
+| SQL server `queenzone-prod-sql` | `…/Microsoft.Sql/servers/queenzone-prod-sql` | manage | Canada East live server; SQL auth still used by app |
+| SQL server `queenzone-sql-server` | `…/Microsoft.Sql/servers/queenzone-sql-server` | import | Australia East rollback source retained through #1272 observation |
 | Firewall `AllowAllWindowsAzureIps` | `…/firewallRules/AllowAllWindowsAzureIps` | import | Required for App Service → SQL |
 | Firewall `ClientIPAddress_2026-6-11_20-28-58` | `…/firewallRules/ClientIPAddress_…` | defer | Operator workstation IP; likely keep outside or replace with named break-glass rule |
 | Database `queenzone-db` | `…/databases/queenzone-db` | import | Basic; **never recreate** (data loss). Schema via EF only |
 | SQL auditing (server + db) | `…/auditingSettings/Default` | data / defer | Currently **Disabled** — do not “enable by default” in first import |
 | Short-term backup (7 days, LRS) | backup policy | import | Provider default-ish for Basic; LTR all zero |
-| Storage account `queenzone` | `…/storageAccounts/queenzone` | import | Shared key allowed; public blob access allowed; **custom domain `cdn.queenzone.org`** |
+| Storage account `queenzoneprod` | `…/storageAccounts/queenzoneprod` | manage | Canada East live account; public blob access allowed; **custom domain `cdn.queenzone.org`** |
+| Storage account `queenzone` | `…/storageAccounts/queenzone` | import | Australia East rollback source retained through #1272 observation |
 | Blob soft-delete / container soft-delete (7 days) | blob service properties | import | Versioning **not** enabled; no lifecycle management policy |
 | Blob containers + public access flags | per-container | import | See [Storage containers](#storage-containers-live); changing ACLs can break media or expose private UGC |
 | Storage RBAC assignments | scope storage account | data | Empty list at audit time (access via keys / portal roles at higher scope) |
@@ -141,7 +144,7 @@ Account id `f93121b2086286e79a7a9fdb8d03cb4c`. Zone id `079fc2f37095c82fb3a2b4da
 | --- | --- | --- |
 | Zone `queenzone.org` | import | Free plan; never recreate casually |
 | DNS `queenzone.org` A → `52.237.246.162` (proxied) | import | App Service inbound IP |
-| DNS `www` CNAME → `queenzone-dev.azurewebsites.net` (proxied) | import | |
+| DNS `www` CNAME → `queenzone-prod.azurewebsites.net` (proxied) | import | |
 | DNS `cdn` / `cdn2` CNAME → `queenzoneprod.blob.core.windows.net` (proxied) | import | Only **cdn2** has a Worker route |
 | DNS `asverify.cdn` CNAME (DNS-only) | import | Azure Storage custom-domain verification |
 | DNS `asuid` / Bing / Google TXT|CNAME verify records | import | Keep; not secrets |
@@ -164,7 +167,7 @@ Account id `f93121b2086286e79a7a9fdb8d03cb4c`. Zone id `079fc2f37095c82fb3a2b4da
 | --- | --- | --- |
 | Workflows under `.github/workflows/` | outside | App deploy path stays GitHub; OpenTofu CI is a later issue (#625). Inventory now includes `opentofu-backend-smoke.yml`. |
 | Environment `prod-release` | outside | Custom policy: branch `main` + tags `v*`. Production migrate + zip deploy (`deploy.yml`). See [`github-environments.md`](github-environments.md). |
-| Environment `prod-deploy` | outside | Custom policy: branch `main` + tags `v*`. Dedicated OIDC identity with **Website Contributor** on site `queenzone-dev` only. `deploy.yml` `configure-app-settings` and `app-service-setting-names-check.yml`. Not an OpenTofu principal — sibling bootstrap at `infra/bootstrap/Bootstrap-DeployIdentity.ps1`. |
+| Environment `prod-deploy` | outside | Custom policy: branch `main` + tags `v*`. Dedicated OIDC identity with **Website Contributor** on site `queenzone-prod` only. `deploy.yml` `configure-app-settings` and `app-service-setting-names-check.yml`. Not an OpenTofu principal — sibling bootstrap at `infra/bootstrap/Bootstrap-DeployIdentity.ps1`. |
 | Environment `prod-google-play` | outside | Custom policy: branch `main`. Play signing / store upload only (`publish-android-google-play.yml`). |
 | Environment `prod-data-read` | outside | Custom policy: branch `main`. Production read used only to refresh/resync the SQL Express mirror. |
 | Environment `dev` (legacy) | outside | **Deleted in Settings** (2026-09-07, #1394). Retired from workflows in #1377. Do not recreate. |
@@ -207,9 +210,9 @@ No storage lifecycle policy exists. Soft delete is 7 days for blobs and containe
 
 ## App Service application setting names (values not recorded)
 
-Present on `queenzone-dev` at the 2026-08-28 refresh (`az webapp config appsettings list`, names only except the one non-secret deploy key below):
+Required on `queenzone-prod` after the 2026-09-10 cutover (`az webapp config appsettings list`, names only except the one non-secret deploy key below):
 
-`APPLICATIONINSIGHTS_CONNECTION_STRING`, `Authentication__Apple__ClientId/TeamId/KeyId/PrivateKey`, `Authentication__Discord__ClientId/Secret`, `Authentication__Facebook__ClientId/Secret`, `Authentication__GitHub__ClientId/Secret`, `Authentication__Google__ClientId/Secret`, `Authentication__Microsoft__ClientId/Secret`, `MobileAuth__SigningKey`, `PushNotifications__Apns__TeamId`, `PushNotifications__Apns__KeyId`, `PushNotifications__Apns__PrivateKeyPem`, `PushNotifications__Apns__Environment`, `PushNotifications__Fcm__ProjectId`, `PushNotifications__Fcm__ServiceAccountJson`, `BlobUpload__PublicBaseUrl`, `ConnectionStrings__BlobStorage`, `ConnectionStrings__QueenZoneLegacy`, `DIAGNOSTICS_AZUREBLOBRETENTIONINDAYS`, `OPENROUTER_API_KEY`, `WEBSITE_HEALTHCHECK_MAXPINGFAILURES`, `WEBSITE_HTTPLOGGING_RETENTION_DAYS`, `Analytics__GoogleAnalyticsServiceAccountJson`, `Analytics__TrafficCacheMinutes`, `Analytics__GoogleAnalyticsPropertyId`, `AzureAd__Instance`, `AzureAd__TenantId`, `AzureAd__ClientId`, `AzureAd__ClientSecret`, `AzureAd__CallbackPath`, `Admin__AllowedEmails__0`, `Admin__AllowedEmails__1`, `SCM_DO_BUILD_DURING_DEPLOYMENT`, `ENABLE_ORYX_BUILD`, `WEBSITE_WARMUP_PATH`. `WEBSITE_RUN_FROM_PACKAGE` was removed (see below) and must stay absent.
+`APPLICATIONINSIGHTS_CONNECTION_STRING`, `Authentication__Apple__ClientId/TeamId/KeyId/PrivateKey`, `Authentication__Discord__ClientId/Secret`, `Authentication__Facebook__ClientId/Secret`, `Authentication__GitHub__ClientId/Secret`, `Authentication__Google__ClientId/Secret`, `Authentication__Microsoft__ClientId/Secret`, `MobileAuth__SigningKey`, `PushNotifications__Apns__TeamId`, `PushNotifications__Apns__KeyId`, `PushNotifications__Apns__PrivateKeyPem`, `PushNotifications__Apns__Environment`, `PushNotifications__Fcm__ProjectId`, `PushNotifications__Fcm__ServiceAccountJson`, `BlobUpload__PublicBaseUrl`, `ConnectionStrings__BlobStorage`, `ConnectionStrings__QueenZoneLegacy`, `OPENROUTER_API_KEY`, `WEBSITE_HEALTHCHECK_MAXPINGFAILURES`, `WEBSITE_HTTPLOGGING_RETENTION_DAYS`, `Analytics__GoogleAnalyticsServiceAccountJson`, `Analytics__TrafficCacheMinutes`, `Analytics__GoogleAnalyticsPropertyId`, `AzureAd__Instance`, `AzureAd__TenantId`, `AzureAd__ClientId`, `AzureAd__ClientSecret`, `AzureAd__CallbackPath`, `Admin__AllowedEmails__0`, `Admin__AllowedEmails__1`, `SCM_DO_BUILD_DURING_DEPLOYMENT`, `ENABLE_ORYX_BUILD`, `WEBSITE_WARMUP_PATH`. `WEBSITE_RUN_FROM_PACKAGE` was removed (see below) and must stay absent. HTTP log retention is already configured through the App Service logging resource; the redundant legacy `DIAGNOSTICS_AZUREBLOBRETENTIONINDAYS` app-setting name is not required.
 
 
 Ownership of App Service settings is decided in [ADR 0008](../decisions/0008-app-service-settings-ownership.md)
@@ -243,13 +246,18 @@ Site health-check path remains `/health`. Remaining secret settings (SQL, Entra,
 
 Blind destroy/recreate of any of these is an outage or data-loss event:
 
-1. Azure SQL database `queenzone-db` (and server if databases cannot move).
-2. Storage account `queenzone` and its blob data.
-3. App Service plan `ASP-Queenzone` / site `queenzone-dev` while DNS points at them (import in place).
+1. Live Azure SQL database `queenzone-db` on `queenzone-prod-sql`.
+2. Live Storage account `queenzoneprod` and its blob data.
+3. App Service plan `ASP-Queenzone-Prod` / site `queenzone-prod` while DNS points at them.
 4. Custom hostname bindings + bound certificates for `queenzone.org` / `www.queenzone.org`.
 5. Cloudflare proxied DNS for apex/www/cdn/cdn2 and the **cdn2 Worker**.
 6. Azure Storage custom domain association for `cdn.queenzone.org`.
 7. App Service access restrictions that deny non-Cloudflare ingress (unless carefully replaced).
+
+The rollback server `queenzone-sql-server` also hosts `queenzone-dev-db` from
+the separate dev state. Production retirement must not delete that logical
+server until the dev database has moved or the dependency has been deliberately
+retained.
 
 ## Suggested import order (later issues)
 

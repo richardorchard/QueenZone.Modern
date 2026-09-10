@@ -185,19 +185,11 @@ Grant the existing production deploy identity Website Contributor on
 same verified build that production runs. Do not change `deploy.yml`'s default
 target yet.
 
-Use `scripts/Prepare-ProductionMigrationCandidate.ps1 -PlanOnly` to validate
-the inputs without writes, then run it without `-PlanOnly` for the secret-safe
-settings clone, endpoint overrides, role assignment, and Bitwarden candidate
-secrets. It sends App Service settings to Azure Resource Manager in memory and
-prints names and counts only. Then dispatch
-`deploy-production-candidate.yml` from `main` with the successful `ci.yml` run
-ID and full build SHA recorded by the latest successful production deploy. The
-workflow fails closed unless that CI run succeeded, came from a pull request,
-and its head SHA matches the requested build version. Because CI publish
-artifacts have short retention, the workflow also requires the Australia East
-app to serve that build stamp, then downloads its exact deployed `wwwroot`
-package through Kudu and deploys that snapshot unchanged. The normal production
-deploy workflow remains pointed at the Australia East app.
+Stage 3 used a temporary candidate-preparation script and manual deployment
+workflow to clone the secret settings and deploy the exact Australia East
+package. Both were retired after cutover so they cannot redeploy from the old
+application or reuse candidate-only credential aliases. Routine production
+deployment now targets Canada East through `deploy.yml`.
 
 Before DNS changes, test the candidate hostname directly:
 
@@ -249,6 +241,12 @@ Keep the old App Service, plan, SQL database/server, Storage account, and the
 immediate pre-cutover backup throughout the agreed observation window. Do not
 remove their state or delete them in the cutover change.
 
+The old logical SQL server also hosts the independently managed
+`queenzone-dev-db` database used by the dev environment. Do **not** delete that
+server during production retirement. Either move the dev database to a
+dev-owned server first, or retain the logical server and remove only the old
+production `queenzone-db` after confirming the dev state still references it.
+
 After the observation window passes with no unresolved mismatch:
 
 1. Back up remote OpenTofu state and stop all applies.
@@ -256,7 +254,8 @@ After the observation window passes with no unresolved mismatch:
 3. Remove the old import blocks and configuration in a follow-up pull request.
 4. Confirm the normal plan has no delete or replacement.
 5. Manually delete only the exact old Azure resources after one final target
-   inventory and backup check.
+   inventory and backup check. Exclude `queenzone-sql-server` while it hosts
+   `queenzone-dev-db`.
 6. Record the retained backup location and expiry without recording secrets.
 
 Update current-state documentation only after live cutover is proven. The

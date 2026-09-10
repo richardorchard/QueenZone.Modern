@@ -64,7 +64,7 @@ It may not appear in the App Service "connection strings" collection. Check App 
 az login --tenant c9f094fd-23bf-4a35-a406-bcaacd7e1a8e
 
 $settings = az webapp config appsettings list `
-  --name queenzone-dev `
+  --name queenzone-prod `
   --resource-group Queenzone-RG `
   -o json | ConvertFrom-Json
 
@@ -73,7 +73,7 @@ $env:ConnectionStrings__QueenZoneLegacy = [string]((
 ).value)
 ```
 
-The current live target is `queenzone-db` on `queenzone-sql-server.database.windows.net`. Do not print the full value; parse and report only non-secret metadata such as server and database names.
+The current live target is `queenzone-db` on `queenzone-prod-sql.database.windows.net`. Do not print the full value; parse and report only non-secret metadata such as server and database names.
 
 Minimal redacted connectivity check:
 

@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: false
 
 # Scope item 5 of #618 (ADR 0008, docs/decisions/0008-app-service-settings-ownership.md):
-# detect a missing required App Service setting *name* on queenzone-dev without
+# detect a missing required App Service setting *name* on queenzone-prod without
 # OpenTofu (or this workflow) ever reading or printing a value. The required
 # name list lives in infra/import/github-bitwarden.json's appServiceSettingNames
 # array, alongside the rest of the #624 sanitised inventory. Only names are

@@ -1,14 +1,14 @@
 # Hosting scale and cache model
 
-Decision for QueenZone production (App Service `queenzone-dev`, plan **ASP-Queenzone**).
+Decision for QueenZone production (App Service `queenzone-prod`, plan **ASP-Queenzone-Prod**).
 
-## Current production shape (re-verified 2026-08-12)
+## Current production shape (re-verified 2026-09-10)
 
 | Setting | Value |
 | --- | --- |
-| App Service | `queenzone-dev` |
+| App Service | `queenzone-prod` |
 | Resource group | `Queenzone-RG` |
-| App Service plan | `ASP-Queenzone` |
+| App Service plan | `ASP-Queenzone-Prod` |
 | SKU / tier | **B1 / Basic** (lowest paid plan in use) |
 | Worker / instance count | **1** |
 | Always On | enabled |

@@ -30,7 +30,7 @@ flowchart LR
 - **`dev`** — always-on environment at `dev.queenzone.org`, App Service `queenzone-devbox` / resource group `Queenzone-Dev-RG`, own SQL database and storage account. Every merge to `main` auto-deploys here via `deploy-dev.yml`. See [`opentofu-dev-environment.md`](opentofu-dev-environment.md).
 - **Production** — `queenzone.org` / `www.queenzone.org`, deployed via `deploy.yml`, which now triggers on `v*` tags rather than every merge to `main` (tag-based promotion, [epic #1264](https://github.com/richardorchard/QueenZone.Modern/issues/1264) Phase 5). Promote a merged commit by tagging it once it has been exercised on `dev`.
 
-> **Naming trap:** the production App Service is still literally named `queenzone-dev` (a historical accident predating the real `dev` environment above) and lives in resource group `Queenzone-RG`. It is **not** the `dev` environment. `queenzone-dev` = production; `queenzone-devbox` = dev. This is scheduled to be renamed to `queenzone-prod` as part of Phase 7 ([#1272](https://github.com/richardorchard/QueenZone.Modern/issues/1272)); every `queenzone-dev` reference below predates that rename.
+Production runs on `queenzone-prod` in `Queenzone-RG`. The previous Australia East app, `queenzone-dev`, is stopped and retained only for the #1272 observation and rollback window. The isolated dev environment remains `queenzone-devbox`.
 
 Optional later:
 
@@ -38,7 +38,7 @@ Optional later:
 
 ## Region
 
-Production's target Azure region is **`canadaeast`** (moving from the current `australiaeast`), decided in [ADR 0020](../decisions/0020-production-region-canadaeast.md) after Microsoft declined access to both East US regions. The dev environment stays in `australiaeast`. See that ADR for the latency basis and for confirmation that the SQL server and storage account move alongside the App Service.
+Production runs in **`canadaeast`**, decided in [ADR 0020](../decisions/0020-production-region-canadaeast.md) after Microsoft declined access to both East US regions. The dev environment stays in `australiaeast`. The previous Australia East production estate remains intact only during the #1272 observation window.
 
 ## Scale and cost model (single instance)
 
@@ -132,7 +132,7 @@ No Redis: limits are per process. Correct on single-instance B1; see [`hosting-s
 
 **Runbook (live Entra app, App Service keys, secret rotation):** see [`docs/architecture/entra-admin-auth.md`](entra-admin-auth.md).
 
-Summary of what is live on App Service `queenzone-dev` (as of 2026-07-23):
+Summary of what is live on App Service `queenzone-prod` (updated 2026-09-10):
 
 | Item | Note |
 | --- | --- |
@@ -188,8 +188,8 @@ the setting if it reappears live, so it must stay absent.
 
 `WEBSITE_WARMUP_PATH` and `WEBSITE_WARMUP_STATUSES` are owned by ARM (#666):
 `deploy.yml`'s `configure-app-settings` job logs in via `azure/login` with a
-dedicated OIDC identity (GitHub environment `deploy`, Website Contributor
-scoped to the `queenzone-dev` site only — not the resource group, and
+dedicated OIDC identity (GitHub environment `prod-deploy`, Website Contributor
+scoped to the `queenzone-prod` site only — not the resource group, and
 separate from the `dev` environment's Bitwarden publish-profile identity),
 then runs `az webapp config appsettings set` before the zip deploy runs. Do
 **not** write ARM Application Settings through Kudu `POST /api/settings` —
@@ -310,12 +310,12 @@ Do not add Azure CDN or Azure Front Door for these hostnames unless the architec
 
 ## Database Access
 
-The `queenzone-dev` App Service connects to the `queenzone-db` Azure SQL database on `queenzone-sql-server.database.windows.net`.
+The `queenzone-prod` App Service connects to the `queenzone-db` Azure SQL database on `queenzone-prod-sql.database.windows.net`.
 
 The current runtime route uses SQL authentication. Store the runtime connection string only in the App Service setting `ConnectionStrings__QueenZoneLegacy`:
 
 ```text
-Server=tcp:queenzone-sql-server.database.windows.net,1433;Database=queenzone-db;User ID=...;Password=...;Encrypt=True;TrustServerCertificate=False;
+Server=tcp:queenzone-prod-sql.database.windows.net,1433;Database=queenzone-db;User ID=...;Password=...;Encrypt=True;TrustServerCertificate=False;
 ```
 
 GitHub Actions uses a separate `QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING` environment secret for EF Core migrations during deployment. Updating that GitHub secret does not update the live App Service runtime setting.

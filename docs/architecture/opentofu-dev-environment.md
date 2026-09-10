@@ -15,7 +15,7 @@ the verified dev-only database. Infrastructure provisioned the targets, but a
 merged workflow alone is not proof that the first data refresh has run.
 
 Mobile staging still points at production until #1270. Production remains in
-`australiaeast` under its historical `queenzone-dev` resource name until #1272.
+`canadaeast` under `queenzone-prod`; its stopped Australia East predecessor is retained through #1272's observation window.
 
 Phase 1 of epic #1264, issue #1265. The new root is
 `infra/environments/dev`; its backend uses `dev.tfstate` in the existing

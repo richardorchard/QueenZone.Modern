@@ -1,8 +1,8 @@
 [CmdletBinding()]
 param(
-    [string]$SiteName = "queenzone-dev",
+    [string]$SiteName = "queenzone-prod",
     [string]$ResourceGroup = "Queenzone-RG",
-    [string]$InventoryPath = (Join-Path $PSScriptRoot "../infra/import/github-bitwarden.json")
+    [string]$InventoryPath
 )
 
 # Scope item 5 of #618 (ADR 0008): detect a missing required App Service
@@ -15,6 +15,10 @@ param(
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
+
+if ([string]::IsNullOrWhiteSpace($InventoryPath)) {
+    $InventoryPath = Join-Path $PSScriptRoot "../infra/import/github-bitwarden.json"
+}
 
 $az = Get-Command az -ErrorAction Stop
 

@@ -1,8 +1,8 @@
 {
   "auditDate": "2026-08-12",
-  "refreshedDate": "2026-09-07",
+  "refreshedDate": "2026-09-10",
   "issue": 624,
-  "refreshNotes": "#1394: legacy GitHub Environments dev and deploy deleted in Settings (verified via Environments API; neither name present). Added live prod-release / prod-deploy / prod-google-play / prod-data-read inventory rows. Secret values were not recorded. Azure/Cloudflare resource IDs were not re-probed.",
+  "refreshNotes": "#1272: production workflow mappings moved to Canada East and the obsolete candidate deployment path was retired. Secret values were not recorded. Azure/Cloudflare resource IDs were not re-probed.",
 
   "github": {
     "environments": [
@@ -35,10 +35,11 @@
         "variableNames": [
           "ARM_CLIENT_ID",
           "ARM_SUBSCRIPTION_ID",
-          "ARM_TENANT_ID"
+          "ARM_TENANT_ID",
+          "BITWARDEN_APP_SERVICE_DEPLOY_SECRETS"
         ],
         "opentofuTreatment": "outside",
-        "notes": "OIDC identity QueenZone Deploy; Website Contributor on site queenzone-dev only. Writes WEBSITE_WARMUP_PATH via ARM (also deletes WEBSITE_WARMUP_STATUSES/WEBSITE_RUN_FROM_PACKAGE if either reappears live). Sibling of OpenTofu plan/apply, not an OpenTofu principal."
+        "notes": "OIDC identity QueenZone Deploy; Website Contributor on site queenzone-prod only. Bitwarden mapping exposes MOBILE_AUTH_SIGNING_KEY only. Writes WEBSITE_WARMUP_PATH via ARM (also deletes WEBSITE_WARMUP_STATUSES/WEBSITE_RUN_FROM_PACKAGE if either reappears live). Sibling of OpenTofu plan/apply, not an OpenTofu principal."
       },
       {
         "name": "prod-google-play",
@@ -56,7 +57,7 @@
         "name": "prod-data-read",
         "protectionRules": ["custom_branch_policy"],
         "opentofuTreatment": "outside",
-        "notes": "Production read used only to refresh/resync the SQL Express mirror. Narrow Bitwarden map (publish profile + migration connection string). Secret values not recorded."
+        "notes": "Canada East production read used only to refresh/resync the SQL Express mirror. Narrow Bitwarden map (publish profile + migration connection string under the existing generic aliases). Secret values not recorded."
       },
       {
         "name": "opentofu-plan",
@@ -198,7 +199,6 @@
     "BlobUpload__PublicBaseUrl",
     "ConnectionStrings__BlobStorage",
     "ConnectionStrings__QueenZoneLegacy",
-    "DIAGNOSTICS_AZUREBLOBRETENTIONINDAYS",
     "OPENROUTER_API_KEY",
     "WEBSITE_HEALTHCHECK_MAXPINGFAILURES",
     "WEBSITE_HTTPLOGGING_RETENTION_DAYS",
