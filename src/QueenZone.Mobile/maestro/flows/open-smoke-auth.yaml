@@ -7,8 +7,8 @@ appId: org.queenzone.mobile
 - runFlow: accept-ios-open-link.yaml
 # iOS can accept the system Open prompt without delivering the first
 # foreground URL event. Retry once when the signed-in masthead affordance did
-# not appear; the scheme is trusted after the first prompt, so no second
-# confirmation is expected (#1281).
+# not appear. Hosted iOS 26 simulators can show another Open confirmation for
+# that retry, so dismiss it before waiting for the signed-in affordance (#1281).
 - runFlow:
     when:
       platform: iOS
@@ -16,6 +16,7 @@ appId: org.queenzone.mobile
         id: home-messages
     commands:
       - openLink: ${SMOKE_AUTH_URL}
+      - runFlow: accept-ios-open-link.yaml
 - extendedWaitUntil:
     visible:
       id: home-messages
