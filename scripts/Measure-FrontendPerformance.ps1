@@ -14,7 +14,7 @@
 #   .\scripts\Measure-FrontendPerformance.ps1 -StartLocalApp -FormFactor both
 #
 #   # Production-style URL (no app start):
-#   .\scripts\Measure-FrontendPerformance.ps1 -BaseUrl https://queenzone-dev.azurewebsites.net -FormFactor mobile
+#   .\scripts\Measure-FrontendPerformance.ps1 -BaseUrl https://www.queenzone.org -FormFactor mobile
 #
 #   # Hard gate (optional; not used in CI yet):
 #   .\scripts\Measure-FrontendPerformance.ps1 -FailOnBudget

@@ -5,6 +5,11 @@ step 5 of epic [#615](https://github.com/richardorchard/QueenZone.Modern/issues/
 
 ## Managed boundary
 
+Production now uses `queenzone-db` on the Canada East logical server
+`queenzone-prod-sql` and Blob Storage account `queenzoneprod`. The original
+Australia East SQL and Storage resources remain declared and protected only
+for the #1272 observation and rollback window.
+
 The production root declares imports for the existing Azure SQL logical server,
 Basic database, Azure-services firewall rule, disabled server/database auditing
 settings, Storage account, Blob service, and 29 product containers.

@@ -1,7 +1,7 @@
 <#
 Bootstraps the OIDC identity `deploy.yml` uses to write ARM Application
 Settings (WEBSITE_WARMUP_PATH; also deletes WEBSITE_WARMUP_STATUSES and
-WEBSITE_RUN_FROM_PACKAGE if either reappears live) on queenzone-dev (#666).
+WEBSITE_RUN_FROM_PACKAGE if either reappears live) on queenzone-prod (#666/#1272).
 
 Sibling to Bootstrap-OpenTofuState.ps1, not an extension of it: this
 identity is scoped to Website Contributor on one site, not Contributor on
@@ -12,9 +12,9 @@ opentofu-apply here would put an approval gate on every routine deploy.
 param(
     [string]$SubscriptionId = "610e3b3a-028d-4f1b-ac1d-a5567a4f8b9d",
     [string]$WorkloadResourceGroup = "Queenzone-RG",
-    [string]$WebAppName = "queenzone-dev",
+    [string]$WebAppName = "queenzone-prod",
     [string]$GitHubRepository = "richardorchard/QueenZone.Modern",
-    [string]$EnvironmentName = "deploy"
+    [string]$EnvironmentName = "prod-deploy"
 )
 
 $ErrorActionPreference = "Stop"

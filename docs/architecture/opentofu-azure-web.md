@@ -5,6 +5,12 @@ step 4 of epic [#615](https://github.com/richardorchard/QueenZone.Modern/issues/
 
 ## Managed boundary
 
+Production now runs on the Canada East `queenzone-prod` app, plan
+`ASP-Queenzone-Prod`, Log Analytics workspace `queenzone-prod-law`, and
+Application Insights component `queenzone-prod-ai`. The same production root
+temporarily retains the imported Australia East resources listed below for the
+#1272 observation and rollback window; they are no longer serving traffic.
+
 The production root declares imports for:
 
 - resource group `Queenzone-RG`;
@@ -42,7 +48,11 @@ On **2026-08-15**, the protected remote state was read and a production plan
 was generated without applying it. All seven declared import addresses were
 `no-op`; no create, update, replace, or delete was proposed.
 
-Read-only live checks also passed:
+The checks below record the original import verification. Current live smoke
+checks target `https://www.queenzone.org`; direct access to
+`https://queenzone-prod.azurewebsites.net` is denied outside Cloudflare.
+
+Original read-only live checks also passed:
 
 - `scripts/Smoke-LiveSite.ps1` passed `/warmup`, GET `/health`, and all public routes;
 - direct GET `https://queenzone-dev.azurewebsites.net/health` returned 403;

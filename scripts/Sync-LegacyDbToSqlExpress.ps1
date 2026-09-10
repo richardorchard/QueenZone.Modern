@@ -52,7 +52,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-# Live Azure SQL (Australia East S0) can drop the sqlpackage socket mid-Extract
+# Live Azure SQL can drop the sqlpackage socket mid-Extract
 # or mid-Publish: TCP Provider "forcibly closed by the remote host", connection
 # reset, or a transport-level timeout. sqlpackage often prints that error and
 # then sits until the GitHub Actions job timeout, which surfaces as a vague
@@ -323,7 +323,7 @@ function Invoke-SqlPackagePhase {
         }
 
         if ($isTransient) {
-            throw "sqlpackage $PhaseName failed after $MaxAttempts attempts due to a TCP/transport error (connection forcibly closed, reset, or transport timeout). Live Azure SQL dropped the connection during $PhaseName. This is not a SQL Express install failure and must not surface as a silent workflow cancel. Re-run the nightly Sync job. If a second consecutive schedule still drops, check Australia East SQL (restart / DTU / firewall). Last exit code: $($result.ExitCode)"
+            throw "sqlpackage $PhaseName failed after $MaxAttempts attempts due to a TCP/transport error (connection forcibly closed, reset, or transport timeout). Live Azure SQL dropped the connection during $PhaseName. This is not a SQL Express install failure and must not surface as a silent workflow cancel. Re-run the nightly Sync job. If a second consecutive schedule still drops, check the production SQL database (restart / DTU / firewall). Last exit code: $($result.ExitCode)"
         }
 
         throw "sqlpackage $PhaseName failed with exit code $($result.ExitCode)"

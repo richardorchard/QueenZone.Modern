@@ -27,12 +27,12 @@ Dual-role users may hold both member and Entra cookies. `AdminAccess` always rea
 
 | Item | Value / note |
 | --- | --- |
-| App Service | `queenzone-dev` in resource group `Queenzone-RG` |
+| App Service | `queenzone-prod` in resource group `Queenzone-RG` |
 | Entra app display name | **QueenZone Admin** |
 | Application (client) ID | `f6d32f3b-7a4e-4517-a4d1-0995caad8feb` |
 | Sign-in audience | `AzureADandPersonalMicrosoftAccount` (work + personal Microsoft accounts) |
 | Tenant setting for the app | `AzureAd__TenantId=common` (matches multi-account audience) |
-| Client secret display name | `queenzone-dev-appservice` |
+| Client secret display name | `queenzone-prod-appservice` (historical secrets may retain the old display name) |
 | Client secret created | **2026-07-23** (via `az ad app credential reset --years 2`) |
 | **Renew secret by** | **2028-07-01** (allow ~3 weeks before the 2-year expiry; do not wait for outage) |
 | ID token issuance | Enabled on the web platform |
@@ -59,7 +59,7 @@ Do not treat the allowlist as a secret, but also do not treat committed appsetti
 
 - `https://www.queenzone.org/signin-oidc`
 - `https://queenzone.org/signin-oidc`
-- `https://queenzone-dev.azurewebsites.net/signin-oidc`
+- `https://queenzone-prod.azurewebsites.net/signin-oidc`
 
 Add further hosts here (and in Entra) if you introduce staging slots or new custom domains.
 
@@ -104,7 +104,7 @@ Requires `az login` with access to subscription **Base Thinking** / the QueenZon
 
 ```powershell
 az webapp config appsettings list `
-  --name queenzone-dev `
+  --name queenzone-prod `
   --resource-group Queenzone-RG `
   --query "[?starts_with(name, 'AzureAd')].{name:name, length:length(value)}" `
   -o table
@@ -134,7 +134,7 @@ Secrets expire. When admin login starts failing with token/credential errors, or
    ```powershell
    $appId = "f6d32f3b-7a4e-4517-a4d1-0995caad8feb"
    # Capture stdout only (CLI may write WARNING to stderr)
-   $cred = az ad app credential reset --id $appId --append --display-name "queenzone-dev-appservice-$(Get-Date -Format yyyyMMdd)" --years 2 -o json 2>$null | ConvertFrom-Json
+   $cred = az ad app credential reset --id $appId --append --display-name "queenzone-prod-appservice-$(Get-Date -Format yyyyMMdd)" --years 2 -o json 2>$null | ConvertFrom-Json
    # $cred.password is the new secret — set it next; do not commit it
    ```
 
@@ -142,7 +142,7 @@ Secrets expire. When admin login starts failing with token/credential errors, or
 
    ```powershell
    az webapp config appsettings set `
-     --name queenzone-dev `
+     --name queenzone-prod `
      --resource-group Queenzone-RG `
      --settings "AzureAd__ClientSecret=<new-secret>"
    ```
@@ -150,7 +150,7 @@ Secrets expire. When admin login starts failing with token/credential errors, or
 3. Restart and smoke-test admin login:
 
    ```powershell
-   az webapp restart --name queenzone-dev --resource-group Queenzone-RG
+   az webapp restart --name queenzone-prod --resource-group Queenzone-RG
    Invoke-WebRequest -Uri https://www.queenzone.org/health -UseBasicParsing | Select-Object StatusCode
    ```
 

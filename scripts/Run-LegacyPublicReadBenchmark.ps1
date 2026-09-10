@@ -9,7 +9,7 @@
   Connection string (first match wins):
     1. -ConnectionString argument
     2. env ConnectionStrings__QueenZoneLegacy
-    3. Azure App Service app setting (az CLI): queenzone-dev / Queenzone-RG
+    3. Azure App Service app setting (az CLI): queenzone-prod / Queenzone-RG
 
   Read-only. Does not print the connection string.
 
@@ -24,7 +24,7 @@
 param(
     [string] $ConnectionString,
     [switch] $FromAppService,
-    [string] $AppName = "queenzone-dev",
+    [string] $AppName = "queenzone-prod",
     [string] $ResourceGroup = "Queenzone-RG",
     [int] $Runs = 3,
     [string] $OutCsv

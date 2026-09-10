@@ -268,7 +268,7 @@ The hosted App Service currently connects to Azure SQL with SQL authentication. 
 ```json
 {
   "ConnectionStrings": {
-    "QueenZoneLegacy": "Server=tcp:queenzone-sql-server.database.windows.net,1433;Database=queenzone-db;User ID=...;Password=...;Encrypt=True;TrustServerCertificate=False;",
+    "QueenZoneLegacy": "Server=tcp:queenzone-prod-sql.database.windows.net,1433;Database=queenzone-db;User ID=...;Password=...;Encrypt=True;TrustServerCertificate=False;",
     "BlobStorage": "DefaultEndpointsProtocol=https;AccountName=...;AccountKey=...;EndpointSuffix=core.windows.net"
   }
 }
@@ -319,7 +319,7 @@ Feature work should happen on an agent-prefixed branch such as `grok/news-pagina
 
 ## Deployment
 
-Every qualifying web merge to `main` deploys automatically to the isolated dev environment through `.github/workflows/deploy-dev.yml`; workflow/docs-only and mobile-only merges skip the web deploy. The production `Deploy` workflow (`.github/workflows/deploy.yml`) runs only for a `v*` tag or a manual dispatch from `main`. Despite its legacy Azure resource name, production is the `queenzone-dev` App Service at `https://www.queenzone.org`.
+Every qualifying web merge to `main` deploys automatically to the isolated dev environment through `.github/workflows/deploy-dev.yml`; workflow/docs-only and mobile-only merges skip the web deploy. The production `Deploy` workflow (`.github/workflows/deploy.yml`) runs only for a `v*` tag or a manual dispatch from `main`. Production is the Canada East `queenzone-prod` App Service at `https://www.queenzone.org`.
 
 `.github/workflows/ci.yml` runs the required build, test, coverage, migration consistency, smoke, and Playwright checks on pull requests. The dev and production deploy workflows reuse the tested `web-publish` artifact when it is still present. If resolve cannot find that zip and a website Deploy is still required, they publish from the checked-out `main`/tag SHA. Manual dispatch and `v*` tags skip when the classified range is mobile-only or otherwise non-web — they do not walk back to an older web tip or rerun CI.
 
@@ -353,7 +353,7 @@ See [`docs/architecture/github-environments.md`](docs/architecture/github-enviro
 
 App Service configuration required:
 
-- `ConnectionStrings__QueenZoneLegacy`: the Azure SQL connection string for the copied legacy tables. The current runtime path uses SQL authentication against `queenzone-db` on `queenzone-sql-server.database.windows.net`.
+- `ConnectionStrings__QueenZoneLegacy`: the Azure SQL connection string for the copied legacy tables. The current runtime path uses SQL authentication against `queenzone-db` on `queenzone-prod-sql.database.windows.net`.
 - `APPLICATIONINSIGHTS_CONNECTION_STRING`: the Application Insights connection string for production/preview telemetry. Leave unset in local development unless local telemetry is intentional.
 
 Application Insights is wired through Azure Monitor OpenTelemetry and is opt-in at runtime: no telemetry is exported unless `APPLICATIONINSIGHTS_CONNECTION_STRING` is present. The default `ApplicationInsights` settings in `src/QueenZone.Web/appsettings.json` are deliberately low-volume for a hobby project: at most 0.2 traces per second, warning-or-higher exported logs, trace-based log sampling enabled, and Live Metrics disabled. In Azure, also set a small daily cap on both the Application Insights resource and its Log Analytics workspace, for example 0.05-0.10 GB/day, so unexpected traffic or noisy logging cannot run up a large bill.
@@ -424,7 +424,7 @@ In production, the identity must come from the dedicated Microsoft Entra ID admi
 Committed `appsettings.json` ships an **empty** allowlist on purpose. Production must set the list on App Service (or Key Vault); Development uses git-ignored `appsettings.Local.json`. See `docs/architecture/entra-admin-auth.md`.
 
 1. Create an Entra app registration for `QueenZone.Web`.
-2. Add a web redirect URI such as `https://queenzone-dev.azurewebsites.net/signin-oidc`.
+2. Add a web redirect URI such as `https://queenzone-prod.azurewebsites.net/signin-oidc`.
 3. Create a client secret for the app registration.
 4. Configure these App Service settings:
 

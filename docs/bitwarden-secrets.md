@@ -130,7 +130,7 @@ App Service setting names verbatim:
 | `PushNotifications__Apns__PrivateKeyPem` | Complete one-time `.p8` download, including the PEM header and footer |
 | `PushNotifications__Apns__Environment` | `production` |
 
-Copy the same four names and values into the `queenzone-dev` App Service configuration. These settings are
+Copy the same four names and values into the `queenzone-prod` App Service configuration. These settings are
 operator-owned under ADR 0008: changing Bitwarden does not update App Service, and the deploy workflow does not
 reconcile them. Never add the `.p8` file or any private-key text to the repository, issue, PR, or logs.
 
@@ -173,7 +173,7 @@ App Service setting names verbatim:
 | `Authentication__Apple__KeyId` | Key ID shown for the active Sign in with Apple key |
 | `Authentication__Apple__PrivateKey` | Complete one-time `.p8` download, including the PEM header and footer |
 
-Copy the same four names and values into the `queenzone-dev` App Service configuration and restart the app.
+Copy the same four names and values into the `queenzone-prod` App Service configuration and restart the app.
 These settings are operator-owned under ADR 0008: updating Bitwarden does not update App Service and the deploy
 workflow does not reconcile them. Verify by setting name and value length only, then confirm Apple appears in
 `GET /api/v1/auth/providers` and that `/account/external-login?provider=Apple` redirects to Apple's authorization
@@ -255,7 +255,7 @@ Verify by setting name and value length only, never by printing the value.
 machine account is unavailable):
 
 1. An operator with Azure portal/CLI access to `Queenzone-RG` may set an App Service setting directly
-   (`az webapp config appsettings set --name queenzone-dev --resource-group Queenzone-RG --settings
+   (`az webapp config appsettings set --name queenzone-prod --resource-group Queenzone-RG --settings
    KEY=VALUE`), bypassing Bitwarden for that one change. This is the same access path
    `.github/workflows/deploy.yml`'s `configure-app-settings` job already uses via OIDC — no new credential to
    provision.
@@ -280,7 +280,7 @@ overwrite secret values, but it cannot export their current values.
 For this migration:
 
 - `AZURE_WEBAPP_PUBLISH_PROFILE` was regenerated fresh from Azure (`az webapp deployment list-publishing-profiles
-  --name queenzone-dev --resource-group Queenzone-RG --xml`) and written into Bitwarden, since the old GitHub secret
+  --name queenzone-prod --resource-group Queenzone-RG --xml`) and written into Bitwarden, since the old GitHub secret
   value could not be recovered.
 - `QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING` reused the existing `ConnectionStrings__QueenZoneLegacy` Bitwarden
   secret, which already held the same connection string for local dev.

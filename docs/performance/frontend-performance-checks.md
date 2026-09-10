@@ -13,7 +13,7 @@ Checks are **advisory by default**. They are not a pull-request CI gate yet, bec
 | Cadence | When | What to do |
 | --- | --- | --- |
 | **Change-driven (primary)** | Before and after work that can change page weight or render path: images, CSS/JS bundling, fonts, third-party tags (GTM/analytics), layout shell, compression, cache headers, homepage hero, shared `_Layout` | Same `-BaseUrl`, form factor, and paths; attach both `summary.md` tables (or median of `-Runs 3`) in the PR |
-| **Release / deploy spot-check** | After a production or `queenzone-dev` deploy that includes frontend or hosting changes | Point `-BaseUrl` at the deployed host; sample a few real article/topic URLs if not on sample data |
+| **Release / deploy spot-check** | After a production deploy that includes frontend or hosting changes | Point `-BaseUrl` at the public production host; sample a few real article/topic URLs if not on sample data |
 | **Quarterly drift check** | About every 3 months, or after a large UI kit / design-system pass, even if no single “perf” issue is open | Full default path list, mobile form factor; optionally commit a dated baseline note under `docs/performance/` if numbers moved a lot |
 | **Skip** | Pure backend/data/docs/tests with no public HTML/CSS/JS/static-asset impact | Default `dotnet test` is enough |
 
@@ -87,8 +87,8 @@ Useful options:
 .\scripts\Measure-FrontendPerformance.ps1 -StartLocalApp -IncludeRepeatLoad
 
 # Custom paths — prefer array syntax in-session, or a comma-separated string with -File:
-.\scripts\Measure-FrontendPerformance.ps1 -BaseUrl https://queenzone-dev.azurewebsites.net -Paths @("/", "/news", "/forum")
-powershell -File .\scripts\Measure-FrontendPerformance.ps1 -BaseUrl https://queenzone-dev.azurewebsites.net -Paths "/,/news,/forum"
+.\scripts\Measure-FrontendPerformance.ps1 -BaseUrl https://www.queenzone.org -Paths @("/", "/news", "/forum")
+powershell -File .\scripts\Measure-FrontendPerformance.ps1 -BaseUrl https://www.queenzone.org -Paths "/,/news,/forum"
 
 # Fail the process if any budget is exceeded (optional; not used in CI yet)
 .\scripts\Measure-FrontendPerformance.ps1 -StartLocalApp -FailOnBudget
