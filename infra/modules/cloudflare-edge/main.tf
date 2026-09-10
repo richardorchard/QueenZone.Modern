@@ -360,6 +360,7 @@ resource "cloudflare_workers_script" "pictures_queenzone_org" {
   # The checked-in snapshot already carries a leading UTF-8 BOM byte,
   # matching the live script (confirmed by a live #626 plan).
   content            = file("${path.module}/../../import/workers/pictures-queenzone-org.js")
+  main_module        = "worker.js"
   compatibility_date = "2026-06-25"
 
   lifecycle {
@@ -376,7 +377,6 @@ resource "cloudflare_workers_script" "pictures_queenzone_org" {
       observability,
       migrations,
       assets,
-      main_module,
       body_part,
     ]
   }
