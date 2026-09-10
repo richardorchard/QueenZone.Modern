@@ -1300,9 +1300,6 @@ namespace QueenZone.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("AuthorMemberId")
-                        .HasDatabaseName("IX_ModernForumPost_AuthorMemberId");
-
                     b.HasIndex("LegacyPostId")
                         .IsUnique()
                         .HasDatabaseName("UQ_ModernForumPost_LegacyPostId");
@@ -1311,6 +1308,9 @@ namespace QueenZone.Data.Migrations
 
                     b.HasIndex("AuthorLegacyUserId", "PostedAt")
                         .HasDatabaseName("IX_ModernForumPost_AuthorLegacyUserId_PostedAt");
+
+                    b.HasIndex("AuthorMemberId", "PostedAt")
+                        .HasDatabaseName("IX_ModernForumPost_AuthorMemberId_PostedAt");
 
                     b.ToTable("ModernForumPost", null, t =>
                         {
