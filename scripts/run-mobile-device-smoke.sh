@@ -12,13 +12,16 @@
 #   ./scripts/run-mobile-device-smoke.sh --platform android --prove-failure
 #   ./scripts/run-mobile-device-smoke.sh --platform android --suite journeys
 #   ./scripts/run-mobile-device-smoke.sh --platform android --suite release
+#   ./scripts/run-mobile-device-smoke.sh --dump-android-host
 #
 # Maestro selector and assertion failures are not retried. One Android device
 # transport failure (DeviceServerDied / emulator gone) or pre-flow iOS
 # driver-startup failure may retry after device recovery. android-transport-death
 # is written only when the emulator is gone or the in-process retry itself
 # dies as transport, so CI can boot a fresh emulator. A selector miss on a
-# live emulator must not retrigger that outer restart.
+# live emulator must not retrigger that outer restart. Hosted Android CI
+# recreates the AVD on that one outer retry (#1454); this script does not
+# add a third attempt.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -29,6 +32,7 @@ skip_build=false
 skip_host=false
 no_build_host=false
 prove_failure=false
+dump_android_host=false
 suite="smoke"
 apk=""
 app=""
@@ -36,9 +40,11 @@ port="${SMOKE_PORT:-5098}"
 results_dir="${SMOKE_RESULTS_DIR:-$root/src/QueenZone.Mobile/maestro-results}"
 fixture="${QUEENZONE_MOBILE_CONTRACT_FIXTURE:-$root/src/QueenZone.Mobile/contracts/host.json}"
 host_log="${SMOKE_HOST_LOG:-$results_dir/contract-host.log}"
+android_logcat_pid=""
+android_watchdog_pid=""
 
 usage() {
-  sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'
 }
 
 while [ "$#" -gt 0 ]; do
@@ -83,6 +89,10 @@ while [ "$#" -gt 0 ]; do
       results_dir="${2:-}"
       shift 2
       ;;
+    --dump-android-host)
+      dump_android_host=true
+      shift
+      ;;
     -h|--help)
       usage
       exit 0
@@ -95,7 +105,7 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
-if [ "$platform" != "android" ] && [ "$platform" != "ios" ]; then
+if [ "$dump_android_host" != true ] && [ "$platform" != "android" ] && [ "$platform" != "ios" ]; then
   echo "--platform android|ios is required." >&2
   exit 2
 fi
@@ -120,6 +130,75 @@ unset ConnectionStrings__BlobStorage || true
 unset ConnectionStrings__SqlServerTest || true
 
 mkdir -p "$results_dir"
+
+android_adb_state() {
+  local state=""
+  if ! command -v adb >/dev/null; then
+    echo missing
+    return 0
+  fi
+  state="$(adb get-state 2>/dev/null || true)"
+  state="$(printf '%s' "$state" | tr -d '\r\n')"
+  if [ -n "$state" ]; then
+    printf '%s\n' "$state"
+  else
+    echo missing
+  fi
+}
+
+# Host-side snapshot that still works after emulator-5554 is gone. Do not
+# wait on adb logcat here — that is empty once the device is missing (#1454).
+dump_android_host_diagnostics() {
+  local tag="${1:-manual}"
+  local out="$results_dir/emulator-host.txt"
+  local avd_dir avd_name
+  mkdir -p "$results_dir"
+  {
+    echo "===== dump tag=$tag at $(date -u +%Y-%m-%dT%H:%M:%SZ) ====="
+    echo "adb_state=$(android_adb_state)"
+    echo "=== adb devices -l ==="
+    if command -v adb >/dev/null; then
+      adb devices -l || true
+    else
+      echo "adb not on PATH"
+    fi
+    echo "=== qemu/emulator processes ==="
+    # Do not match this script, emulator-host.txt, or the hosted job name.
+    ps -eo pid,ppid,stat,pcpu,pmem,rss,args 2>/dev/null | grep -E '[q]emu-system|[e]mulator/emulator|[e]mulator64-' || echo "none"
+    echo "=== free -h ==="
+    free -h 2>/dev/null || true
+    echo "=== /proc/meminfo (head) ==="
+    head -n 8 /proc/meminfo 2>/dev/null || true
+    echo "=== dmesg oom/qemu ==="
+    # Hosted GHA VMs are KVM guests; do not scrape kvm-clock boot noise.
+    if dmesg -T 2>/dev/null | grep -Ei 'out of memory|killed process|oom-kill|qemu-system' | tail -n 40; then
+      :
+    elif command -v sudo >/dev/null && sudo -n dmesg -T 2>/dev/null | grep -Ei 'out of memory|killed process|oom-kill|qemu-system' | tail -n 40; then
+      :
+    else
+      echo "dmesg unavailable or no matching lines"
+    fi
+    echo "=== AVD config.ini ==="
+    for avd_dir in "$HOME"/.android/avd/*.avd; do
+      [ -d "$avd_dir" ] || continue
+      echo "--- $avd_dir/config.ini ---"
+      cat "$avd_dir/config.ini" 2>/dev/null || true
+    done
+    echo "=== AVD lock files ==="
+    ls -la "$HOME"/.android/avd/*.avd/*.lock 2>/dev/null || echo "no locks"
+  } >> "$out" 2>&1 || true
+  for avd_dir in "$HOME"/.android/avd/*.avd; do
+    [ -d "$avd_dir" ] || continue
+    avd_name="$(basename "$avd_dir" .avd)"
+    cp "$avd_dir/config.ini" "$results_dir/avd-${avd_name}-config.ini" 2>/dev/null || true
+  done
+}
+
+if [ "$dump_android_host" = true ]; then
+  dump_android_host_diagnostics "cli-dump-android-host"
+  exit 0
+fi
+
 rm -f "$results_dir/android-transport-death"
 {
   echo "started_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -130,21 +209,83 @@ rm -f "$results_dir/android-transport-death"
 export QUEENZONE_MOBILE_CONTRACT_FIXTURE="$fixture"
 
 host_pid=""
+
+copy_android_disk_logs() {
+  local f
+  for f in "$HOME"/.android/*.log "$HOME"/.android/avd/*/*.log; do
+    [ -f "$f" ] || continue
+    cp "$f" "$results_dir/$(basename "$f")" 2>/dev/null || true
+  done
+}
+
+stop_android_side_processes() {
+  if [ -n "${android_watchdog_pid}" ]; then
+    kill "$android_watchdog_pid" 2>/dev/null || true
+    wait "$android_watchdog_pid" 2>/dev/null || true
+    android_watchdog_pid=""
+  fi
+  if [ -n "${android_logcat_pid}" ]; then
+    kill "$android_logcat_pid" 2>/dev/null || true
+    wait "$android_logcat_pid" 2>/dev/null || true
+    android_logcat_pid=""
+  fi
+}
+
+start_android_logcat() {
+  if ! command -v adb >/dev/null; then
+    return 0
+  fi
+  if [ -n "${android_logcat_pid}" ]; then
+    kill "$android_logcat_pid" 2>/dev/null || true
+    wait "$android_logcat_pid" 2>/dev/null || true
+    android_logcat_pid=""
+  fi
+  if [ -s "$results_dir/logcat.txt" ]; then
+    adb logcat -v threadtime >> "$results_dir/logcat.txt" 2>>"$results_dir/logcat.err" &
+  else
+    adb logcat -v threadtime > "$results_dir/logcat.txt" 2>"$results_dir/logcat.err" &
+  fi
+  android_logcat_pid=$!
+  echo "android_logcat_pid=$android_logcat_pid" >> "$results_dir/harness.log"
+}
+
+start_android_watchdog() {
+  if ! command -v adb >/dev/null; then
+    return 0
+  fi
+  if [ -n "${android_watchdog_pid}" ]; then
+    kill "$android_watchdog_pid" 2>/dev/null || true
+    wait "$android_watchdog_pid" 2>/dev/null || true
+    android_watchdog_pid=""
+  fi
+  (
+    for _ in $(seq 1 3600); do
+      sleep 2
+      if [ "$(adb get-state 2>/dev/null || true)" != "device" ]; then
+        dump_android_host_diagnostics "watchdog-adb-lost"
+        exit 0
+      fi
+    done
+  ) &
+  android_watchdog_pid=$!
+  echo "android_watchdog_pid=$android_watchdog_pid" >> "$results_dir/harness.log"
+}
+
 collect_diagnostics() {
   local reason="${1:-unknown}"
   echo "collect_diagnostics reason=$reason" >> "$results_dir/harness.log"
-  if [ "$platform" = "android" ] && command -v adb >/dev/null; then
-    # Leftover adb after emulator teardown can hang forever (journeys
-    # 33795259183 leftover collect sat until the job was cancelled).
-    if command -v timeout >/dev/null; then
-      timeout 30 adb logcat -d > "$results_dir/logcat.txt" 2>/dev/null || true
-    else
-      adb logcat -d > "$results_dir/logcat.txt" 2>/dev/null || true
+  if [ "$platform" = "android" ]; then
+    dump_android_host_diagnostics "collect-$reason"
+    copy_android_disk_logs
+    # Streaming logcat is started while the device is alive. A post-death
+    # `adb logcat -d` overwrite would replace that file with empty output.
+    if [ ! -s "$results_dir/logcat.txt" ] && command -v adb >/dev/null; then
+      if command -v timeout >/dev/null; then
+        timeout 30 adb logcat -d > "$results_dir/logcat.txt" 2>/dev/null || true
+      else
+        adb logcat -d > "$results_dir/logcat.txt" 2>/dev/null || true
+      fi
     fi
-    for f in "$HOME"/.android/*.log "$HOME"/.android/avd/*/*.log; do
-      [ -f "$f" ] || continue
-      cp "$f" "$results_dir/$(basename "$f")" 2>/dev/null || true
-    done
   fi
   if [ "$platform" = "ios" ]; then
     xcrun simctl spawn booted log show --last 5m --style compact \
@@ -157,6 +298,7 @@ collect_diagnostics() {
 
 cleanup() {
   local status=$?
+  stop_android_side_processes
   if [ "$status" -ne 0 ]; then
     collect_diagnostics "exit-$status"
   fi
@@ -409,6 +551,8 @@ if [ "$platform" = "android" ]; then
   echo "Installing $apk"
   adb wait-for-device
   adb install -r "$apk"
+  start_android_logcat
+  start_android_watchdog
   if [ "$suite" = "journeys" ]; then
     # Clear before push_attach_fixture. Clearing from launchApp afterwards
     # deletes the app-private attachment URI while leaving its UI metadata.
@@ -526,13 +670,25 @@ android_latest_attempt_transport_died() {
 
 write_android_transport_marker() {
   local reason="${1:-device-server-or-emulator-transport-loss}"
+  local qemu_state="missing"
+  local logcat_bytes=0
+  dump_android_host_diagnostics "transport-marker-$reason"
+  copy_android_disk_logs
+  if ps -eo args 2>/dev/null | grep -Eq '[q]emu-system|[e]mulator/emulator|[e]mulator64-'; then
+    qemu_state="running"
+  fi
+  if [ -f "$results_dir/logcat.txt" ]; then
+    logcat_bytes="$(wc -c < "$results_dir/logcat.txt" | tr -d ' ')"
+  fi
   {
     echo "class=transport_death"
     echo "reason=$reason"
     echo "detected_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-    echo "adb_state=$(adb get-state 2>/dev/null || echo missing)"
+    echo "adb_state=$(android_adb_state)"
+    echo "qemu_state=$qemu_state"
+    echo "logcat_bytes=$logcat_bytes"
   } > "$results_dir/android-transport-death"
-  echo "android_failure_class=transport_death reason=$reason" >> "$results_dir/harness.log"
+  echo "android_failure_class=transport_death reason=$reason qemu_state=$qemu_state logcat_bytes=$logcat_bytes" >> "$results_dir/harness.log"
 }
 
 run_maestro_once() {
@@ -584,6 +740,8 @@ if [ "$platform" = "android" ] \
     sleep 2
   done
   if [ "$android_ready" = true ]; then
+    start_android_logcat
+    start_android_watchdog
     adb install -r "$apk"
     set +e
     run_maestro_once
