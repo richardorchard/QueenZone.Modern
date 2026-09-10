@@ -78,6 +78,11 @@ export type InboxReadQuery = PageQuery & {
   cache?: ContentCache;
   /** Pull-to-refresh: write-through on success, never serve a cached snapshot. */
   networkOnly?: boolean;
+  /**
+   * Stale-while-revalidate window (issue #1477). Unset means the existing
+   * network-first behaviour. Ignored when `networkOnly` is set.
+   */
+  ttlMs?: number;
 };
 
 const cachedInboxPageSize = 50;
@@ -113,6 +118,7 @@ export async function fetchInbox(
       cache: query.cache,
       fallback: query.networkOnly !== true,
       invalidateOn: [401, 403],
+      ttlMs: query.ttlMs,
     },
   );
   return result.data;

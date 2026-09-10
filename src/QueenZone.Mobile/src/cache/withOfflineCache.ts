@@ -1,4 +1,4 @@
-import type { ContentCache } from './contentCache';
+import type { CacheRecord, ContentCache } from './contentCache';
 
 export type CacheSource = 'network' | 'cache';
 
@@ -16,6 +16,14 @@ export type OfflineCacheOptions = {
   invalidateOn?: readonly number[];
   /** Network-only (pull-to-refresh): write-through on success, never serve cache. */
   fallback?: boolean;
+  /**
+   * Stale-while-revalidate window. A cached entry younger than this is served
+   * immediately (no network round trip) while a fresh fetch runs in the
+   * background to update the cache for the next call. Ignored when
+   * `fallback: false` (pull-to-refresh stays network-only). Unset means the
+   * existing network-first behaviour (no TTL short-circuit).
+   */
+  ttlMs?: number;
 };
 
 function isAbortError(err: unknown): boolean {
@@ -41,6 +49,72 @@ function httpStatus(err: unknown): number | null {
   return typeof status === 'number' ? status : null;
 }
 
+function cacheAgeMs(cachedAt: string): number {
+  const parsed = Date.parse(cachedAt);
+  return Number.isNaN(parsed) ? Number.POSITIVE_INFINITY : Date.now() - parsed;
+}
+
+// Tracks cacheKeys with a background revalidation in flight per ContentCache
+// instance, so concurrent SWR hits (e.g. two screens reading the same key)
+// only trigger one network call. Scoped by instance so tests using a fresh
+// ContentCache never see another test's in-flight state.
+const revalidating = new WeakMap<ContentCache, Set<string>>();
+
+function beginRevalidation(cache: ContentCache, cacheKey: string): boolean {
+  let keys = revalidating.get(cache);
+  if (!keys) {
+    keys = new Set();
+    revalidating.set(cache, keys);
+  }
+  if (keys.has(cacheKey)) {
+    return false;
+  }
+  keys.add(cacheKey);
+  return true;
+}
+
+function endRevalidation(cache: ContentCache, cacheKey: string): void {
+  revalidating.get(cache)?.delete(cacheKey);
+}
+
+/**
+ * Fire-and-forget refresh behind a stale-while-revalidate hit. Mirrors the
+ * invalidateOn/abort handling of the foreground path, but never surfaces a
+ * failure — the caller already has stale data to show.
+ */
+function revalidateInBackground<T>(
+  cache: ContentCache,
+  cacheKey: string,
+  fetchFresh: () => Promise<T>,
+  invalidateOn: readonly number[],
+): void {
+  if (!beginRevalidation(cache, cacheKey)) {
+    return;
+  }
+  void (async () => {
+    try {
+      const data = await fetchFresh();
+      try {
+        await cache.put(cacheKey, data);
+      } catch {
+        // Device store full/unavailable: stale value stays put until it ages out.
+      }
+    } catch (err) {
+      if (isAbortError(err)) {
+        return;
+      }
+      const status = httpStatus(err);
+      if (status !== null && invalidateOn.includes(status)) {
+        try {
+          await cache.remove(cacheKey);
+        } catch {}
+      }
+    } finally {
+      endRevalidation(cache, cacheKey);
+    }
+  })();
+}
+
 /**
  * Network-first with optional offline/timeout cache fallback.
  * Returns provenance so screens can show “Offline · last updated …”.
@@ -53,6 +127,17 @@ export async function withOfflineCacheResult<T>(
 ): Promise<CachedResult<T>> {
   const fallback = options.fallback !== false;
   const invalidateOn = options.invalidateOn ?? [];
+
+  if (fallback && options.ttlMs !== undefined && options.ttlMs > 0) {
+    let fresh: CacheRecord<T> | null = null;
+    try {
+      fresh = await cache.read<T>(cacheKey);
+    } catch {}
+    if (fresh !== null && cacheAgeMs(fresh.cachedAt) < options.ttlMs) {
+      revalidateInBackground(cache, cacheKey, fetchFresh, invalidateOn);
+      return { data: fresh.payload, source: 'cache', cachedAt: fresh.cachedAt };
+    }
+  }
 
   try {
     const data = await fetchFresh();

@@ -1,4 +1,5 @@
 import { fetchJsonWithOfflineCache } from '../cache';
+import type { OfflineCacheOptions } from '../cache';
 import { fetchJson, sendJson } from './client';
 import type {
   AlbumDetail,
@@ -29,6 +30,15 @@ export type PageQuery = {
   signal?: AbortSignal;
 };
 
+/**
+ * Opt-in stale-while-revalidate hint (issue #1477). Only callers that pass a
+ * `cacheKey` route through `withOfflineCache`; everyone else keeps the
+ * existing network-only `fetchJson` call.
+ */
+export type CacheHint = OfflineCacheOptions & {
+  cacheKey: string;
+};
+
 function pageParams({ page, pageSize }: PageQuery) {
   return {
     page,
@@ -41,13 +51,24 @@ export type NewsPageQuery = PageQuery & {
   decade?: number;
   /** A single year (e.g. 2008). Server-side filter for the year-rail scrubber — see issue #886. Wins over `decade` if both are set. */
   year?: number;
+  /** Stale-while-revalidate hint (issue #1477) — the home screen's hero rail. */
+  cacheHint?: CacheHint;
 };
 
 export function fetchNewsPage(query: NewsPageQuery = {}): Promise<ApiPagedResponse<NewsListItem>> {
-  return fetchJson('/content/news', {
+  const fetchOptions = {
     query: { ...pageParams(query), decade: query.decade, year: query.year },
     signal: query.signal,
-  });
+  };
+  if (query.cacheHint) {
+    const { cacheKey, ...cacheOptions } = query.cacheHint;
+    return fetchJsonWithOfflineCache<ApiPagedResponse<NewsListItem>>('/content/news', {
+      ...fetchOptions,
+      cacheKey,
+      ...cacheOptions,
+    });
+  }
+  return fetchJson('/content/news', fetchOptions);
 }
 
 /** Earliest/latest published years in the archive, for the year-rail scrubber's tick marks. */
@@ -120,7 +141,15 @@ export function fetchTimelineEventById(id: number, signal?: AbortSignal): Promis
 }
 
 /** The single most notable history event for today's date, or null when there is none. */
-export function fetchOnThisDay(signal?: AbortSignal): Promise<TimelineEvent | null> {
+export function fetchOnThisDay(signal?: AbortSignal, cacheHint?: CacheHint): Promise<TimelineEvent | null> {
+  if (cacheHint) {
+    const { cacheKey, ...cacheOptions } = cacheHint;
+    return fetchJsonWithOfflineCache<TimelineEvent | null>('/content/on-this-day', {
+      signal,
+      cacheKey,
+      ...cacheOptions,
+    });
+  }
   return fetchJson('/content/on-this-day', { signal });
 }
 
@@ -128,12 +157,31 @@ export function fetchOnThisDay(signal?: AbortSignal): Promise<TimelineEvent | nu
  * Count of new forum replies posted today. No presence/reading tracking exists, so this is
  * the only honest live signal for the home screen's activity strip.
  */
-export function fetchLiveActivity(signal?: AbortSignal): Promise<LiveActivitySummary> {
+export function fetchLiveActivity(
+  signal?: AbortSignal,
+  cacheHint?: CacheHint,
+): Promise<LiveActivitySummary> {
+  if (cacheHint) {
+    const { cacheKey, ...cacheOptions } = cacheHint;
+    return fetchJsonWithOfflineCache<LiveActivitySummary>('/content/live-activity', {
+      signal,
+      cacheKey,
+      ...cacheOptions,
+    });
+  }
   return fetchJson('/content/live-activity', { signal });
 }
 
 /** A single random published quote, or null when none are published. */
-export function fetchRandomQuote(signal?: AbortSignal): Promise<RandomQuote | null> {
+export function fetchRandomQuote(signal?: AbortSignal, cacheHint?: CacheHint): Promise<RandomQuote | null> {
+  if (cacheHint) {
+    const { cacheKey, ...cacheOptions } = cacheHint;
+    return fetchJsonWithOfflineCache<RandomQuote | null>('/content/quotes/random', {
+      signal,
+      cacheKey,
+      ...cacheOptions,
+    });
+  }
   return fetchJson('/content/quotes/random', { signal });
 }
 
@@ -147,7 +195,11 @@ export function fetchRandomTrivia(signal?: AbortSignal): Promise<RandomTrivia | 
   return fetchJson('/content/trivia/random', { signal });
 }
 
-/** The current Home poll, or null when none is live. Optional Bearer marks the viewer's choice. */
+/**
+ * The current Home poll, or null when none is live. Optional Bearer marks the
+ * viewer's choice, so this is deliberately never cached with a TTL (issue
+ * #1477) — a stale response would hide the viewer's own just-cast vote.
+ */
 export function fetchHomePoll(
   signal?: AbortSignal,
   accessToken?: string | null,
@@ -219,9 +271,17 @@ export type PhotoPageQuery = PageQuery & {
 };
 
 export function fetchPhotoCategories(
-  query: PageQuery = {},
+  query: PageQuery & { cacheHint?: CacheHint } = {},
 ): Promise<ApiPagedResponse<PhotoCategoryListItem>> {
-  return fetchJson('/content/photos/categories', { query: pageParams(query), signal: query.signal });
+  const fetchOptions = { query: pageParams(query), signal: query.signal };
+  if (query.cacheHint) {
+    const { cacheKey, ...cacheOptions } = query.cacheHint;
+    return fetchJsonWithOfflineCache<ApiPagedResponse<PhotoCategoryListItem>>(
+      '/content/photos/categories',
+      { ...fetchOptions, cacheKey, ...cacheOptions },
+    );
+  }
+  return fetchJson('/content/photos/categories', fetchOptions);
 }
 
 export function fetchPhotoCategory(
