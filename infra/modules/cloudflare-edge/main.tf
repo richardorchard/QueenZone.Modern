@@ -177,7 +177,7 @@ resource "cloudflare_dns_record" "apex" {
   zone_id = var.zone_id
   name    = "queenzone.org"
   type    = "A"
-  content = "52.237.246.162"
+  content = "40.69.106.99"
   ttl     = 1
   proxied = true
   comment = "Apex -> App Service inbound IP"
@@ -192,7 +192,7 @@ resource "cloudflare_dns_record" "www" {
   zone_id = var.zone_id
   name    = "www.queenzone.org"
   type    = "CNAME"
-  content = "queenzone-dev.azurewebsites.net"
+  content = "queenzone-prod.azurewebsites.net"
   ttl     = 1
   proxied = true
 
@@ -284,7 +284,7 @@ resource "cloudflare_dns_record" "asuid_apex" {
   zone_id = var.zone_id
   name    = "asuid.queenzone.org"
   type    = "TXT"
-  content = "\"0740A9DBFCBF1CE22090C2574D9867A086204B58D7CE4676D90FEB5E85B3A068\""
+  content = "\"BF3C6D1B1E965ADCA69EAFCA5EE652A43A44E9441CE4E3A82C4B47646F3A9AE2\""
   ttl     = 1
   comment = "App Service custom domain verification"
 
@@ -298,7 +298,7 @@ resource "cloudflare_dns_record" "asuid_www" {
   zone_id = var.zone_id
   name    = "asuid.www.queenzone.org"
   type    = "TXT"
-  content = "\"0740A9DBFCBF1CE22090C2574D9867A086204B58D7CE4676D90FEB5E85B3A068\""
+  content = "\"BF3C6D1B1E965ADCA69EAFCA5EE652A43A44E9441CE4E3A82C4B47646F3A9AE2\""
   ttl     = 1
   comment = "App Service custom domain verification"
 

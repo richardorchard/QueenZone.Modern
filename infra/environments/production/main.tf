@@ -39,9 +39,8 @@ module "azure_data" {
   location            = var.azure_location
 }
 
-# Phase 7 (#1272), parallel-candidate stage. These resources intentionally
-# coexist with the imported australiaeast estate. No custom hostname, DNS
-# record, or existing resource changes occur until the later cutover stage.
+# Phase 7 (#1272), Canada East production target. The Australia East estate
+# remains alongside it for the observation and rollback window.
 module "azure_web_target" {
   source = "../../modules/azure-web"
 
@@ -53,9 +52,12 @@ module "azure_web_target" {
   application_insights_name    = "queenzone-prod-ai"
   sku_name                     = var.app_service_sku
   worker_count                 = var.app_service_worker_count
-  environment_name             = "migration"
-  allow_direct_access          = true
-  custom_hostnames             = {}
+  environment_name             = "production"
+  allow_direct_access          = false
+  custom_hostnames = {
+    "queenzone.org"     = "16D5EE38A8ECAB979AE6960C2CEAABCAF5B7FC14"
+    "www.queenzone.org" = "16D5EE38A8ECAB979AE6960C2CEAABCAF5B7FC14"
+  }
 }
 
 module "azure_data_target" {

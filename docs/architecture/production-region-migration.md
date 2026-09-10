@@ -223,6 +223,13 @@ records to `queenzone-prod.azurewebsites.net`, then disable direct candidate
 ingress by restoring the Cloudflare-only default deny rule. Update
 `deploy.yml` and its deploy identity/publish-profile mappings to the new app.
 
+For the Canada East cutover, use the Cloudflare Origin CA certificate covering
+the apex and `www` that is stored in Bitwarden and uploaded to the target App
+Service webspace. Its non-secret Azure thumbprint is
+`16D5EE38A8ECAB979AE6960C2CEAABCAF5B7FC14`. This keeps Cloudflare Full (strict)
+enabled throughout the handover; never put the PFX or password in OpenTofu
+configuration, state, plans, workflow output, or the repository.
+
 Verify the live hostname over HTTPS, including build stamp, full route smoke,
 auth, forum, uploads, Blob media, and mobile API journeys. If a blocking check
 fails, point Cloudflare back to `queenzone-dev`, restore the old app to service,

@@ -12,11 +12,10 @@ Use [`scripts/Test-OpenTofu.ps1`](../../../scripts/Test-OpenTofu.ps1) for local 
 
 ## Phase 7 staged migration
 
-Issue #1272 adds a `canadaeast` candidate alongside the imported
-`australiaeast` estate. The first stage creates only the replacement web,
-telemetry, SQL-server, Storage, and container resources. It does not create
-the destination database, bind production hostnames, change Cloudflare DNS,
-or alter an existing resource.
+Issue #1272 moves production to `canadaeast` while retaining the imported
+`australiaeast` estate for a rollback window. The target owns the production
+hostnames and uses Cloudflare-only ingress after Stage 4. The old web and data
+resources remain protected until the observation gates permit retirement.
 
 The SQL administrator password comes from the existing Bitwarden migration
 connection-string secret. OpenTofu passes it through the AzureRM provider's
