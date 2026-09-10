@@ -159,7 +159,7 @@ describe('Maestro device flows (#1281)', () => {
     assert.doesNotMatch(authenticated, /openLink: \$\{SMOKE_AUTH_URL\}/);
     assert.match(
       openAuth,
-      /accept-ios-open-link\.yaml[\s\S]*platform: iOS[\s\S]*notVisible:[\s\S]*id: home-messages[\s\S]*openLink: \$\{SMOKE_AUTH_URL\}[\s\S]*visible:[\s\S]*id: home-messages/,
+      /accept-ios-open-link\.yaml[\s\S]*platform: iOS[\s\S]*notVisible:[\s\S]*id: home-messages[\s\S]*openLink: \$\{SMOKE_AUTH_URL\}[\s\S]*accept-ios-open-link\.yaml[\s\S]*visible:[\s\S]*id: home-messages/,
     );
     assert.match(authenticated, /id: home-profile[\s\S]*id: profile-signed-in/);
     assert.match(authenticated, /id: profile-messages/);
