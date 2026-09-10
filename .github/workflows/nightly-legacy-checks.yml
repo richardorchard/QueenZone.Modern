@@ -94,7 +94,11 @@ jobs:
     # workflow_dispatch's skip_sync input lets an on-demand run reuse the
     # existing mirror instead of paying the roughly 25-30 minute sqlpackage extract/publish.
     if: github.event_name != 'workflow_dispatch' || inputs.skip_sync != true
-    timeout-minutes: 45
+    # One successful extract/publish is ~25-30 minutes. Transient live-DB TCP
+    # drops retry the failed phase up to 3 times inside the script (#1453);
+    # this budget is room for those retries, not a substitute for retrying or
+    # failing clearly. Do not treat a timeout raise as the fix.
+    timeout-minutes: 110
     # Reads production Azure SQL only to refresh the disposable SQL Express
     # mirror (issue #1377 Option B). Custom policy: branch main. Do not give
     # this environment to probe / UI / cleanup jobs.
@@ -121,7 +125,22 @@ jobs:
           if ([string]::IsNullOrWhiteSpace($env:ConnectionStrings__QueenZoneLegacy)) {
             Write-Error "QUEENZONE_LEGACY_MIGRATION_CONNECTION_STRING is not configured. Check the Bitwarden secret and BITWARDEN_APP_SERVICE_DEPLOY_SECRETS mapping."
           }
-          ./scripts/Sync-LegacyDbToSqlExpress.ps1
+          try {
+            ./scripts/Sync-LegacyDbToSqlExpress.ps1
+            if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) {
+              throw "Sync-LegacyDbToSqlExpress.ps1 exited with code $LASTEXITCODE"
+            }
+          }
+          catch {
+            $message = $_.Exception.Message
+            if ($message -match 'TCP/transport|forcibly closed|connection reset|transport-level|transport timeout') {
+              Write-Host "::error title=Nightly Sync TCP/transport failure::Live Azure SQL TCP/transport drop during Extract or Publish. $message Downstream probe and RealData jobs will stay skipped."
+            }
+            else {
+              Write-Host "::error title=Nightly Sync failed::$message"
+            }
+            throw
+          }
 
   legacy-read-probes:
     name: Legacy SQL read probes
