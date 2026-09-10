@@ -131,6 +131,21 @@ unset ConnectionStrings__SqlServerTest || true
 
 mkdir -p "$results_dir"
 
+android_adb_state() {
+  local state=""
+  if ! command -v adb >/dev/null; then
+    echo missing
+    return 0
+  fi
+  state="$(adb get-state 2>/dev/null || true)"
+  state="$(printf '%s' "$state" | tr -d '\r\n')"
+  if [ -n "$state" ]; then
+    printf '%s\n' "$state"
+  else
+    echo missing
+  fi
+}
+
 # Host-side snapshot that still works after emulator-5554 is gone. Do not
 # wait on adb logcat here — that is empty once the device is missing (#1454).
 dump_android_host_diagnostics() {
@@ -140,7 +155,7 @@ dump_android_host_diagnostics() {
   mkdir -p "$results_dir"
   {
     echo "===== dump tag=$tag at $(date -u +%Y-%m-%dT%H:%M:%SZ) ====="
-    echo "adb_state=$(command -v adb >/dev/null && adb get-state 2>/dev/null || echo missing)"
+    echo "adb_state=$(android_adb_state)"
     echo "=== adb devices -l ==="
     if command -v adb >/dev/null; then
       adb devices -l || true
@@ -669,7 +684,7 @@ write_android_transport_marker() {
     echo "class=transport_death"
     echo "reason=$reason"
     echo "detected_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-    echo "adb_state=$(adb get-state 2>/dev/null || echo missing)"
+    echo "adb_state=$(android_adb_state)"
     echo "qemu_state=$qemu_state"
     echo "logcat_bytes=$logcat_bytes"
   } > "$results_dir/android-transport-death"
