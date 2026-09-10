@@ -3,6 +3,17 @@
 Issue: [#1272](https://github.com/richardorchard/QueenZone.Modern/issues/1272),
 Phase 7 of [epic #1264](https://github.com/richardorchard/QueenZone.Modern/issues/1264).
 
+## Current status: 10 September 2026
+
+Stages 1–4 are complete. Production traffic, deployment, SQL, Blob Storage,
+telemetry, authentication callbacks, and mobile configuration now target the
+Canada East estate listed below. The previous Australia East App Service is
+stopped and retained with the old data resources only for rollback.
+
+Stage 5 is pending the agreed observation window. Do not retire the old estate
+yet. In particular, `queenzone-sql-server` cannot be deleted while it also
+hosts the Australia East dev database `queenzone-dev-db`.
+
 ## Target and safety boundary
 
 ADR 0020 approves `canadaeast` for production. The App Service, SQL server and
@@ -102,7 +113,7 @@ az resource delete `
   --resource-type Microsoft.AlertsManagement/smartDetectorAlertRules
 ```
 
-## Stage 1: build the parallel target
+## Stage 1: build the parallel target — completed
 
 The production apply plan runs `Test-AzureMigrationTargetCapacity.ps1` before
 the approval gate. If the target App Service plan or SQL logical server does
@@ -138,7 +149,7 @@ then approve the protected `opentofu-apply` environment only when it still
 contains creates and state-address moves only. Reject any run that changes or
 deletes an existing resource.
 
-## Stage 2: copy and verify data
+## Stage 2: copy and verify data — completed
 
 Take a fresh, retained database export or backup before the final cutover. Do
 not delete or overwrite the source database or source blobs.
@@ -172,7 +183,7 @@ After the database copy is verified, add it to the target module with
 The follow-up plan may show that import but must still show no replacement or
 delete.
 
-## Stage 3: configure and test the candidate
+## Stage 3: configure and test the candidate — completed
 
 Create candidate connection strings by changing only the SQL server and
 Storage account endpoints. Store them in Bitwarden; never commit or print
@@ -180,10 +191,10 @@ them. Copy the remaining production application settings by name and value
 through a secret-safe operator script, then update only the candidate
 connection strings and Application Insights connection.
 
-Grant the existing production deploy identity Website Contributor on
-`queenzone-prod`, add a candidate publish profile in Bitwarden, and deploy the
-same verified build that production runs. Do not change `deploy.yml`'s default
-target yet.
+The candidate stage granted the existing production deploy identity Website
+Contributor on `queenzone-prod`, added a candidate publish profile in Bitwarden,
+and deployed the same verified build that Australia East production ran. The
+routine `deploy.yml` target was deliberately left unchanged until cutover.
 
 Stage 3 used a temporary candidate-preparation script and manual deployment
 workflow to clone the secret settings and deploy the exact Australia East
@@ -202,7 +213,7 @@ Before DNS changes, test the candidate hostname directly:
 Source and candidate may both receive writes during this stage. Treat the
 candidate as disposable until the final copy.
 
-## Stage 4: final copy and cutover
+## Stage 4: final copy and cutover — completed
 
 Schedule a write freeze. Stop the old app or enable a maintenance response so
 no writes occur after the final copy starts. Recreate the candidate database
@@ -235,7 +246,7 @@ fails, point Cloudflare back to `queenzone-dev`, restore the old app to service,
 and end the write freeze. Do not attempt an OpenTofu state rollback during the
 traffic incident.
 
-## Stage 5: observation and retirement
+## Stage 5: observation and retirement — pending
 
 Keep the old App Service, plan, SQL database/server, Storage account, and the
 immediate pre-cutover backup throughout the agreed observation window. Do not
