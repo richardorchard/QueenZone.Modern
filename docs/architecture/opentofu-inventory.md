@@ -112,7 +112,8 @@ Treatments:
 | Site `queenzone-prod` | `…/Microsoft.Web/sites/queenzone-prod` | manage | Canada East live application; Cloudflare-only ingress |
 | Hostname bindings `queenzone.org`, `www.queenzone.org` | `…/sites/queenzone-prod/hostNameBindings/…` | manage | SNI certs bound; breaking bindings = public TLS outage |
 | Plan `ASP-Queenzone` / site `queenzone-dev` | Australia East resource paths | import | Stopped rollback estate; retain through #1272 observation, then remove from state before manual retirement |
-| Certificates `queenzone.org`, `www.queenzone.org` | `…/Microsoft.Web/certificates/…` | import or defer | GeoTrust TLS RSA CA G1, expire **2026-12-29**; confirm renew path before encoding as managed vs uploaded |
+| Rollback certificates `queenzone.org`, `www.queenzone.org` | `…/Microsoft.Web/certificates/…` | import or defer | Australia East GeoTrust TLS RSA CA G1 certificates expire **2026-12-29**; retain with the rollback app during observation |
+| Active Canada East SNI certificate | uploaded certificate in the `queenzone-prod` webspace | outside | Cloudflare Origin CA certificate; secret material stays in Bitwarden. OpenTofu manages the target hostname bindings by the non-secret thumbprint recorded in `production-region-migration.md` |
 | Access restrictions (Cloudflare IPv4/IPv6 allow + deny all) | site `ipSecurityRestrictions` | import | Mis-order or drop = either open origin or lock out Cloudflare |
 | SCM access restrictions | site `scmIpSecurityRestrictions` | import | Currently **Allow all**; keep separate from main site rules (deploy path) |
 | App settings (names only) | site config | outside → [ADR 0008](../decisions/0008-app-service-settings-ownership.md) | Names re-listed 2026-08-24. Secret **values** stay in Azure/Bitwarden, never state. `deploy.yml` ARM-owns three non-secret deploy keys outside OpenTofu (see [App Service settings](#app-service-application-setting-names-values-not-recorded)). #622's site resource must omit/`ignore_changes` on `app_settings`/`connection_string` |
@@ -131,7 +132,7 @@ Treatments:
 | Log Analytics `queenzone-dev-law` | `…/workspaces/queenzone-dev-law` | import | Retention 30d; daily cap **0.1 GB** |
 | App Insights `queenzone-dev-ai` | `…/components/queenzone-dev-ai` | import | Workspace-linked; retention 90d; daily volume cap 100 GB (platform billing cap) |
 | Action group `queenzone-alerts` | `…/actionGroups/queenzone-alerts` | import | Email receiver present (address not recorded here) |
-| Webtest `queenzone-dev-health` | `…/webtests/queenzone-dev-health` | import / defer | Targets `https://queenzone-dev.azurewebsites.net/health` — **blocked by Cloudflare IP allowlist** for external probes; fix URL or allowlist before trusting alert |
+| Legacy webtest `queenzone-dev-health` | `…/webtests/queenzone-dev-health` | import / defer | Still targets the stopped rollback app at `https://queenzone-dev.azurewebsites.net/health`; it is not a current production monitor and remains blocked by the Cloudflare IP allowlist |
 | Metric / query alerts | listed in import JSON | import | `queenzone-dev-failed-requests` is **disabled** on purpose |
 | Smart detector `Failure Anomalies - queenzone-dev-ai` | alertsmanagement | defer | Dashboard-created default; prefer leave as provider default unless drift forces import |
 | Diagnostic settings (web/sql/storage) | n/a | outside | None configured — do not invent |
@@ -143,7 +144,7 @@ Account id `f93121b2086286e79a7a9fdb8d03cb4c`. Zone id `079fc2f37095c82fb3a2b4da
 | Item | Treatment | Notes |
 | --- | --- | --- |
 | Zone `queenzone.org` | import | Free plan; never recreate casually |
-| DNS `queenzone.org` A → `52.237.246.162` (proxied) | import | App Service inbound IP |
+| DNS `queenzone.org` A → `40.69.106.99` (proxied) | import | Canada East `queenzone-prod` App Service inbound IP |
 | DNS `www` CNAME → `queenzone-prod.azurewebsites.net` (proxied) | import | |
 | DNS `cdn` / `cdn2` CNAME → `queenzoneprod.blob.core.windows.net` (proxied) | import | Only **cdn2** has a Worker route |
 | DNS `asverify.cdn` CNAME (DNS-only) | import | Azure Storage custom-domain verification |

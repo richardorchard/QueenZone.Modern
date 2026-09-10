@@ -90,7 +90,7 @@ Keep App Service setting names canonical in Bitwarden (`ConnectionStrings__Queen
 
 ### Scale / cache (single instance — no Redis)
 
-- Plan **ASP-Queenzone**: **B1 Basic**, **1 worker**. Do not assume scale-out.
+- Plan **ASP-Queenzone-Prod**: **B1 Basic**, **1 worker**. Do not assume scale-out.
 - Process-local memory/output cache and invalidation are intentional.
 - **No Azure Cache for Redis** while this cost model holds.
 - Decision + archived issues: [`docs/architecture/hosting-scale-and-cache.md`](architecture/hosting-scale-and-cache.md).
