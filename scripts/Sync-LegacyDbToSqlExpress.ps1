@@ -45,15 +45,22 @@
 param(
     [string]$InstanceName = "SQLEXPRESS",
     [string]$TargetDatabase = "queenzone_legacy_sync",
-    [string]$ProbeLoginName = "queenzone_probe"
+    [string]$ProbeLoginName = "queenzone_probe",
+    [int]$SqlPackageTransientAttempts = 3,
+    [switch]$SelfTest
 )
 
 $ErrorActionPreference = "Stop"
 
-$sourceConnectionString = $env:ConnectionStrings__QueenZoneLegacy
-if ([string]::IsNullOrWhiteSpace($sourceConnectionString)) {
-    Write-Error "ConnectionStrings__QueenZoneLegacy is not set."
-}
+# Live Azure SQL (Australia East S0) can drop the sqlpackage socket mid-Extract
+# or mid-Publish: TCP Provider "forcibly closed by the remote host", connection
+# reset, or a transport-level timeout. sqlpackage often prints that error and
+# then sits until the GitHub Actions job timeout, which surfaces as a vague
+# `cancelled` with no actionable step (issue #1453). Retry the failed phase a
+# small fixed number of times with backoff. If the process hangs after a
+# transport error, stop it so the attempt can retry or fail clearly. Do not
+# treat contained-user / staging-file collisions as transient — those are
+# #1334 / #1384. Publish exclusions and unique staging names stay unchanged.
 
 $dacpacPath = Join-Path ([System.IO.Path]::GetTempPath()) "queenzone-legacy-$(Get-Date -Format 'yyyyMMdd-HHmmss').dacpac"
 $stagingToken = [Guid]::NewGuid().ToString("N")
@@ -65,6 +72,397 @@ if ($TargetDatabase -notmatch '^[A-Za-z0-9_]+$' -or
     $ProbeLoginName -notmatch '^[A-Za-z0-9_]+$' -or
     $stagingDatabase.Length -gt 128) {
     throw "Mirror database and probe-login names may contain only letters, numbers, and underscores; the generated staging database name must not exceed 128 characters."
+}
+
+function Test-SqlPackageTransientTransportError {
+    param([string]$Text)
+
+    if ([string]::IsNullOrWhiteSpace($Text)) {
+        return $false
+    }
+
+    $patterns = @(
+        'forcibly closed by the remote host',
+        'an existing connection was forcibly closed',
+        'connection reset',
+        'connection was reset',
+        'a transport-level error has occurred',
+        'transport-level error',
+        'transport timeout',
+        'semaphore timeout period has expired',
+        'physical connection is not usable',
+        'the connection is broken and recovery is not possible',
+        'the specified network name is no longer available',
+        'an established connection was aborted',
+        'provider: TCP Provider',
+        'TCP Provider, error'
+    )
+
+    foreach ($pattern in $patterns) {
+        if ($Text -imatch [regex]::Escape($pattern)) {
+            return $true
+        }
+    }
+
+    return $false
+}
+
+function ConvertTo-WindowsProcessArguments {
+    param([string[]]$Values)
+
+    return (($Values | ForEach-Object {
+        $value = [string]$_
+        if ($value -notmatch '[ \t"]') {
+            $value
+        }
+        else {
+            '"' + ($value.Replace('"', '""')) + '"'
+        }
+    }) -join ' ')
+}
+
+function Stop-SqlPackageProcessTree {
+    param($Process)
+
+    if ($null -eq $Process) {
+        return
+    }
+
+    try {
+        if ($Process.HasExited) {
+            return
+        }
+    }
+    catch {
+    }
+
+    $processId = $Process.Id
+    try {
+        $Process.Kill($true)
+    }
+    catch {
+        try {
+            Get-CimInstance -ClassName Win32_Process -Filter "ParentProcessId = $processId" -ErrorAction SilentlyContinue |
+                ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+        }
+        catch {
+        }
+        Stop-Process -Id $processId -Force -ErrorAction SilentlyContinue
+    }
+
+    try {
+        $null = $Process.WaitForExit(15000)
+    }
+    catch {
+    }
+}
+
+function Read-SqlPackageRedirectedChunk {
+    param(
+        [string]$Path,
+        [ref]$Offset
+    )
+
+    if (-not (Test-Path -LiteralPath $Path)) {
+        return ""
+    }
+
+    $content = Get-Content -LiteralPath $Path -Raw -ErrorAction SilentlyContinue
+    if ([string]::IsNullOrEmpty($content)) {
+        return ""
+    }
+
+    if ($content.Length -le $Offset.Value) {
+        return $content
+    }
+
+    $newText = $content.Substring($Offset.Value)
+    $Offset.Value = $content.Length
+    if (-not [string]::IsNullOrWhiteSpace($newText)) {
+        Write-Host $newText.TrimEnd()
+    }
+
+    return $content
+}
+
+function Invoke-SqlPackageProcess {
+    param(
+        [string[]]$SqlPackageArguments,
+        [int]$HungTransportGraceSeconds = 60
+    )
+
+    $stdoutPath = Join-Path ([System.IO.Path]::GetTempPath()) ("queenzone-sqlpackage-out-{0}.log" -f [Guid]::NewGuid().ToString("N"))
+    $stderrPath = Join-Path ([System.IO.Path]::GetTempPath()) ("queenzone-sqlpackage-err-{0}.log" -f [Guid]::NewGuid().ToString("N"))
+    $dotnetArgs = @('tool', 'run', 'sqlpackage') + $SqlPackageArguments
+    $argumentString = ConvertTo-WindowsProcessArguments $dotnetArgs
+
+    $process = $null
+    $stdoutOffset = 0
+    $stderrOffset = 0
+    $sawTransient = $false
+    $graceDeadline = $null
+
+    try {
+        # Start-Process -RedirectStandard* lets us poll for a TCP drop while
+        # sqlpackage is still alive. PS7 treats -ArgumentList as discrete argv
+        # entries; Windows PowerShell 5.1 wants one pre-quoted argument string.
+        if ($PSVersionTable.PSVersion.Major -ge 6) {
+            $process = Start-Process -FilePath "dotnet" -ArgumentList $dotnetArgs `
+                -WorkingDirectory (Get-Location).Path `
+                -NoNewWindow -PassThru `
+                -RedirectStandardOutput $stdoutPath `
+                -RedirectStandardError $stderrPath
+        }
+        else {
+            $process = Start-Process -FilePath "dotnet" -ArgumentList $argumentString `
+                -WorkingDirectory (Get-Location).Path `
+                -NoNewWindow -PassThru `
+                -RedirectStandardOutput $stdoutPath `
+                -RedirectStandardError $stderrPath
+        }
+
+        while (-not $process.HasExited) {
+            $stdout = Read-SqlPackageRedirectedChunk -Path $stdoutPath -Offset ([ref]$stdoutOffset)
+            $stderr = Read-SqlPackageRedirectedChunk -Path $stderrPath -Offset ([ref]$stderrOffset)
+            $combined = "$stdout`n$stderr"
+            if (-not $sawTransient -and (Test-SqlPackageTransientTransportError $combined)) {
+                $sawTransient = $true
+                $graceDeadline = (Get-Date).AddSeconds($HungTransportGraceSeconds)
+                Write-Host "Detected a TCP/transport error in sqlpackage output. Waiting ${HungTransportGraceSeconds}s for the process to exit before retrying the failed phase (or failing the Sync job with a named TCP/transport error)."
+            }
+            if ($sawTransient -and (Get-Date) -gt $graceDeadline) {
+                Write-Host "sqlpackage did not exit after a TCP/transport error. Stopping the hung process so this phase can retry or fail clearly instead of sitting until the workflow cancels."
+                Stop-SqlPackageProcessTree -Process $process
+                break
+            }
+            Start-Sleep -Seconds 2
+        }
+
+        try {
+            $null = $process.WaitForExit(5000)
+        }
+        catch {
+        }
+
+        $null = Read-SqlPackageRedirectedChunk -Path $stdoutPath -Offset ([ref]$stdoutOffset)
+        $null = Read-SqlPackageRedirectedChunk -Path $stderrPath -Offset ([ref]$stderrOffset)
+
+        $output = ""
+        if (Test-Path -LiteralPath $stdoutPath) {
+            $output += (Get-Content -LiteralPath $stdoutPath -Raw -ErrorAction SilentlyContinue)
+        }
+        if (Test-Path -LiteralPath $stderrPath) {
+            $output += "`n" + (Get-Content -LiteralPath $stderrPath -Raw -ErrorAction SilentlyContinue)
+        }
+
+        $exitCode = 1
+        try {
+            if ($null -ne $process.ExitCode) {
+                $exitCode = $process.ExitCode
+            }
+        }
+        catch {
+            $exitCode = 1
+        }
+
+        return @{
+            ExitCode = $exitCode
+            Output   = $output
+        }
+    }
+    finally {
+        Remove-Item -LiteralPath $stdoutPath, $stderrPath -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Invoke-SqlPackagePhase {
+    param(
+        [Parameter(Mandatory = $true)][string]$PhaseName,
+        [Parameter(Mandatory = $true)][string[]]$SqlPackageArguments,
+        [int]$MaxAttempts = 3,
+        [int[]]$BackoffSeconds = @(20, 45),
+        [scriptblock]$Runner,
+        [scriptblock]$BeforeAttempt
+    )
+
+    if ($MaxAttempts -lt 1) {
+        throw "SqlPackageTransientAttempts must be at least 1."
+    }
+
+    if (-not $Runner) {
+        $Runner = {
+            param($PhaseArguments)
+            Invoke-SqlPackageProcess -SqlPackageArguments $PhaseArguments
+        }
+    }
+
+    for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
+        if ($BeforeAttempt) {
+            & $BeforeAttempt
+        }
+
+        Write-Host "sqlpackage $PhaseName attempt $attempt of $MaxAttempts..."
+        $result = & $Runner $SqlPackageArguments
+        if ($null -eq $result) {
+            $result = @{ ExitCode = 1; Output = "" }
+        }
+
+        if ([int]$result.ExitCode -eq 0) {
+            return
+        }
+
+        $isTransient = Test-SqlPackageTransientTransportError ([string]$result.Output)
+        if ($isTransient -and $attempt -lt $MaxAttempts) {
+            $delayIndex = [Math]::Min($attempt - 1, $BackoffSeconds.Length - 1)
+            $delay = [int]$BackoffSeconds[$delayIndex]
+            Write-Host "Transient TCP/transport error during sqlpackage $PhaseName (attempt $attempt of $MaxAttempts). Retrying the failed phase in ${delay}s..."
+            if ($delay -gt 0) {
+                Start-Sleep -Seconds $delay
+            }
+            continue
+        }
+
+        if ($isTransient) {
+            throw "sqlpackage $PhaseName failed after $MaxAttempts attempts due to a TCP/transport error (connection forcibly closed, reset, or transport timeout). Live Azure SQL dropped the connection during $PhaseName. This is not a SQL Express install failure and must not surface as a silent workflow cancel. Re-run the nightly Sync job. If a second consecutive schedule still drops, check Australia East SQL (restart / DTU / firewall). Last exit code: $($result.ExitCode)"
+        }
+
+        throw "sqlpackage $PhaseName failed with exit code $($result.ExitCode)"
+    }
+}
+
+function Invoke-SyncLegacyDbSelfTest {
+    $tcp = 'A transport-level error has occurred when receiving results from the server. (provider: TCP Provider, error: 0 - An existing connection was forcibly closed by the remote host.)'
+    $reset = 'The connection was reset by the remote host (connection reset).'
+    $transportTimeout = 'A transport-level error has occurred when receiving results from the server. (provider: TCP Provider, error: 0 - The semaphore timeout period has expired.)'
+    $containedUser = 'Error SQL72014: An error occurred during deployment. Msg 33233. You can only create a user with a password in a contained database.'
+    $mdfCollision = 'Msg 5170 Cannot create file queenzone_legacy_sync_refresh.mdf because it already exists.'
+
+    if (-not (Test-SqlPackageTransientTransportError $tcp)) {
+        throw "Classifier missed TCP forcibly closed."
+    }
+    if (-not (Test-SqlPackageTransientTransportError $reset)) {
+        throw "Classifier missed connection reset."
+    }
+    if (-not (Test-SqlPackageTransientTransportError $transportTimeout)) {
+        throw "Classifier missed transport timeout."
+    }
+    if (Test-SqlPackageTransientTransportError $containedUser) {
+        throw "Classifier must not treat contained-user publish errors (#1334) as transient."
+    }
+    if (Test-SqlPackageTransientTransportError $mdfCollision) {
+        throw "Classifier must not treat staging filename collisions (#1384/#1386) as transient."
+    }
+    if (Test-SqlPackageTransientTransportError 'Timeout expired. The timeout period elapsed prior to completion of the operation.') {
+        throw "Classifier must not treat a SQL command timeout as a transport drop."
+    }
+
+    $quoted = ConvertTo-WindowsProcessArguments @(
+        'tool',
+        'run',
+        'sqlpackage',
+        '/p:ExcludeObjectTypes=Views;Users;Logins;Permissions;RoleMembership',
+        '/SourceConnectionString:Server=example;Database=queenzone-db'
+    )
+    if ($quoted -notmatch '/p:ExcludeObjectTypes=Views;Users;Logins;Permissions;RoleMembership') {
+        throw "Argument quoting must keep the #1334 Publish exclusions intact."
+    }
+
+    $state = @{ Calls = 0 }
+    $runner = {
+        param($PhaseArguments)
+        $state.Calls++
+        if ($state.Calls -eq 1) {
+            return @{ ExitCode = 1; Output = $tcp }
+        }
+        return @{ ExitCode = 0; Output = "ok" }
+    }
+    Invoke-SqlPackagePhase -PhaseName "Extract" -SqlPackageArguments @("/Action:Extract") -MaxAttempts 3 -BackoffSeconds @(0, 0) -Runner $runner
+    if ($state.Calls -ne 2) {
+        throw "Expected Extract to retry once then succeed; got $($state.Calls) attempts."
+    }
+
+    $state.Calls = 0
+    $exhausted = $false
+    try {
+        $failRunner = {
+            param($PhaseArguments)
+            $state.Calls++
+            return @{ ExitCode = 1; Output = $tcp }
+        }
+        Invoke-SqlPackagePhase -PhaseName "Publish" -SqlPackageArguments @("/Action:Publish") -MaxAttempts 3 -BackoffSeconds @(0, 0) -Runner $failRunner
+    }
+    catch {
+        $exhausted = $true
+        if ($_.Exception.Message -notmatch 'TCP/transport') {
+            throw "Exhausted retries must name TCP/transport. Message: $($_.Exception.Message)"
+        }
+        if ($_.Exception.Message -notmatch 'Publish') {
+            throw "Exhausted retries must name the failed phase. Message: $($_.Exception.Message)"
+        }
+    }
+    if (-not $exhausted) {
+        throw "Expected Publish to fail after exhausted TCP/transport retries."
+    }
+    if ($state.Calls -ne 3) {
+        throw "Expected 3 Publish attempts; got $($state.Calls)."
+    }
+
+    $state.Calls = 0
+    $permanentFailed = $false
+    try {
+        $permanentRunner = {
+            param($PhaseArguments)
+            $state.Calls++
+            return @{ ExitCode = 1; Output = $containedUser }
+        }
+        Invoke-SqlPackagePhase -PhaseName "Publish" -SqlPackageArguments @("/Action:Publish") -MaxAttempts 3 -BackoffSeconds @(0, 0) -Runner $permanentRunner
+    }
+    catch {
+        $permanentFailed = $true
+        if ($_.Exception.Message -match 'TCP/transport') {
+            throw "Permanent publish errors must not be reported as TCP/transport."
+        }
+    }
+    if (-not $permanentFailed) {
+        throw "Expected a permanent Publish failure to throw."
+    }
+    if ($state.Calls -ne 1) {
+        throw "Permanent errors must not retry; got $($state.Calls) attempts."
+    }
+
+    $wrapperPattern = 'TCP/transport|forcibly closed|connection reset|transport-level|transport timeout'
+    $namedFailure = 'sqlpackage Extract failed after 3 attempts due to a TCP/transport error (connection forcibly closed, reset, or transport timeout).'
+    if ($namedFailure -notmatch $wrapperPattern) {
+        throw "Nightly Sync wrapper must annotate the script's named TCP/transport failure."
+    }
+
+    $smokeOut = Join-Path ([System.IO.Path]::GetTempPath()) ("queenzone-dotnet-smoke-out-{0}.log" -f [Guid]::NewGuid().ToString("N"))
+    $smokeErr = Join-Path ([System.IO.Path]::GetTempPath()) ("queenzone-dotnet-smoke-err-{0}.log" -f [Guid]::NewGuid().ToString("N"))
+    try {
+        $smoke = Start-Process -FilePath "dotnet" -ArgumentList @('--version') -NoNewWindow -PassThru -Wait -RedirectStandardOutput $smokeOut -RedirectStandardError $smokeErr
+        if ($smoke.ExitCode -ne 0) {
+            throw "Process-launch smoke failed with exit $($smoke.ExitCode)."
+        }
+        $versionText = (Get-Content -LiteralPath $smokeOut -Raw -ErrorAction SilentlyContinue)
+        if ($versionText -notmatch '\d+\.\d+') {
+            throw "Process-launch smoke did not print a dotnet version."
+        }
+    }
+    finally {
+        Remove-Item -LiteralPath $smokeOut, $smokeErr -Force -ErrorAction SilentlyContinue
+    }
+
+    Write-Host "Sync-LegacyDbToSqlExpress.ps1 self-test passed."
+}
+
+if ($SelfTest) {
+    Invoke-SyncLegacyDbSelfTest
+    exit 0
+}
+
+$sourceConnectionString = $env:ConnectionStrings__QueenZoneLegacy
+if ([string]::IsNullOrWhiteSpace($sourceConnectionString)) {
+    Write-Error "ConnectionStrings__QueenZoneLegacy is not set."
 }
 
 function Get-SourceSchemaUserNames([string] $ConnectionString) {
@@ -108,12 +506,18 @@ try {
     $schemaUserNames = @(Get-SourceSchemaUserNames $sourceConnectionString)
 
     Write-Host "Extracting live legacy database (schema + data) to $dacpacPath..."
-    dotnet tool run sqlpackage /Action:Extract `
-        /SourceConnectionString:"$sourceConnectionString" `
-        /TargetFile:"$dacpacPath" `
-        /p:ExtractAllTableData=True `
-        /p:VerifyExtraction=False
-    if ($LASTEXITCODE -ne 0) { throw "sqlpackage extract failed with exit code $LASTEXITCODE" }
+    Invoke-SqlPackagePhase -PhaseName "Extract" -MaxAttempts $SqlPackageTransientAttempts -SqlPackageArguments @(
+        "/Action:Extract",
+        "/SourceConnectionString:$sourceConnectionString",
+        "/TargetFile:$dacpacPath",
+        "/p:ExtractAllTableData=True",
+        "/p:VerifyExtraction=False"
+    ) -BeforeAttempt {
+        if (Test-Path -LiteralPath $dacpacPath) {
+            Write-Host "Removing incomplete dacpac from a previous Extract attempt: $dacpacPath"
+            Remove-Item -LiteralPath $dacpacPath -Force -ErrorAction SilentlyContinue
+        }
+    }
 
     Write-Host "Recreating staging database $stagingDatabase..."
 
@@ -146,13 +550,14 @@ IF DATABASE_PRINCIPAL_ID(N'$ownerLiteral') IS NULL
     }
 
     Write-Host "Publishing dacpac into SQLEXPRESS as staging database $stagingDatabase (excluding views and Azure security objects)..."
-    dotnet tool run sqlpackage /Action:Publish `
-        /SourceFile:"$dacpacPath" `
-        /TargetConnectionString:"Server=localhost\$InstanceName;Database=$stagingDatabase;Integrated Security=True;TrustServerCertificate=True" `
-        /p:ExcludeObjectTypes="Views;Users;Logins;Permissions;RoleMembership" `
-        /p:ScriptDatabaseOptions=False `
-        /p:AllowIncompatiblePlatform=True
-    if ($LASTEXITCODE -ne 0) { throw "sqlpackage publish failed with exit code $LASTEXITCODE" }
+    Invoke-SqlPackagePhase -PhaseName "Publish" -MaxAttempts $SqlPackageTransientAttempts -SqlPackageArguments @(
+        "/Action:Publish",
+        "/SourceFile:$dacpacPath",
+        "/TargetConnectionString:Server=localhost\$InstanceName;Database=$stagingDatabase;Integrated Security=True;TrustServerCertificate=True",
+        "/p:ExcludeObjectTypes=Views;Users;Logins;Permissions;RoleMembership",
+        "/p:ScriptDatabaseOptions=False",
+        "/p:AllowIncompatiblePlatform=True"
+    )
 
     $verifySql = @"
 USE [$stagingDatabase];
