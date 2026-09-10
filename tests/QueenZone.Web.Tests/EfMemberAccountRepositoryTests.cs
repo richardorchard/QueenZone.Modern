@@ -436,6 +436,29 @@ public sealed class EfMemberAccountRepositoryTests : IAsyncDisposable
         Assert.Empty(await repository.ListLocalPasswordAccountsAsync());
     }
 
+    [Fact]
+    public async Task ListActiveMemberIdsAsync_ExcludesDeletionRequestedAndUnknownIds()
+    {
+        var active = await SeedAccountAsync("active@example.com", "Active");
+        var leaving = await SeedAccountAsync("leaving@example.com", "Leaving");
+        var unknownId = Guid.NewGuid();
+        await repository.RequestDeletionAsync(
+            leaving.Id,
+            new DateTime(2026, 8, 12, 7, 0, 0, DateTimeKind.Utc));
+
+        var result = await repository.ListActiveMemberIdsAsync([active.Id, leaving.Id, unknownId]);
+
+        Assert.Equal([active.Id], result);
+    }
+
+    [Fact]
+    public async Task ListActiveMemberIdsAsync_EmptyInput_DoesNotQuery()
+    {
+        var result = await repository.ListActiveMemberIdsAsync([]);
+
+        Assert.Empty(result);
+    }
+
     private async Task<MemberAccount> SeedAccountAsync(string email, string displayName)
     {
         return await repository.CreateAsync(new MemberAccount
