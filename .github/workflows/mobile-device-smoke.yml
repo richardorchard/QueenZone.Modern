@@ -172,12 +172,15 @@ jobs:
             echo "PROVE_FAILURE_ARGS=" >> "$GITHUB_ENV"
           fi
 
+      # Hosted GHA Linux only: API 34 + stable emulator channel. API 36 qemu
+      # exited mid-run (qemu_state=missing, not OOM) on both attempts (#1458).
       - name: Run Android device smoke
         id: android-smoke
         continue-on-error: true
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 36
+          api-level: 34
+          channel: stable
           target: google_apis
           arch: x86_64
           cores: 3
@@ -218,7 +221,8 @@ jobs:
         if: steps.android-smoke-classify.outputs.retry == 'true'
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 36
+          api-level: 34
+          channel: stable
           target: google_apis
           arch: x86_64
           cores: 3
@@ -529,12 +533,14 @@ jobs:
           } > src/QueenZone.Mobile/maestro-results/harness.log
           echo "DEVICE_SUITE_ARGS=--suite journeys" >> "$GITHUB_ENV"
 
+      # Hosted GHA Linux only: API 34 + stable emulator channel (#1458).
       - name: Run Android device journeys
         id: android-journeys
         continue-on-error: true
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 36
+          api-level: 34
+          channel: stable
           target: google_apis
           arch: x86_64
           cores: 3
@@ -569,7 +575,8 @@ jobs:
         if: steps.android-journeys-classify.outputs.retry == 'true'
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 36
+          api-level: 34
+          channel: stable
           target: google_apis
           arch: x86_64
           cores: 3
