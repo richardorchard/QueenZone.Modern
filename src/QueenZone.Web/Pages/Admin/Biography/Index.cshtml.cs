@@ -7,6 +7,7 @@ namespace QueenZone.Web.Pages.Admin.Biography;
 
 public sealed class IndexModel(
     IBiographyRepository biographyRepository,
+    PublicQueryCacheService publicQueryCache,
     CoreSitemapService coreSitemapService,
     IOutputCacheStore outputCacheStore,
     UgcHtml ugcHtml) : AdminBiographyPageModel
@@ -46,17 +47,23 @@ public sealed class IndexModel(
         }
 
         var id = await biographyRepository.CreateAsync(draft, cancellationToken);
-        await InvalidatePublicBiographyCachesAsync(coreSitemapService, outputCacheStore, cancellationToken);
+        await InvalidatePublicBiographyCachesAsync(
+            publicQueryCache,
+            coreSitemapService,
+            outputCacheStore,
+            cancellationToken);
         TempData[MessageKey] = $"Created chapter \"{draft.Title}\".";
         TempData[MessageKindKey] = "success";
         return Redirect($"/admin/biography/{id}/edit");
     }
 
     internal static async Task InvalidatePublicBiographyCachesAsync(
+        PublicQueryCacheService publicQueryCache,
         CoreSitemapService coreSitemapService,
         IOutputCacheStore outputCacheStore,
         CancellationToken cancellationToken)
     {
+        publicQueryCache.InvalidateBiographyCache();
         await coreSitemapService.InvalidateAsync(cancellationToken);
         await outputCacheStore.EvictByTagAsync(PublicOutputCachePolicies.PublicHtmlTag, cancellationToken);
     }

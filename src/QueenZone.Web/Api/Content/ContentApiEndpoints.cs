@@ -19,7 +19,10 @@ namespace QueenZone.Web;
 /// use <see cref="PublicQueryCacheService"/> (same helpers as Razor photography
 /// pages); detail neighbors still come from <see cref="IPhotoRepository"/>.
 /// Fan-performance list/detail use the same query cache so admin publish/hide
-/// is visible without a process restart.
+/// is visible without a process restart. News/articles archive pages, the
+/// published timeline, random quote/trivia, biography chapters, and discography
+/// albums also go through <see cref="PublicQueryCacheService"/> (repository
+/// shapes only; mapping, paging, and random pick stay in the handlers).
 /// Category items default and clamp <c>pageSize</c> to
 /// <see cref="PhotoRoutes.CategoryPageSize"/>.
 /// </summary>
@@ -187,7 +190,7 @@ public static class ContentApiEndpoints
     }
 
     internal static async Task<IResult> GetNewsListAsync(
-        INewsRepository newsRepository,
+        PublicQueryCacheService publicQueryCache,
         NewsDiscussionComposer newsDiscussion,
         int? page,
         int? pageSize,
@@ -197,8 +200,12 @@ public static class ContentApiEndpoints
     {
         var request = ApiPagination.Normalize(page, pageSize);
         var filter = NewsArchiveFilter.Parse(decade, year);
-        var items = await newsRepository.GetArchivePageAsync(request.Page, request.PageSize, filter, cancellationToken);
-        var totalCount = await newsRepository.GetPublishedCountAsync(filter, cancellationToken);
+        var items = await publicQueryCache.GetNewsArchivePageAsync(
+            request.Page,
+            request.PageSize,
+            filter,
+            cancellationToken);
+        var totalCount = await publicQueryCache.GetNewsPublishedCountAsync(filter, cancellationToken);
 
         var response = ApiPagedResponse<NewsListItemDto>.Create(
             await newsDiscussion.ToListItemsAsync(items, cancellationToken),
@@ -236,14 +243,17 @@ public static class ContentApiEndpoints
     }
 
     internal static async Task<IResult> GetArticlesListAsync(
-        IArticlesRepository articlesRepository,
+        PublicQueryCacheService publicQueryCache,
         int? page,
         int? pageSize,
         CancellationToken cancellationToken)
     {
         var request = ApiPagination.Normalize(page, pageSize, ArticlesRoutes.ArchivePageSize);
-        var items = await articlesRepository.GetArchivePageAsync(request.Page, request.PageSize, cancellationToken);
-        var totalCount = await articlesRepository.GetPublishedCountAsync(cancellationToken);
+        var items = await publicQueryCache.GetArticlesArchivePageAsync(
+            request.Page,
+            request.PageSize,
+            cancellationToken);
+        var totalCount = await publicQueryCache.GetArticlePublishedCountAsync(cancellationToken);
 
         var response = ApiPagedResponse<ArticleListItemDto>.Create(
             ContentApiMapper.ToArticleListItems(items),
@@ -272,13 +282,13 @@ public static class ContentApiEndpoints
     }
 
     internal static async Task<IResult> GetTimelineEventsAsync(
-        IQueenHistoryRepository historyRepository,
+        PublicQueryCacheService publicQueryCache,
         int? page,
         int? pageSize,
         CancellationToken cancellationToken)
     {
         var request = ApiPagination.Normalize(page, pageSize);
-        var events = (await historyRepository.GetAllPublishedAsync(cancellationToken))
+        var events = (await publicQueryCache.GetAllPublishedHistoryEventsAsync(cancellationToken))
             .OrderBy(e => e.EventDate)
             .ThenByDescending(e => e.Importance)
             .ToList();
@@ -298,11 +308,11 @@ public static class ContentApiEndpoints
     }
 
     internal static async Task<IResult> GetTimelineEventDetailAsync(
-        IQueenHistoryRepository historyRepository,
+        PublicQueryCacheService publicQueryCache,
         int id,
         CancellationToken cancellationToken)
     {
-        var historyEvent = (await historyRepository.GetAllPublishedAsync(cancellationToken))
+        var historyEvent = (await publicQueryCache.GetAllPublishedHistoryEventsAsync(cancellationToken))
             .FirstOrDefault(item => item.Id == id);
         if (historyEvent is null)
         {
@@ -343,10 +353,10 @@ public static class ContentApiEndpoints
     }
 
     internal static async Task<IResult> GetRandomQuoteAsync(
-        IQuoteRepository quoteRepository,
+        PublicQueryCacheService publicQueryCache,
         CancellationToken cancellationToken)
     {
-        var quote = await quoteRepository.GetRandomPublishedAsync(cancellationToken);
+        var quote = await publicQueryCache.GetRandomPublishedQuoteAsync(cancellationToken);
 
         // ASP.NET Core Ok(null) / Json(null) write an empty 200. The contract is JSON null.
         QuoteDto? payload = quote is null ? null : ContentApiMapper.ToQuoteDto(quote);
@@ -356,10 +366,10 @@ public static class ContentApiEndpoints
     }
 
     internal static async Task<IResult> GetRandomTriviaAsync(
-        ITriviaRepository triviaRepository,
+        PublicQueryCacheService publicQueryCache,
         CancellationToken cancellationToken)
     {
-        var fact = await triviaRepository.GetRandomPublishedAsync(cancellationToken);
+        var fact = await publicQueryCache.GetRandomPublishedTriviaAsync(cancellationToken);
 
         // ASP.NET Core Ok(null) / Json(null) write an empty 200. The contract is JSON null.
         TriviaDto? payload = fact is null ? null : ContentApiMapper.ToTriviaDto(fact);
@@ -440,14 +450,14 @@ public static class ContentApiEndpoints
     }
 
     internal static async Task<IResult> GetBiographyChaptersAsync(
-        IBiographyRepository biographyRepository,
+        PublicQueryCacheService publicQueryCache,
         int? page,
         int? pageSize,
         CancellationToken cancellationToken)
     {
         var request = ApiPagination.Normalize(page, pageSize);
         var chapters = BiographyChapterOrdering.ByDisplaySequenceAscending(
-            await biographyRepository.GetChaptersAsync(cancellationToken));
+            await publicQueryCache.GetBiographyChaptersAsync(cancellationToken));
 
         var pageItems = chapters
             .Skip((request.Page - 1) * request.PageSize)
@@ -482,13 +492,13 @@ public static class ContentApiEndpoints
     }
 
     internal static async Task<IResult> GetAlbumsAsync(
-        IDiscographyRepository discographyRepository,
+        PublicQueryCacheService publicQueryCache,
         int? page,
         int? pageSize,
         CancellationToken cancellationToken)
     {
         var request = ApiPagination.Normalize(page, pageSize);
-        var albums = await discographyRepository.GetAlbumsAsync(cancellationToken);
+        var albums = await publicQueryCache.GetDiscographyAlbumsAsync(cancellationToken);
 
         var pageItems = albums
             .Skip((request.Page - 1) * request.PageSize)

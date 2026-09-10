@@ -6,6 +6,7 @@ namespace QueenZone.Web.Pages.Admin.Trivia;
 
 public sealed class EditPostModel(
     ITriviaRepository triviaRepository,
+    PublicQueryCacheService publicQueryCache,
     IOutputCacheStore outputCacheStore) : AdminTriviaPageModel
 {
     public TriviaFormViewModel? Form { get; private set; }
@@ -33,7 +34,7 @@ public sealed class EditPostModel(
         }
 
         await triviaRepository.UpdateAsync(id, draft, cancellationToken);
-        await IndexModel.InvalidatePublicHomeCacheAsync(outputCacheStore, cancellationToken);
+        await IndexModel.InvalidatePublicHomeCacheAsync(publicQueryCache, outputCacheStore, cancellationToken);
 
         TempData[MessageKey] = "Saved trivia fact.";
         TempData[MessageKindKey] = "success";

@@ -14,7 +14,11 @@ public sealed class PublicQueryCacheService(
     IQueenHistoryRepository queenHistoryRepository,
     IPhotoRepository photoRepository,
     ILiveActivityQueryService liveActivityQuery,
-    IFanPerformanceRepository fanPerformanceRepository)
+    IFanPerformanceRepository fanPerformanceRepository,
+    IQuoteRepository quoteRepository,
+    ITriviaRepository triviaRepository,
+    IBiographyRepository biographyRepository,
+    IDiscographyRepository discographyRepository)
 {
     private static readonly MemoryCacheEntryOptions VersionEntryOptions = new()
     {
@@ -24,7 +28,7 @@ public sealed class PublicQueryCacheService(
     /// <summary>
     /// Process-wide per-key gates so concurrent cold-cache hits share a single factory execution
     /// even when <see cref="PublicQueryCacheService"/> is scoped (one instance per HTTP request).
-    /// Key set is small (news version variants, forum stats, on-this-day dates, photo pages).
+    /// Key set is small (news/article version variants, catalog pools, forum stats, history, photo pages).
     /// </summary>
     private static readonly ConcurrentDictionary<string, SemaphoreSlim> LoadGates =
         new(StringComparer.Ordinal);
@@ -39,29 +43,70 @@ public sealed class PublicQueryCacheService(
             cancellationToken);
     }
 
-    public Task<int> GetNewsPublishedCountAsync(CancellationToken cancellationToken = default)
+    public Task<int> GetNewsPublishedCountAsync(CancellationToken cancellationToken = default) =>
+        GetNewsPublishedCountAsync(NewsArchiveFilter.None, cancellationToken);
+
+    public Task<int> GetNewsPublishedCountAsync(
+        NewsArchiveFilter filter,
+        CancellationToken cancellationToken = default)
     {
         var version = GetNewsCacheVersion();
+        var key = filter.IsActive
+            ? PublicQueryCacheKeys.NewsPublishedCount(version, filter.DecadeStartYear, filter.Year)
+            : PublicQueryCacheKeys.NewsPublishedCount(version);
         return GetOrCreateAsync(
-            PublicQueryCacheKeys.NewsPublishedCount(version),
+            key,
             options.Value.NewsCacheDuration,
-            () => newsRepository.GetPublishedCountAsync(cancellationToken: cancellationToken),
+            () => newsRepository.GetPublishedCountAsync(filter, cancellationToken),
             cancellationToken);
     }
 
-    public Task<int> GetArticlePublishedCountAsync(CancellationToken cancellationToken = default) =>
-        GetOrCreateAsync(
-            PublicQueryCacheKeys.ArticlePublishedCount,
+    public Task<IReadOnlyList<NewsItem>> GetNewsArchivePageAsync(
+        int page,
+        int pageSize,
+        NewsArchiveFilter filter = default,
+        CancellationToken cancellationToken = default)
+    {
+        var version = GetNewsCacheVersion();
+        return GetOrCreateAsync(
+            PublicQueryCacheKeys.NewsArchivePage(version, page, pageSize, filter.DecadeStartYear, filter.Year),
+            options.Value.NewsCacheDuration,
+            () => newsRepository.GetArchivePageAsync(page, pageSize, filter, cancellationToken),
+            cancellationToken);
+    }
+
+    public Task<int> GetArticlePublishedCountAsync(CancellationToken cancellationToken = default)
+    {
+        var version = GetArticleCacheVersion();
+        return GetOrCreateAsync(
+            PublicQueryCacheKeys.ArticlePublishedCount(version),
             options.Value.ArticleCountCacheDuration,
             () => articlesRepository.GetPublishedCountAsync(cancellationToken),
             cancellationToken);
+    }
 
-    public Task<IReadOnlyList<ArticleItem>> GetLatestArticlesAsync(int count, CancellationToken cancellationToken = default) =>
-        GetOrCreateAsync(
-            PublicQueryCacheKeys.LatestArticles(count),
+    public Task<IReadOnlyList<ArticleItem>> GetLatestArticlesAsync(int count, CancellationToken cancellationToken = default)
+    {
+        var version = GetArticleCacheVersion();
+        return GetOrCreateAsync(
+            PublicQueryCacheKeys.LatestArticles(version, count),
             options.Value.ArticleCountCacheDuration,
             () => articlesRepository.GetLatestAsync(count, cancellationToken),
             cancellationToken);
+    }
+
+    public Task<IReadOnlyList<ArticleItem>> GetArticlesArchivePageAsync(
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        var version = GetArticleCacheVersion();
+        return GetOrCreateAsync(
+            PublicQueryCacheKeys.ArticlesArchivePage(version, page, pageSize),
+            options.Value.ArticleCountCacheDuration,
+            () => articlesRepository.GetArchivePageAsync(page, pageSize, cancellationToken),
+            cancellationToken);
+    }
 
     public Task<IReadOnlyList<ForumCategoryItem>> GetForumCategoriesAsync(CancellationToken cancellationToken = default) =>
         GetOrCreateAsync(
@@ -124,6 +169,63 @@ public sealed class PublicQueryCacheService(
             () => queenHistoryRepository.GetAroundThisDayAsync(date, dayWindow, count, cancellationToken),
             cancellationToken);
     }
+
+    public Task<IReadOnlyList<QueenHistoryEvent>> GetAllPublishedHistoryEventsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var version = GetHistoryCacheVersion();
+        return GetOrCreateAsync(
+            PublicQueryCacheKeys.AllPublishedHistory(version),
+            options.Value.OnThisDayCacheDuration,
+            () => queenHistoryRepository.GetAllPublishedAsync(cancellationToken),
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// Caches the published quote pool and picks <see cref="Random.Shared"/> per request
+    /// so consecutive callers do not freeze on one quote.
+    /// </summary>
+    public async Task<QuoteItem?> GetRandomPublishedQuoteAsync(CancellationToken cancellationToken = default)
+    {
+        var published = await GetPublishedQuotesAsync(cancellationToken);
+        if (published.Count == 0)
+        {
+            return null;
+        }
+
+        return published[Random.Shared.Next(published.Count)];
+    }
+
+    /// <summary>
+    /// Caches the published trivia pool and picks <see cref="Random.Shared"/> per request
+    /// so consecutive callers do not freeze on one fact.
+    /// </summary>
+    public async Task<TriviaFactItem?> GetRandomPublishedTriviaAsync(CancellationToken cancellationToken = default)
+    {
+        var published = await GetPublishedTriviaAsync(cancellationToken);
+        if (published.Count == 0)
+        {
+            return null;
+        }
+
+        return published[Random.Shared.Next(published.Count)];
+    }
+
+    public Task<IReadOnlyList<BiographyChapterItem>> GetBiographyChaptersAsync(
+        CancellationToken cancellationToken = default) =>
+        GetOrCreateAsync(
+            PublicQueryCacheKeys.BiographyChapters,
+            options.Value.CatalogCacheDuration,
+            () => biographyRepository.GetChaptersAsync(cancellationToken),
+            cancellationToken);
+
+    public Task<IReadOnlyList<AlbumSummary>> GetDiscographyAlbumsAsync(
+        CancellationToken cancellationToken = default) =>
+        GetOrCreateAsync(
+            PublicQueryCacheKeys.DiscographyAlbums,
+            options.Value.CatalogCacheDuration,
+            () => discographyRepository.GetAlbumsAsync(cancellationToken),
+            cancellationToken);
 
     public Task<IReadOnlyList<PhotoCategory>> GetPhotoCategoriesAsync(CancellationToken cancellationToken = default)
     {
@@ -205,7 +307,7 @@ public sealed class PublicQueryCacheService(
     }
 
     /// <summary>
-    /// Invalidates all public news cache entries (latest lists for any count and published count)
+    /// Invalidates all public news cache entries (latest lists, archive pages, and published counts)
     /// by bumping the news cache version. Call after publish, unpublish, delete of published news,
     /// or edit of published news.
     /// </summary>
@@ -225,20 +327,27 @@ public sealed class PublicQueryCacheService(
     }
 
     /// <summary>
-    /// Evicts the public legacy-article published count so archive pagination refreshes after
-    /// editorial changes (or import tooling) that alter the published set.
+    /// Invalidates public article cache entries (latest lists, archive pages, published count)
+    /// by bumping the article cache version.
     /// </summary>
-    public void InvalidateArticleCountCache()
-    {
-        cache.Remove(PublicQueryCacheKeys.ArticlePublishedCount);
-        cache.Remove(PublicQueryCacheKeys.LatestArticles(ArticlesRoutes.HomeFeaturedCount));
-    }
+    public void InvalidateArticleCountCache() => InvalidateArticlesCache();
 
     public void InvalidateArticlesCache()
     {
-        cache.Remove(PublicQueryCacheKeys.LatestArticles(ArticlesRoutes.HomeFeaturedCount));
-        InvalidateArticleCountCache();
+        cache.Set(PublicQueryCacheKeys.ArticleVersion, CreateCacheVersion(), VersionEntryOptions);
     }
+
+    public void InvalidateQuotesCache() => cache.Remove(PublicQueryCacheKeys.PublishedQuotes);
+
+    public void InvalidateTriviaCache() => cache.Remove(PublicQueryCacheKeys.PublishedTrivia);
+
+    public void InvalidateBiographyCache() => cache.Remove(PublicQueryCacheKeys.BiographyChapters);
+
+    /// <summary>
+    /// Evicts the public discography album list. No admin write path exists today;
+    /// TTL is the freshness fallback until a sync/admin writer is wired.
+    /// </summary>
+    public void InvalidateDiscographyCache() => cache.Remove(PublicQueryCacheKeys.DiscographyAlbums);
 
     /// <summary>
     /// Bumps the photo cache version so category lists and paged grids refresh after admin writes.
@@ -264,6 +373,8 @@ public sealed class PublicQueryCacheService(
 
     private string GetNewsCacheVersion() => GetOrInitVersion(PublicQueryCacheKeys.NewsVersion);
 
+    private string GetArticleCacheVersion() => GetOrInitVersion(PublicQueryCacheKeys.ArticleVersion);
+
     private string GetPhotoCacheVersion() => GetOrInitVersion(PublicQueryCacheKeys.PhotoVersion);
 
     private string GetHistoryCacheVersion() => GetOrInitVersion(PublicQueryCacheKeys.HistoryVersion);
@@ -281,6 +392,30 @@ public sealed class PublicQueryCacheService(
         cache.Set(key, initial, VersionEntryOptions);
         return initial;
     }
+
+    private Task<IReadOnlyList<QuoteItem>> GetPublishedQuotesAsync(CancellationToken cancellationToken) =>
+        GetOrCreateAsync(
+            PublicQueryCacheKeys.PublishedQuotes,
+            options.Value.CatalogCacheDuration,
+            async () =>
+            {
+                var all = await quoteRepository.GetAllAsync(cancellationToken);
+                IReadOnlyList<QuoteItem> published = all.Where(quote => quote.IsPublished).ToList();
+                return published;
+            },
+            cancellationToken);
+
+    private Task<IReadOnlyList<TriviaFactItem>> GetPublishedTriviaAsync(CancellationToken cancellationToken) =>
+        GetOrCreateAsync(
+            PublicQueryCacheKeys.PublishedTrivia,
+            options.Value.CatalogCacheDuration,
+            async () =>
+            {
+                var all = await triviaRepository.GetAllAsync(cancellationToken);
+                IReadOnlyList<TriviaFactItem> published = all.Where(fact => fact.IsPublished).ToList();
+                return published;
+            },
+            cancellationToken);
 
     private static string CreateCacheVersion() => Guid.NewGuid().ToString("N");
 
