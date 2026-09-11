@@ -212,7 +212,7 @@ describe('device-smoke harness (#1281)', () => {
       workflow.indexOf('  mobile-ios-journeys:'),
     );
     assert.equal((workflow.match(/\.\/gradlew --stop/g) ?? []).length, 3);
-    assert.equal((workflow.match(/api-level: 36/g) ?? []).length, 4);
+    assert.equal((workflow.match(/api-level: 34/g) ?? []).length, 4);
     assert.equal((workflow.match(/-gpu swiftshader_indirect/g) ?? []).length, 4);
     assert.match(workflow, /mobile-android-release:[\s\S]*runs-on: \[self-hosted, macOS, ARM64, queenzone\]/);
     assert.match(workflow, /mobile-android-release:[\s\S]*github\.event\.inputs\.suite == 'release'/);
