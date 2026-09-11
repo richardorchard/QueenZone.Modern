@@ -7,6 +7,7 @@ namespace QueenZone.Web.Pages.Admin.Trivia;
 
 public sealed class IndexModel(
     ITriviaRepository triviaRepository,
+    PublicQueryCacheService publicQueryCache,
     IOutputCacheStore outputCacheStore) : AdminTriviaPageModel
 {
     public IReadOnlyList<TriviaFactItem> Facts { get; private set; } = [];
@@ -74,7 +75,7 @@ public sealed class IndexModel(
         }
 
         await triviaRepository.CreateAsync(draft, cancellationToken);
-        await InvalidatePublicHomeCacheAsync(outputCacheStore, cancellationToken);
+        await InvalidatePublicHomeCacheAsync(publicQueryCache, outputCacheStore, cancellationToken);
         TempData[MessageKey] = "Added trivia fact.";
         TempData[MessageKindKey] = "success";
         return Redirect("/admin/trivia");
@@ -86,7 +87,7 @@ public sealed class IndexModel(
         CancellationToken cancellationToken)
     {
         await triviaRepository.DeleteAsync(id, cancellationToken);
-        await InvalidatePublicHomeCacheAsync(outputCacheStore, cancellationToken);
+        await InvalidatePublicHomeCacheAsync(publicQueryCache, outputCacheStore, cancellationToken);
         TempData[MessageKey] = "Deleted trivia fact.";
         TempData[MessageKindKey] = "success";
         return Redirect(BuildReturnUrl(category));
@@ -99,7 +100,7 @@ public sealed class IndexModel(
         CancellationToken cancellationToken)
     {
         await triviaRepository.SetPublishedAsync(id, !isPublished, cancellationToken);
-        await InvalidatePublicHomeCacheAsync(outputCacheStore, cancellationToken);
+        await InvalidatePublicHomeCacheAsync(publicQueryCache, outputCacheStore, cancellationToken);
         TempData[MessageKey] = !isPublished ? "Trivia fact published." : "Trivia fact unpublished.";
         TempData[MessageKindKey] = "success";
         return Redirect(BuildReturnUrl(category));
@@ -108,9 +109,11 @@ public sealed class IndexModel(
     private string BuildReturnUrl(string? category) => AdminTriviaRoutes.GetListPath(PageNumber, category);
 
     internal static async Task InvalidatePublicHomeCacheAsync(
+        PublicQueryCacheService publicQueryCache,
         IOutputCacheStore outputCacheStore,
         CancellationToken cancellationToken)
     {
+        publicQueryCache.InvalidateTriviaCache();
         await outputCacheStore.EvictByTagAsync(PublicOutputCachePolicies.PublicHtmlTag, cancellationToken);
     }
 }

@@ -20,4 +20,9 @@ public sealed class PublicQueryCacheOptions
 
     /// <summary>Short-lived: the mobile home screen's live-activity strip is meant to feel current.</summary>
     public TimeSpan LiveActivityCacheDuration { get; init; } = TimeSpan.FromSeconds(45);
+
+    /// <summary>
+    /// Stable catalog slices (published quotes/trivia pools, biography chapters, discography albums).
+    /// </summary>
+    public TimeSpan CatalogCacheDuration { get; init; } = TimeSpan.FromMinutes(30);
 }

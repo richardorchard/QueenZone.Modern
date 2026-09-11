@@ -5,7 +5,8 @@ namespace QueenZone.Web.Pages.Admin.TriviaSubmissions;
 
 public sealed class ActionModel(
     ITriviaFactSubmissionRepository triviaFactSubmissionRepository,
-    ITriviaRepository triviaRepository) : AdminTriviaSubmissionsPageModel
+    ITriviaRepository triviaRepository,
+    PublicQueryCacheService publicQueryCache) : AdminTriviaSubmissionsPageModel
 {
     [BindProperty]
     public string Text { get; set; } = string.Empty;
@@ -52,6 +53,7 @@ public sealed class ActionModel(
         }
 
         var factId = await triviaRepository.CreateAsync(draft, cancellationToken);
+        publicQueryCache.InvalidateTriviaCache();
         try
         {
             var approved = await triviaFactSubmissionRepository.ApproveAsync(
