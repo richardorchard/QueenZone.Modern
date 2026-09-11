@@ -26,6 +26,7 @@ import {
   fetchTimelinePage,
 } from './content';
 import { fanPerformanceFixture, jsonResponse } from '../test/fixtures';
+import { ContentCache, createMemoryStorage, setContentCacheForTests } from '../cache';
 
 jest.mock('../config', () => ({
   apiV1Url: (path: string) => `http://qz.test/api/v1${path.startsWith('/') ? path : `/${path}`}`,
@@ -36,6 +37,10 @@ const fetchMock = jest.fn<Promise<Response>, [RequestInfo | URL, RequestInit?]>(
 beforeEach(() => {
   fetchMock.mockReset();
   global.fetch = fetchMock as unknown as typeof fetch;
+});
+
+afterEach(() => {
+  setContentCacheForTests(null);
 });
 
 function lastUrl() {
@@ -57,6 +62,22 @@ describe('fetchNewsPage', () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ items: [] }));
     await fetchNewsPage();
     expect(lastUrl()).toBe('http://qz.test/api/v1/content/news');
+  });
+
+  it('serves a fresh-enough cached page without waiting on the network when cacheHint is set (issue #1477)', async () => {
+    const cache = new ContentCache({ storage: createMemoryStorage() });
+    setContentCacheForTests(cache);
+    const cached = { items: [{ id: 1 }], totalCount: 1 };
+    await cache.put('home:news', cached);
+    fetchMock.mockResolvedValueOnce(jsonResponse(null)); // background revalidation, result unused by this test
+
+    const page = await fetchNewsPage({
+      page: 1,
+      pageSize: 4,
+      cacheHint: { cacheKey: 'home:news', ttlMs: 60_000 },
+    });
+
+    expect(page).toEqual(cached);
   });
 });
 
@@ -117,6 +138,17 @@ describe('fetchTimelinePage and fetchOnThisDay', () => {
     expect(lastUrl()).toBe('http://qz.test/api/v1/content/on-this-day');
     expect(event).toBeNull();
   });
+
+  it('serves a fresh-enough cached on-this-day event without waiting on the network (issue #1477)', async () => {
+    const cache = new ContentCache({ storage: createMemoryStorage() });
+    setContentCacheForTests(cache);
+    await cache.put('home:on-this-day', { id: 1, title: 'cached event' });
+    fetchMock.mockResolvedValueOnce(jsonResponse(null)); // background revalidation, result unused by this test
+
+    const event = await fetchOnThisDay(undefined, { cacheKey: 'home:on-this-day', ttlMs: 60_000 });
+
+    expect(event).toEqual({ id: 1, title: 'cached event' });
+  });
 });
 
 describe('fetchTimelineEventById', () => {
@@ -146,6 +178,18 @@ describe('fetchLiveActivity', () => {
     expect(lastUrl()).toBe('http://qz.test/api/v1/content/live-activity');
     expect(summary.newForumRepliesToday).toBe(3);
   });
+
+  it('fetches over the network once a cached entry ages past ttlMs (issue #1477)', async () => {
+    const cache = new ContentCache({ storage: createMemoryStorage() });
+    setContentCacheForTests(cache);
+    await cache.put('home:live-activity', { newForumRepliesToday: 1 });
+    fetchMock.mockResolvedValueOnce(jsonResponse({ newForumRepliesToday: 9 }));
+
+    const summary = await fetchLiveActivity(undefined, { cacheKey: 'home:live-activity', ttlMs: -1 });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(summary.newForumRepliesToday).toBe(9);
+  });
 });
 
 describe('fetchRandomQuote', () => {
@@ -160,6 +204,22 @@ describe('fetchRandomQuote', () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ id: 5, text: 'A kind of magic', whoSaid: 'Freddie Mercury' }));
     const quote = await fetchRandomQuote();
     expect(quote).toMatchObject({ id: 5, text: 'A kind of magic', whoSaid: 'Freddie Mercury' });
+  });
+
+  it('always hits the network when fallback is forced off (pull-to-refresh, issue #1477)', async () => {
+    const cache = new ContentCache({ storage: createMemoryStorage() });
+    setContentCacheForTests(cache);
+    await cache.put('home:quote', { id: 1, text: 'cached', whoSaid: 'Freddie Mercury' });
+    fetchMock.mockResolvedValueOnce(jsonResponse({ id: 2, text: 'fresh', whoSaid: 'Freddie Mercury' }));
+
+    const quote = await fetchRandomQuote(undefined, {
+      cacheKey: 'home:quote',
+      ttlMs: 60_000,
+      fallback: false,
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(quote).toMatchObject({ id: 2, text: 'fresh' });
   });
 });
 
@@ -327,5 +387,21 @@ describe('photo content endpoints', () => {
     expect(lastUrl()).toBe(
       'http://qz.test/api/v1/content/photos/categories/live-shots/items/3?size=full',
     );
+  });
+
+  it('serves a fresh-enough cached category page without waiting on the network (issue #1477)', async () => {
+    const cache = new ContentCache({ storage: createMemoryStorage() });
+    setContentCacheForTests(cache);
+    const cached = { items: [{ slug: 'live-shots' }], totalCount: 1 };
+    await cache.put('home:photo-categories', cached);
+    fetchMock.mockResolvedValueOnce(jsonResponse(null)); // background revalidation, result unused by this test
+
+    const page = await fetchPhotoCategories({
+      page: 1,
+      pageSize: 3,
+      cacheHint: { cacheKey: 'home:photo-categories', ttlMs: 60_000 },
+    });
+
+    expect(page).toEqual(cached);
   });
 });

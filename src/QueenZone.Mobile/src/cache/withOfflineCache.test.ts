@@ -147,6 +147,21 @@ describe('withOfflineCacheResult TTL / stale-while-revalidate', () => {
     assert.equal(await cache.get('k'), null);
   });
 
+  it('swallows an aborted background revalidation without touching the cache', async () => {
+    const cache = newCache();
+    await cache.put('k', { value: 'cached' });
+    const abortError = new Error('aborted');
+    abortError.name = 'AbortError';
+    const fetchFresh = mock.fn(async () => {
+      throw abortError;
+    });
+
+    await withOfflineCacheResult(cache, 'k', fetchFresh, { ttlMs: 60_000 });
+    await flush();
+
+    assert.deepEqual(await cache.get('k'), { value: 'cached' });
+  });
+
   it('allows a new background revalidation after the previous one settles', async () => {
     const cache = newCache();
     await cache.put('k', { value: 'cached' });

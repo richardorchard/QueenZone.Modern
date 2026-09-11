@@ -60,6 +60,18 @@ describe('read endpoints', () => {
     await fetchForumRecentThreads(5);
     expect(lastCall().url).toBe('http://qz.test/api/v1/forum/recent-threads?count=5');
 
+    const cache = new ContentCache({ storage: createMemoryStorage() });
+    const cached = [{ id: 1, title: 'cached thread' }];
+    await cache.put('home:forum-threads', cached);
+    setContentCacheForTests(cache);
+    fetchMock.mockResolvedValueOnce(jsonResponse([])); // background revalidation, result unused by this test
+    const threads = await fetchForumRecentThreads(3, undefined, {
+      cacheKey: 'home:forum-threads',
+      ttlMs: 60_000,
+    });
+    expect(threads).toEqual(cached);
+    setContentCacheForTests(null);
+
     fetchMock.mockResolvedValueOnce(jsonResponse({ boardCount: 6, threadCount: 12600, postCount: 1 }));
     await fetchForumStats();
     expect(lastCall().url).toBe('http://qz.test/api/v1/forum/stats');
