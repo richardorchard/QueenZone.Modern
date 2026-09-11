@@ -19,9 +19,9 @@
 # driver-startup failure may retry after device recovery. android-transport-death
 # is written only when the emulator is gone or the in-process retry itself
 # dies as transport, so CI can boot a fresh emulator. A selector miss on a
-# live emulator must not retrigger that outer restart. Hosted Android CI
-# recreates the AVD on that one outer retry (#1454); this script does not
-# add a third attempt.
+# live emulator must not retrigger that outer restart. Android smoke CI
+# recreates an isolated AVD on that one outer retry (#1454); this script
+# does not add a third attempt.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"

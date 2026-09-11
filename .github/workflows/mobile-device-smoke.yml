@@ -50,11 +50,10 @@ concurrency:
 env:
   SIXLABORS_LICENSE_KEY: ${{ secrets.SIXLABORS_LICENSE_KEY }}
   SMOKE_PORT: "5098"
-  # Hosted ubuntu-latest is 4 vCPU / 16 GB. Default emulator-runner (2 cores,
-  # implicit ~2G RAM, force-avd-creation false) lost ADB twice on #1454:
-  # retry reused the crashed AVD and appended another hw.cpu.ncore. Leave one
-  # host core for Maestro + the Testing contract host. Self-hosted P0 release
-  # keeps its own AVD and is not this QEMU path.
+  # Android smoke (#1454) uses the self-hosted Mac + isolated AVD/port.
+  # Hosted ubuntu-latest qemu still dies intermittently (transport_death /
+  # emulator-gone, not OOM). Journeys stay on that hosted path. P0 release
+  # keeps QueenZone_CI_API_36 on port 5556 and is not this smoke AVD.
 
 jobs:
   mobile-android-smoke:
@@ -64,7 +63,9 @@ jobs:
       || (github.event_name == 'workflow_dispatch'
         && (github.event.inputs.suite == 'smoke' || github.event.inputs.suite == 'both')
         && (github.event.inputs.platform == 'android' || github.event.inputs.platform == 'both'))
-    runs-on: ubuntu-latest
+    # Same labels as P0 Android release. Isolated AVD/port in the smoke wrapper.
+    # Reversible: previous path was GitHub-hosted Linux qemu.
+    runs-on: [self-hosted, macOS, ARM64, queenzone]
     timeout-minutes: 90
     defaults:
       run:
@@ -95,12 +96,19 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Enable KVM
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
+      - name: Export installed Android SDK
         working-directory: .
+        run: |
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Library/Android/sdk}}"
+          if [ ! -d "$SDK_ROOT" ]; then
+            echo "::error::Android SDK not found at $SDK_ROOT."
+            exit 1
+          fi
+          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
+          echo "$SDK_ROOT/emulator" >> "$GITHUB_PATH"
+          echo "$SDK_ROOT/platform-tools" >> "$GITHUB_PATH"
+          echo "$SDK_ROOT/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
 
       - name: Install mobile JS
         run: npm ci
@@ -112,16 +120,6 @@ jobs:
           unset ConnectionStrings__BlobStorage || true
           unset ConnectionStrings__SqlServerTest || true
           dotnet build src/QueenZone.Web/QueenZone.Web.csproj --configuration Release
-
-      - name: Cache Gradle
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-smoke-${{ runner.os }}-${{ hashFiles('src/QueenZone.Mobile/package-lock.json') }}
-          restore-keys: |
-            gradle-smoke-${{ runner.os }}-
 
       - name: Preinstall Android NDK 27.1.12297006
         working-directory: .
@@ -154,9 +152,8 @@ jobs:
           fi
           maestro --version
 
-      # android-emulator-runner executes `script` line-by-line via `sh -c`.
-      # Keep that script a single static invocation. Compute prove_failure in
-      # this prior run step (schedule has no inputs, so default is off) (#1225).
+      # Compute prove_failure in this prior run step (schedule has no inputs,
+      # so default is off) (#1225).
       - name: Prepare Android smoke harness
         working-directory: .
         run: |
@@ -172,29 +169,25 @@ jobs:
             echo "PROVE_FAILURE_ARGS=" >> "$GITHUB_ENV"
           fi
 
-      # Hosted GHA Linux only: API 34 + stable emulator channel. API 36 qemu
-      # exited mid-run (qemu_state=missing, not OOM) on both attempts (#1458).
       - name: Run Android device smoke
         id: android-smoke
         continue-on-error: true
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 34
-          channel: stable
-          target: google_apis
-          arch: x86_64
-          cores: 3
-          ram-size: 4096M
-          heap-size: 512M
-          force-avd-creation: true
-          emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          disable-animations: true
-          script: ./scripts/run-mobile-device-smoke.sh --platform android --skip-build --no-build --apk src/QueenZone.Mobile/android/app/build/outputs/apk/release/app-release.apk $PROVE_FAILURE_ARGS
+        working-directory: .
+        env:
+          ANDROID_SMOKE_AVD: QueenZone_CI_Smoke_API_36
+          ANDROID_SMOKE_EMULATOR_PORT: "5558"
+        run: |
+          unset ConnectionStrings__QueenZoneLegacy || true
+          unset ConnectionStrings__BlobStorage || true
+          unset ConnectionStrings__SqlServerTest || true
+          ./scripts/run-mobile-android-smoke-self-hosted.sh \
+            src/QueenZone.Mobile/android/app/build/outputs/apk/release/app-release.apk \
+            $PROVE_FAILURE_ARGS
 
       # hashFiles() is evaluated at job start, so classify from the marker the
-      # script writes. Retry boots a new AVD (test-retry, force create); do not
-      # add a third identical attempt. In-process ADB recovery cannot revive
-      # emulator-5554 after DeviceServerDied (#1432 / #1454).
+      # script writes. Retry boots a new AVD (QueenZone_CI_Smoke_API_36_retry)
+      # on the same isolated port; do not add a third identical attempt.
+      # In-process ADB recovery cannot revive a dead emulator (#1432 / #1454).
       - name: Classify Android smoke transport death
         id: android-smoke-classify
         if: steps.android-smoke.outcome == 'failure'
@@ -219,20 +212,18 @@ jobs:
       - name: Retry Android device smoke after transport death
         id: android-smoke-retry
         if: steps.android-smoke-classify.outputs.retry == 'true'
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 34
-          channel: stable
-          target: google_apis
-          arch: x86_64
-          cores: 3
-          ram-size: 4096M
-          heap-size: 512M
-          avd-name: test-retry
-          force-avd-creation: true
-          emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          disable-animations: true
-          script: ./scripts/run-mobile-device-smoke.sh --platform android --skip-build --no-build --apk src/QueenZone.Mobile/android/app/build/outputs/apk/release/app-release.apk $PROVE_FAILURE_ARGS
+        working-directory: .
+        env:
+          ANDROID_SMOKE_AVD: QueenZone_CI_Smoke_API_36_retry
+          ANDROID_SMOKE_EMULATOR_PORT: "5558"
+          ANDROID_SMOKE_FORCE_AVD: "1"
+        run: |
+          unset ConnectionStrings__QueenZoneLegacy || true
+          unset ConnectionStrings__BlobStorage || true
+          unset ConnectionStrings__SqlServerTest || true
+          ./scripts/run-mobile-android-smoke-self-hosted.sh \
+            src/QueenZone.Mobile/android/app/build/outputs/apk/release/app-release.apk \
+            $PROVE_FAILURE_ARGS
 
       - name: Collect leftover Android smoke logs
         if: >-

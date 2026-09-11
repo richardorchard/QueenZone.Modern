@@ -566,8 +566,9 @@ staging/production store Release behavior.
 
 CI: [`.github/workflows/mobile-device-smoke.yml`](../../.github/workflows/mobile-device-smoke.yml)
 runs on **Actions → Mobile device smoke** (`workflow_dispatch`) and
-weekdays at 04:00 UTC. Jobs are `Mobile Android device smoke` and
-`Mobile iOS device smoke`. Phase 1 is soak only — do **not** add those
+weekdays at 04:00 UTC. Jobs are `Mobile Android device smoke` (self-hosted
+Mac, isolated AVD/port) and `Mobile iOS device smoke` (hosted `macos-26`).
+Phase 1 is soak only — do **not** add those
 names as required checks on `main`. Device smoke is **not** started for
 API-only PRs (that stays `mobile-api-contracts`). After pass rate and
 duration are known, promote the short set by adding the jobs to `ci.yml`
@@ -577,10 +578,11 @@ protection; record the date on #872. See
 Failures upload `maestro-results/` (screenshots, JUnit, host/app logs).
 Maestro app assertions are not retried. The harness retries one Android
 device-server or emulator transport loss (`DeviceServerDied`, hierarchy
-timeout, or a vanished `emulator-5554`): it recovers ADB when the
-emulator is still alive, otherwise the hosted Android job boots a fresh
-emulator and reruns once. Failure logs name transport death versus a
-selector miss. An iOS driver startup may likewise retry once only when no
+timeout, or a vanished emulator serial): it recovers ADB when the
+emulator is still alive, otherwise the self-hosted Android smoke job
+boots a fresh isolated AVD (`QueenZone_CI_Smoke_API_36_retry` on port
+5558, not the P0 `QueenZone_CI_API_36` / 5556 path) and reruns once.
+Failure logs name transport death versus a selector miss. An iOS driver startup may likewise retry once only when no
 JUnit file exists; the harness reboots the Simulator and preserves the
 first driver log. The authenticated smoke flow repeats only the
 iOS smoke-auth deep link when the profile explicitly remains signed out after
