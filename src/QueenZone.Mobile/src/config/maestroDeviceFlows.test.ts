@@ -205,20 +205,67 @@ describe('device-smoke harness (#1281)', () => {
     assert.equal(workflow.match(/github\.event\.inputs\.platform == 'ios'/g)?.length, 2);
   });
 
-  it('releases Gradle memory and isolates hosted from P0 Android runners', () => {
+  it('releases Gradle memory and isolates hosted journeys from P0 Android runners', () => {
     const workflow = readRepo('mobile-device-smoke.yml', workflowsDir);
+    const journeysJob = workflow.slice(
+      workflow.indexOf('  mobile-android-journeys:'),
+      workflow.indexOf('  mobile-android-release:'),
+    );
     const releaseJob = workflow.slice(
       workflow.indexOf('  mobile-android-release:'),
       workflow.indexOf('  mobile-ios-journeys:'),
     );
     assert.equal((workflow.match(/\.\/gradlew --stop/g) ?? []).length, 3);
-    assert.equal((workflow.match(/api-level: 34/g) ?? []).length, 4);
-    assert.equal((workflow.match(/-gpu swiftshader_indirect/g) ?? []).length, 4);
+    assert.equal((journeysJob.match(/api-level: 34/g) ?? []).length, 2);
+    assert.equal((journeysJob.match(/-gpu swiftshader_indirect/g) ?? []).length, 2);
+    assert.match(journeysJob, /runs-on: ubuntu-latest/);
+    assert.match(journeysJob, /android-emulator-runner/);
     assert.match(workflow, /mobile-android-release:[\s\S]*runs-on: \[self-hosted, macOS, ARM64, queenzone\]/);
     assert.match(workflow, /mobile-android-release:[\s\S]*github\.event\.inputs\.suite == 'release'/);
     assert.match(workflow, /mobile-android-release:[\s\S]*Export installed Android SDK/);
     assert.match(workflow, /ANDROID_HOME=\$SDK_ROOT/);
     assert.doesNotMatch(releaseJob, /actions\/cache/);
+    assert.doesNotMatch(releaseJob, /run-mobile-android-smoke-self-hosted/);
+  });
+
+  it('runs Android smoke on the Mac self-hosted runner with an isolated AVD', () => {
+    const workflow = readRepo('mobile-device-smoke.yml', workflowsDir);
+    const runner = readRepo('run-mobile-android-smoke-self-hosted.sh', scriptsDir);
+    const release = readRepo('run-mobile-android-release-self-hosted.sh', scriptsDir);
+    const smokeJob = workflow.slice(
+      workflow.indexOf('  mobile-android-smoke:'),
+      workflow.indexOf('  mobile-ios-smoke:'),
+    );
+    assert.match(smokeJob, /runs-on: \[self-hosted, macOS, ARM64, queenzone\]/);
+    assert.match(smokeJob, /run-mobile-android-smoke-self-hosted\.sh/);
+    assert.match(smokeJob, /Export installed Android SDK/);
+    assert.match(smokeJob, /ANDROID_SMOKE_AVD: QueenZone_CI_Smoke_API_36\b/);
+    assert.match(smokeJob, /ANDROID_SMOKE_AVD: QueenZone_CI_Smoke_API_36_retry/);
+    assert.match(smokeJob, /ANDROID_SMOKE_EMULATOR_PORT: "5558"/);
+    assert.match(smokeJob, /ANDROID_SMOKE_FORCE_AVD: "1"/);
+    assert.match(smokeJob, /Retry Android device smoke after transport death/);
+    assert.equal((smokeJob.match(/Retry Android device smoke after transport death/g) ?? []).length, 1);
+    assert.doesNotMatch(smokeJob, /android-emulator-runner/);
+    assert.doesNotMatch(smokeJob, /ubuntu-latest/);
+    assert.doesNotMatch(smokeJob, /Enable KVM/);
+    assert.doesNotMatch(smokeJob, /ANDROID_RELEASE_AVD/);
+    assert.doesNotMatch(smokeJob, /ANDROID_RELEASE_EMULATOR_PORT/);
+    assert.match(runner, /ANDROID_SMOKE_AVD:-QueenZone_CI_Smoke_API_36/);
+    assert.match(runner, /ANDROID_SMOKE_EMULATOR_PORT:-5558/);
+    assert.match(runner, /system-images;android-36;google_apis;arm64-v8a/);
+    assert.match(runner, /Another Android emulator is active/);
+    assert.match(runner, /-gpu host/);
+    assert.match(runner, /MAESTRO_TARGET_DEVICE="\$serial"/);
+    assert.match(runner, /--suite smoke/);
+    assert.doesNotMatch(runner, /ANDROID_RELEASE_/);
+    assert.doesNotMatch(runner, /ANDROID_SMOKE_AVD:-QueenZone_CI_API_36/);
+    assert.doesNotMatch(runner, /ANDROID_SMOKE_EMULATOR_PORT:-5556/);
+    assert.doesNotMatch(runner, /x86_64/);
+    assert.match(release, /ANDROID_RELEASE_AVD:-QueenZone_CI_API_36/);
+    assert.match(release, /ANDROID_RELEASE_EMULATOR_PORT:-5556/);
+    assert.doesNotMatch(release, /ANDROID_SMOKE_/);
+    assert.doesNotMatch(release, /QueenZone_CI_Smoke_API_36/);
+    assert.doesNotMatch(release, /ANDROID_RELEASE_EMULATOR_PORT:-5558/);
   });
 
   it('boots and targets a dedicated hardware-rendered Android release emulator', () => {
