@@ -104,7 +104,7 @@ resource "cloudflare_zone_setting" "development_mode" {
   value      = "off"
 }
 
-# Keep high-volume archive crawlers at the edge. These four user agents were the
+# Keep high-volume archive crawlers at the edge. These user agents were the
 # sustained source of expensive forum-author/topic reads in Application Insights
 # on 6-9 September 2026. Search-engine crawlers such as Googlebot and bingbot are
 # deliberately unaffected.
@@ -117,10 +117,12 @@ resource "cloudflare_ruleset" "bot_blocking" {
 
   rules = [{
     ref         = "block_expensive_archive_crawlers"
-    description = "Block ClaudeBot, Amazonbot, SemrushBot, and MJ12bot"
+    description = "Block crawlers proven to overload the forum archive"
     expression  = <<-EOT
       (http.host in {"queenzone.org" "www.queenzone.org"}) and (
         http.user_agent contains "ClaudeBot" or
+        http.user_agent contains "Claude-SearchBot" or
+        http.user_agent contains "AionBot" or
         http.user_agent contains "Amazonbot" or
         http.user_agent contains "SemrushBot" or
         http.user_agent contains "MJ12bot"
