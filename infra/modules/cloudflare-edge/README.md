@@ -6,7 +6,7 @@ The zone, public DNS records, both Worker scripts, and both Worker routes set `l
 
 ## Archive traffic controls
 
-- The zone custom-firewall ruleset blocks `ClaudeBot`, `Amazonbot`, `SemrushBot`, and `MJ12bot` on the apex and `www` hosts. These were the crawlers proven to drive sustained Azure SQL Data IO; Googlebot and bingbot remain allowed.
+- The zone custom-firewall ruleset blocks `ClaudeBot`, `Claude-SearchBot`, `AionBot`, `Amazonbot`, `SemrushBot`, and `MJ12bot` on the apex and `www` hosts. These were the crawlers proven to drive sustained Azure SQL Data IO; Googlebot and bingbot remain allowed.
 - The zone cache ruleset caches cookie-free `GET /forum/archive-authors/*` responses at the edge for one hour. Any request carrying a cookie bypasses this rule and follows the application's authentication-aware cache policy.
 
 ## Hostnames
