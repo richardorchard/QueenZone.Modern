@@ -30,7 +30,7 @@ export async function fetchJsonWithOfflineCacheResult<T>(
   path: string,
   options: FetchCachedOptions,
 ): Promise<CachedResult<T>> {
-  const { cacheKey, cache = getContentCache(), invalidateOn, fallback, ...fetchOptions } = options;
+  const { cacheKey, cache = getContentCache(), invalidateOn, fallback, ttlMs, ...fetchOptions } = options;
 
   const existing = inFlight.get(cacheKey);
   if (existing) {
@@ -40,6 +40,7 @@ export async function fetchJsonWithOfflineCacheResult<T>(
   const pending = withOfflineCacheResult(cache, cacheKey, () => fetchJson<T>(path, fetchOptions), {
     invalidateOn,
     fallback,
+    ttlMs,
   }).finally(() => {
     if (inFlight.get(cacheKey) === pending) {
       inFlight.delete(cacheKey);

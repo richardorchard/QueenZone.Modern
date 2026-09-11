@@ -50,7 +50,15 @@ export type HomeSection<T> = {
   refresh: () => Promise<void>;
 };
 
-export function useHomeSection<T>(fetcher: (signal: AbortSignal) => Promise<T>): HomeSection<T> {
+/**
+ * `mode` tells the fetcher whether this is the mount/tab-back reload (where a
+ * fresh-enough cached value may be served, per issue #1477's TTL support in
+ * `withOfflineCache`) or an explicit pull-to-refresh (which must stay
+ * network-only, same as every other pull-to-refresh in the app).
+ */
+export function useHomeSection<T>(
+  fetcher: (signal: AbortSignal, mode: 'reload' | 'refresh') => Promise<T>,
+): HomeSection<T> {
   const [snapshot, setSnapshot] = useState<SectionSnapshot<T>>({ status: 'pending', data: null });
   const coordinatorRef = useRef<PagedRequestCoordinator | null>(null);
   if (coordinatorRef.current === null) {
@@ -66,7 +74,7 @@ export function useHomeSection<T>(fetcher: (signal: AbortSignal) => Promise<T>):
       }
 
       try {
-        const result = await fetcher(signal);
+        const result = await fetcher(signal, mode);
         if (!coordinator.isCurrent(generation)) {
           return;
         }

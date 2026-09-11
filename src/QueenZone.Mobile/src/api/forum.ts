@@ -1,8 +1,9 @@
 import { getContentCache } from '../cache/defaultCache';
 import type { ContentCache } from '../cache/contentCache';
+import { fetchJsonWithOfflineCache } from '../cache/fetchCached';
 import { forumTopicCacheKey, forumTopicPostsCacheKey } from '../cache/keys';
 import { invalidateIncompatiblePostPages } from '../cache/pagedCache';
-import { withOfflineCacheResult, type CachedResult } from '../cache/withOfflineCache';
+import { withOfflineCacheResult, type CachedResult, type OfflineCacheOptions } from '../cache/withOfflineCache';
 import { reportApiFailure } from '../config/sentry';
 import { fetchJson, sendJson, sendMultipart } from './client';
 import type {
@@ -37,11 +38,23 @@ function pageParams({ page, pageSize }: PageQuery) {
   };
 }
 
+export type ForumRecentThreadsCacheHint = OfflineCacheOptions & { cacheKey: string };
+
 /** Cross-board recent-activity feed, most-recent first. Used by the home screen. */
 export function fetchForumRecentThreads(
   count: number,
   signal?: AbortSignal,
+  cacheHint?: ForumRecentThreadsCacheHint,
 ): Promise<ForumRecentThread[]> {
+  if (cacheHint) {
+    const { cacheKey, ...cacheOptions } = cacheHint;
+    return fetchJsonWithOfflineCache<ForumRecentThread[]>('/forum/recent-threads', {
+      query: { count },
+      signal,
+      cacheKey,
+      ...cacheOptions,
+    });
+  }
   return fetchJson('/forum/recent-threads', { query: { count }, signal });
 }
 

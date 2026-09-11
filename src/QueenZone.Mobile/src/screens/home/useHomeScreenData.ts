@@ -9,7 +9,16 @@ import {
   fetchPhotoCategories,
   fetchRandomQuote,
 } from '../../api';
-import { NEWS_LIST_CACHE_KEY } from '../../cache/keys';
+import {
+  HOME_FORUM_THREADS_CACHE_KEY,
+  HOME_LIVE_ACTIVITY_CACHE_KEY,
+  HOME_NEWS_CACHE_KEY,
+  HOME_ON_THIS_DAY_CACHE_KEY,
+  HOME_PHOTO_CATEGORIES_CACHE_KEY,
+  HOME_QUOTE_CACHE_KEY,
+  NEWS_LIST_CACHE_KEY,
+} from '../../cache/keys';
+import { HOME_LIVE_TTL_MS, HOME_MODERATE_TTL_MS, HOME_SLOW_CHANGING_TTL_MS } from '../../cache/ttl';
 import { useStoreRefresh } from '../../cache/useExternalStore';
 import { useHomeSection } from '../../hooks/useHomeSection';
 import { usePullToRefresh } from '../../hooks/usePullToRefresh';
@@ -18,27 +27,101 @@ import { onThisDayIsVisible, queenQuotesIsVisible } from './homeMeta';
 import { inboxPageSize } from '../messages/inboxMeta';
 
 /**
+ * Reload may be served a fresh-enough cached value (TTL, issue #1477);
+ * pull-to-refresh must always hit the network, same as every other
+ * pull-to-refresh in the app.
+ */
+function ttlUnlessRefresh(mode: 'reload' | 'refresh', ttlMs: number) {
+  return mode === 'refresh' ? { fallback: false as const } : { ttlMs };
+}
+
+/**
  * Owns every `useHomeSection` call for the home screen. This is the single place
  * they may live — pull-to-refresh must keep refetching a section's data even
  * while a filter chip hides that section's presentational component, so the
  * fetch hooks can never move into the section components themselves.
  */
 export function useHomeScreenData(isSignedIn: boolean, accessToken: string | null) {
-  const news = useHomeSection(useCallback((signal) => fetchNewsPage({ page: 1, pageSize: 4, signal }), []));
-  useStoreRefresh(NEWS_LIST_CACHE_KEY, news.refresh);
-  const forum = useHomeSection(useCallback((signal) => fetchForumRecentThreads(3, signal), []));
-  const gallery = useHomeSection(
-    useCallback((signal) => fetchPhotoCategories({ page: 1, pageSize: 3, signal }), []),
+  const news = useHomeSection(
+    useCallback(
+      (signal, mode) =>
+        fetchNewsPage({
+          page: 1,
+          pageSize: 4,
+          signal,
+          cacheHint: { cacheKey: HOME_NEWS_CACHE_KEY, ...ttlUnlessRefresh(mode, HOME_MODERATE_TTL_MS) },
+        }),
+      [],
+    ),
   );
-  const onThisDay = useHomeSection(useCallback((signal) => fetchOnThisDay(signal), []));
-  const quote = useHomeSection(useCallback((signal) => fetchRandomQuote(signal), []));
+  useStoreRefresh(NEWS_LIST_CACHE_KEY, news.refresh);
+  const forum = useHomeSection(
+    useCallback(
+      (signal, mode) =>
+        fetchForumRecentThreads(3, signal, {
+          cacheKey: HOME_FORUM_THREADS_CACHE_KEY,
+          ...ttlUnlessRefresh(mode, HOME_MODERATE_TTL_MS),
+        }),
+      [],
+    ),
+  );
+  const gallery = useHomeSection(
+    useCallback(
+      (signal, mode) =>
+        fetchPhotoCategories({
+          page: 1,
+          pageSize: 3,
+          signal,
+          cacheHint: {
+            cacheKey: HOME_PHOTO_CATEGORIES_CACHE_KEY,
+            ...ttlUnlessRefresh(mode, HOME_MODERATE_TTL_MS),
+          },
+        }),
+      [],
+    ),
+  );
+  const onThisDay = useHomeSection(
+    useCallback(
+      (signal, mode) =>
+        fetchOnThisDay(signal, {
+          cacheKey: HOME_ON_THIS_DAY_CACHE_KEY,
+          ...ttlUnlessRefresh(mode, HOME_SLOW_CHANGING_TTL_MS),
+        }),
+      [],
+    ),
+  );
+  const quote = useHomeSection(
+    useCallback(
+      (signal, mode) =>
+        fetchRandomQuote(signal, {
+          cacheKey: HOME_QUOTE_CACHE_KEY,
+          ...ttlUnlessRefresh(mode, HOME_SLOW_CHANGING_TTL_MS),
+        }),
+      [],
+    ),
+  );
   const poll = useHomeSection(useCallback((signal) => fetchHomePoll(signal, accessToken), [accessToken]));
-  const liveActivity = useHomeSection(useCallback((signal) => fetchLiveActivity(signal), []));
+  const liveActivity = useHomeSection(
+    useCallback(
+      (signal, mode) =>
+        fetchLiveActivity(signal, {
+          cacheKey: HOME_LIVE_ACTIVITY_CACHE_KEY,
+          ...ttlUnlessRefresh(mode, HOME_LIVE_TTL_MS),
+        }),
+      [],
+    ),
+  );
   const messages = useHomeSection(
     useCallback(
-      (signal) =>
+      (signal, mode) =>
         isSignedIn && accessToken
-          ? fetchInbox(accessToken, { page: 1, pageSize: inboxPageSize, signal }).then((page) => ({
+          ? fetchInbox(accessToken, {
+              page: 1,
+              pageSize: inboxPageSize,
+              signal,
+              networkOnly: mode === 'refresh',
+              ttlMs: HOME_LIVE_TTL_MS,
+            }).then((page) => ({
               ...page,
               items: page.items.slice(0, 2),
             }))

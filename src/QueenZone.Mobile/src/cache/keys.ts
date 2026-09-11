@@ -72,3 +72,16 @@ export function downloadUiCachePrefix(memberId: string): string {
 export function downloadUiCacheKey(memberId: string, performanceId: string): string {
   return `${downloadUiCachePrefix(memberId)}performance:${performanceId}`;
 }
+
+/**
+ * Home-screen section cache keys (issue #1477). Public, so they survive
+ * sign-out; the inbox preview keys off {@link inboxCacheKey} instead since it
+ * is member-scoped and already purged there.
+ */
+export const HOME_NEWS_CACHE_KEY = 'home:news';
+export const HOME_FORUM_THREADS_CACHE_KEY = 'home:forum-threads';
+export const HOME_PHOTO_CATEGORIES_CACHE_KEY = 'home:photo-categories';
+export const HOME_ON_THIS_DAY_CACHE_KEY = 'home:on-this-day';
+export const HOME_QUOTE_CACHE_KEY = 'home:quote';
+export const HOME_POLL_CACHE_KEY = 'home:poll';
+export const HOME_LIVE_ACTIVITY_CACHE_KEY = 'home:live-activity';
