@@ -337,6 +337,30 @@ function Invoke-SqlPackagePhase {
     }
 }
 
+function New-MirrorPromotionSql {
+    param(
+        [Parameter(Mandatory = $true)][string]$StagingDatabase,
+        [Parameter(Mandatory = $true)][string]$TargetDatabase
+    )
+
+    return @"
+IF DB_ID(N'$StagingDatabase') IS NULL
+    THROW 50000, 'The staged mirror database does not exist.', 1;
+IF DB_ID(N'$TargetDatabase') IS NOT NULL
+BEGIN
+    ALTER DATABASE [$TargetDatabase] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+    DROP DATABASE [$TargetDatabase];
+END
+-- Keep this sqlcmd session inside the staged database before reserving its
+-- single-user slot. Otherwise a recently closing SqlPackage connection can
+-- claim that slot between SET SINGLE_USER and MODIFY NAME (SQL error 924).
+USE [$StagingDatabase];
+ALTER DATABASE [$StagingDatabase] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+ALTER DATABASE [$StagingDatabase] MODIFY NAME = [$TargetDatabase];
+ALTER DATABASE [$TargetDatabase] SET MULTI_USER;
+"@
+}
+
 function Invoke-SyncLegacyDbSelfTest {
     $tcp = 'A transport-level error has occurred when receiving results from the server. (provider: TCP Provider, error: 0 - An existing connection was forcibly closed by the remote host.)'
     $reset = 'The connection was reset by the remote host (connection reset).'
@@ -361,6 +385,14 @@ function Invoke-SyncLegacyDbSelfTest {
     }
     if (Test-SqlPackageTransientTransportError 'Timeout expired. The timeout period elapsed prior to completion of the operation.') {
         throw "Classifier must not treat a SQL command timeout as a transport drop."
+    }
+
+    $promotionSql = New-MirrorPromotionSql -StagingDatabase 'selftest_stage' -TargetDatabase 'selftest_target'
+    $useStagingIndex = $promotionSql.IndexOf('USE [selftest_stage];', [StringComparison]::Ordinal)
+    $singleUserIndex = $promotionSql.IndexOf('ALTER DATABASE [selftest_stage] SET SINGLE_USER', [StringComparison]::Ordinal)
+    $renameIndex = $promotionSql.IndexOf('ALTER DATABASE [selftest_stage] MODIFY NAME', [StringComparison]::Ordinal)
+    if ($useStagingIndex -lt 0 -or $singleUserIndex -le $useStagingIndex -or $renameIndex -le $singleUserIndex) {
+        throw "Promotion SQL must enter the staged database before reserving SINGLE_USER and renaming it."
     }
 
     $quoted = ConvertTo-WindowsProcessArguments @(
@@ -584,18 +616,7 @@ END
     sqlcmd -S "localhost\$InstanceName" -Q $grantSql
 
     Write-Host "Replacing $TargetDatabase with the verified staged mirror..."
-    $promoteSql = @"
-IF DB_ID(N'$stagingDatabase') IS NULL
-    THROW 50000, 'The staged mirror database does not exist.', 1;
-IF DB_ID(N'$TargetDatabase') IS NOT NULL
-BEGIN
-    ALTER DATABASE [$TargetDatabase] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
-    DROP DATABASE [$TargetDatabase];
-END
-ALTER DATABASE [$stagingDatabase] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
-ALTER DATABASE [$stagingDatabase] MODIFY NAME = [$TargetDatabase];
-ALTER DATABASE [$TargetDatabase] SET MULTI_USER;
-"@
+    $promoteSql = New-MirrorPromotionSql -StagingDatabase $stagingDatabase -TargetDatabase $TargetDatabase
     sqlcmd -S "localhost\$InstanceName" -b -Q $promoteSql
     if ($LASTEXITCODE -ne 0) { throw "Mirror promotion failed with exit code $LASTEXITCODE" }
     $stagingPromoted = $true
