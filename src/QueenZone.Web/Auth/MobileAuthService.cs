@@ -11,7 +11,8 @@ public sealed class MobileAuthService(
     MemberAccountService memberAccountService,
     MobileAuthAccountRateLimiter accountRateLimiter,
     IOptions<MobileAuthOptions> options,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    ILogger<MobileAuthService> logger)
 {
     public MobileAuthStartResult StartAuthorization(
         string? responseType,
@@ -226,11 +227,26 @@ public sealed class MobileAuthService(
         var stored = await grants.FindRefreshTokenByHashAsync(tokenHash, cancellationToken);
         if (stored is null)
         {
+            // Most often a grant issued by a different environment: TestFlight
+            // ships staging and production under one bundle id.
+            logger.LogInformation(
+                "Mobile auth refresh rejected: no grant matches the presented token for client {ClientId}.",
+                clientId);
             return MobileAuthTokenResult.Failed("invalid_grant", "The refresh token grant is invalid.");
         }
 
         if (stored.RevokedAt is not null)
         {
+            // Refresh-token reuse: the presented grant was already rotated away.
+            // Revoking every grant signs the member out on every device, so this
+            // must be visible — a client that lost a rotation response looks the
+            // same as a stolen token from here.
+            logger.LogWarning(
+                "Mobile auth refresh-token reuse detected for member {MemberId}; revoking all grants. "
+                    + "Grant issued {CreatedAt:o}, revoked {RevokedAt:o}.",
+                stored.MemberAccountId,
+                stored.CreatedAt,
+                stored.RevokedAt);
             await grants.RevokeAllRefreshTokensForMemberAsync(stored.MemberAccountId, now, cancellationToken);
             return MobileAuthTokenResult.Failed("invalid_grant", "The refresh token grant is invalid.");
         }
@@ -238,6 +254,10 @@ public sealed class MobileAuthService(
         if (stored.ExpiresAt <= now
             || !string.Equals(stored.ClientId, clientId, StringComparison.Ordinal))
         {
+            logger.LogInformation(
+                "Mobile auth refresh rejected for member {MemberId}: grant expired {ExpiresAt:o} or client mismatch.",
+                stored.MemberAccountId,
+                stored.ExpiresAt);
             return MobileAuthTokenResult.Failed("invalid_grant", "The refresh token grant is invalid.");
         }
 
@@ -248,12 +268,20 @@ public sealed class MobileAuthService(
 
         if (!await grants.TryRevokeRefreshTokenAsync(tokenHash, now, cancellationToken))
         {
+            // A concurrent refresh rotated this grant between the read above and
+            // here. The loser gets invalid_grant and signs out locally.
+            logger.LogWarning(
+                "Mobile auth refresh lost the rotation race for member {MemberId}; concurrent refresh in flight.",
+                stored.MemberAccountId);
             return MobileAuthTokenResult.Failed("invalid_grant", "The refresh token grant is invalid.");
         }
 
         var account = await memberAccountService.FindByIdAsync(stored.MemberAccountId, cancellationToken);
         if (account is null || account.IsSuspended)
         {
+            logger.LogInformation(
+                "Mobile auth refresh rejected for member {MemberId}: account missing or suspended; revoking all grants.",
+                stored.MemberAccountId);
             await grants.RevokeAllRefreshTokensForMemberAsync(stored.MemberAccountId, now, cancellationToken);
             return MobileAuthTokenResult.Failed("invalid_grant", "The refresh token grant is invalid.");
         }
