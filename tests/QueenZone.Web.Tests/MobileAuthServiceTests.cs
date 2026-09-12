@@ -293,6 +293,113 @@ public sealed class MobileAuthServiceTests
     }
 
     [Fact]
+    public async Task ExchangeRefreshToken_LogsReuseBeforeRevokingEveryGrant()
+    {
+        // Reuse revokes every grant the member holds, signing them out on every
+        // device. A client that lost a rotation response looks identical to a
+        // stolen token from here, so the decision has to be traceable.
+        var log = new RecordingServiceLogger();
+        var issued = await IssueTokensAsync(serviceLogger: log);
+        await issued.Service.ExchangeRefreshTokenAsync(
+            MobileAuthOptions.DefaultClientId,
+            issued.RefreshToken,
+            CancellationToken.None);
+
+        var reused = await issued.Service.ExchangeRefreshTokenAsync(
+            MobileAuthOptions.DefaultClientId,
+            issued.RefreshToken,
+            CancellationToken.None);
+
+        Assert.False(reused.Success);
+        var warning = Assert.Single(
+            log.Entries,
+            entry =>
+                entry.Level == LogLevel.Warning
+                && entry.Message.Contains("reuse detected", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains("revoking all grants", warning.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(issued.RefreshToken!, warning.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ExchangeRefreshToken_LogsAnUnknownGrantWithoutEchoingTheToken()
+    {
+        // The common cause is a grant issued by another environment: TestFlight
+        // ships staging and production under one bundle id.
+        var log = new RecordingServiceLogger();
+        var service = CreateService(serviceLogger: log);
+
+        var result = await service.ExchangeRefreshTokenAsync(
+            MobileAuthOptions.DefaultClientId,
+            "grant-from-another-origin",
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal("invalid_grant", result.Error);
+        var entry = Assert.Single(
+            log.Entries,
+            e => e.Message.Contains("no grant matches", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain("grant-from-another-origin", entry.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ExchangeRefreshToken_RejectsAndLogsTheLoserOfARotationRace()
+    {
+        var log = new RecordingServiceLogger();
+        var grants = new RotationRaceLoserGrantRepository(
+            new InMemoryMobileAuthGrantRepository(new SharedMobileAuthGrantStore()));
+        var issued = await IssueTokensAsync(serviceLogger: log, grants: grants);
+
+        grants.LoseNextRotation = true;
+        var lost = await issued.Service.ExchangeRefreshTokenAsync(
+            MobileAuthOptions.DefaultClientId,
+            issued.RefreshToken,
+            CancellationToken.None);
+
+        Assert.False(lost.Success);
+        Assert.Equal("invalid_grant", lost.Error);
+        Assert.Null(lost.RefreshToken);
+        var warning = Assert.Single(
+            log.Entries,
+            entry =>
+                entry.Level == LogLevel.Warning
+                && entry.Message.Contains("rotation race", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(issued.RefreshToken!, warning.Message, StringComparison.Ordinal);
+
+        // The race loser must not take the whole account down with it: the grant
+        // is still there for the winner, so a later refresh still works.
+        var recovered = await issued.Service.ExchangeRefreshTokenAsync(
+            MobileAuthOptions.DefaultClientId,
+            issued.RefreshToken,
+            CancellationToken.None);
+        Assert.True(recovered.Success);
+    }
+
+    [Fact]
+    public async Task ExchangeRefreshToken_RevokesEveryGrantWhenTheAccountIsSuspended()
+    {
+        var log = new RecordingServiceLogger();
+        var accounts = new InMemoryMemberAccountRepository();
+        var issued = await IssueTokensAsync(serviceLogger: log, accounts: accounts);
+
+        var account = await accounts.FindByExternalLoginAsync(
+            MemberAuthenticationSchemes.Google,
+            "refresh-subject-1");
+        Assert.NotNull(account);
+        account!.IsSuspended = true;
+
+        var result = await issued.Service.ExchangeRefreshTokenAsync(
+            MobileAuthOptions.DefaultClientId,
+            issued.RefreshToken,
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal("invalid_grant", result.Error);
+        Assert.Single(
+            log.Entries,
+            entry => entry.Message.Contains("missing or suspended", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public async Task ExchangeRefreshToken_RejectsRevokedToken()
     {
         var issued = await IssueTokensAsync();
@@ -665,10 +772,17 @@ public sealed class MobileAuthServiceTests
     }
 
     private static async Task<(MobileAuthService Service, string RefreshToken)> IssueTokensAsync(
-        AuthRateLimitingOptions? authLimits = null)
+        AuthRateLimitingOptions? authLimits = null,
+        ILogger<MobileAuthService>? serviceLogger = null,
+        InMemoryMemberAccountRepository? accounts = null,
+        IMobileAuthGrantRepository? grants = null)
     {
         var pair = MobileAuthPkceTestData.CreatePair();
-        var service = CreateService(authLimits: authLimits);
+        var service = CreateService(
+            accounts,
+            authLimits: authLimits,
+            serviceLogger: serviceLogger,
+            grants: grants);
         var started = service.StartAuthorization(
             "code",
             MobileAuthOptions.DefaultClientId,
@@ -721,7 +835,9 @@ public sealed class MobileAuthServiceTests
         string environmentName = "Testing",
         TimeProvider? timeProvider = null,
         AuthRateLimitingOptions? authLimits = null,
-        ILogger<MobileAuthAccountRateLimiter>? logger = null)
+        ILogger<MobileAuthAccountRateLimiter>? logger = null,
+        ILogger<MobileAuthService>? serviceLogger = null,
+        IMobileAuthGrantRepository? grants = null)
     {
         var clock = timeProvider ?? TimeProvider.System;
         var options = Options.Create(new MobileAuthOptions());
@@ -739,7 +855,7 @@ public sealed class MobileAuthServiceTests
 
         return new MobileAuthService(
             new MobileAuthAuthorizationSessionStore(clock),
-            new InMemoryMobileAuthGrantRepository(new SharedMobileAuthGrantStore()),
+            grants ?? new InMemoryMobileAuthGrantRepository(new SharedMobileAuthGrantStore()),
             new MobileAuthTokenIssuer(options, site, environment, clock),
             members,
             new MobileAuthAccountRateLimiter(
@@ -749,7 +865,8 @@ public sealed class MobileAuthServiceTests
                 Options.Create(authLimits ?? new AuthRateLimitingOptions()),
                 logger ?? NullLogger<MobileAuthAccountRateLimiter>.Instance),
             options,
-            clock);
+            clock,
+            serviceLogger ?? NullLogger<MobileAuthService>.Instance);
     }
 
     private sealed class ManualTimeProvider(DateTimeOffset start) : TimeProvider
@@ -779,6 +896,79 @@ public sealed class MobileAuthServiceTests
             Func<TState, Exception?, string> formatter)
         {
             Messages.Add(formatter(state, exception));
+        }
+    }
+
+    /// <summary>
+    /// Rotation loser: the grant is readable and unrevoked, but a concurrent
+    /// refresh claims it first, so <c>TryRevokeRefreshTokenAsync</c> comes back
+    /// false. Forcing it beats racing two real refreshes in a test.
+    /// </summary>
+    private sealed class RotationRaceLoserGrantRepository(IMobileAuthGrantRepository inner)
+        : IMobileAuthGrantRepository
+    {
+        public bool LoseNextRotation { get; set; }
+
+        public Task StoreAuthorizationCodeAsync(
+            MobileAuthAuthorizationCodeEntity code,
+            CancellationToken cancellationToken = default) =>
+            inner.StoreAuthorizationCodeAsync(code, cancellationToken);
+
+        public Task<MobileAuthAuthorizationCodeEntity?> RedeemAuthorizationCodeAsync(
+            string codeHash,
+            DateTime utcNow,
+            CancellationToken cancellationToken = default) =>
+            inner.RedeemAuthorizationCodeAsync(codeHash, utcNow, cancellationToken);
+
+        public Task StoreRefreshTokenAsync(
+            MobileAuthRefreshTokenEntity token,
+            CancellationToken cancellationToken = default) =>
+            inner.StoreRefreshTokenAsync(token, cancellationToken);
+
+        public Task<MobileAuthRefreshTokenEntity?> FindRefreshTokenByHashAsync(
+            string tokenHash,
+            CancellationToken cancellationToken = default) =>
+            inner.FindRefreshTokenByHashAsync(tokenHash, cancellationToken);
+
+        public Task<bool> TryRevokeRefreshTokenAsync(
+            string tokenHash,
+            DateTime utcNow,
+            CancellationToken cancellationToken = default)
+        {
+            if (LoseNextRotation)
+            {
+                LoseNextRotation = false;
+                return Task.FromResult(false);
+            }
+
+            return inner.TryRevokeRefreshTokenAsync(tokenHash, utcNow, cancellationToken);
+        }
+
+        public Task<int> RevokeAllRefreshTokensForMemberAsync(
+            Guid memberAccountId,
+            DateTime utcNow,
+            CancellationToken cancellationToken = default) =>
+            inner.RevokeAllRefreshTokensForMemberAsync(memberAccountId, utcNow, cancellationToken);
+    }
+
+    private sealed class RecordingServiceLogger : ILogger<MobileAuthService>
+    {
+        public List<(LogLevel Level, string Message)> Entries { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state)
+            where TState : notnull =>
+            null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            Entries.Add((logLevel, formatter(state, exception)));
         }
     }
 }
