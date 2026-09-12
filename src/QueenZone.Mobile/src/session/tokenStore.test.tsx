@@ -76,8 +76,8 @@ describe('tokenStore', () => {
     expect(roundTrip?.refreshToken).toBe('r');
     expect(roundTrip?.expiresAt).toBe(stored.expiresAt);
     expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
-      key('accessToken'),
-      'a',
+      key('grant'),
+      JSON.stringify({ accessToken: 'a', refreshToken: 'r', expiresAt: stored.expiresAt }),
       sessionStoreOptions,
     );
   });
@@ -111,22 +111,66 @@ describe('tokenStore', () => {
     });
 
     await writeStoredSession({ accessToken: 'a', refreshToken: 'r', expiresIn: 900 });
-    for (const name of ['accessToken', 'refreshToken', 'accessExpiresAt']) {
-      const scoped = key(name);
-      expect(order.filter((entry) => entry.endsWith(`:${scoped}`))).toEqual([
-        `delete:${scoped}`,
-        `set:${scoped}`,
-      ]);
-    }
+    const grantKey = key('grant');
+    expect(order.filter((entry) => entry.endsWith(`:${grantKey}`))).toEqual([
+      `delete:${grantKey}`,
+      `set:${grantKey}`,
+    ]);
 
     order.length = 0;
     await writeStoredIdentityShell({ displayName: 'Freddie', memberId: 'member-1' });
     expect(order).toEqual([`delete:${key('identityShell')}`, `set:${key('identityShell')}`]);
   });
 
-  it('returns null when either token is missing', async () => {
+  it('returns null when there is no grant', async () => {
+    await expect(readStoredSession()).resolves.toBeNull();
+  });
+
+  it('returns null when a leftover per-field key is missing its pair', async () => {
     await SecureStore.setItemAsync(key('accessToken'), 'a');
     await expect(readStoredSession()).resolves.toBeNull();
+  });
+
+  it('never leaves an access token without a refresh token when the write is interrupted mid-flight', async () => {
+    await writeStoredSession({ accessToken: 'old-a', refreshToken: 'old-r', expiresIn: 900 });
+
+    (SecureStore.setItemAsync as jest.Mock).mockImplementationOnce(async () => {
+      throw new Error('process killed mid-write');
+    });
+    await expect(
+      writeStoredSession({ accessToken: 'new-a', refreshToken: 'new-r', expiresIn: 900 }),
+    ).rejects.toThrow('process killed mid-write');
+
+    // The delete half of the torn write already ran, so the grant is gone entirely —
+    // never left with a new access token and the old (or no) refresh token.
+    await expect(readStoredSession()).resolves.toBeNull();
+  });
+
+  it('migrates a legacy per-field grant to the scoped combined key without signing the member out', async () => {
+    await SecureStore.setItemAsync(legacyKey('accessToken'), 'legacy-a');
+    await SecureStore.setItemAsync(legacyKey('refreshToken'), 'legacy-r');
+    await SecureStore.setItemAsync(legacyKey('accessExpiresAt'), '12345');
+
+    const stored = await readStoredSession();
+    expect(stored?.accessToken).toBe('legacy-a');
+    expect(stored?.refreshToken).toBe('legacy-r');
+    expect(stored?.expiresAt).toBe(12345);
+
+    expect(mockMemory.has(legacyKey('accessToken'))).toBe(false);
+    expect(mockMemory.has(legacyKey('refreshToken'))).toBe(false);
+    expect(mockMemory.has(legacyKey('accessExpiresAt'))).toBe(false);
+    expect(mockMemory.get(key('grant'))).toBe(
+      JSON.stringify({ accessToken: 'legacy-a', refreshToken: 'legacy-r', expiresAt: 12345 }),
+    );
+
+    const again = await readStoredSession();
+    expect(again?.accessToken).toBe('legacy-a');
+  });
+
+  it('does not migrate a legacy grant missing either field', async () => {
+    await SecureStore.setItemAsync(legacyKey('accessToken'), 'legacy-a');
+    await expect(readStoredSession()).resolves.toBeNull();
+    expect(mockMemory.has(key('grant'))).toBe(false);
   });
 
   it('clears stored tokens', async () => {
@@ -234,8 +278,8 @@ describe('tokenStore', () => {
     const previousVersion = '0.1.0';
     const nextVersion = '0.1.214';
     expect(previousVersion).not.toBe(nextVersion);
-    expect(mockMemory.has(key('accessToken'))).toBe(true);
-    expect(mockMemory.has(`${key('accessToken')}.${nextVersion}`)).toBe(false);
+    expect(mockMemory.has(key('grant'))).toBe(true);
+    expect(mockMemory.has(`${key('grant')}.${nextVersion}`)).toBe(false);
     expect(mockMemory.has(`${key('identityShell')}.${nextVersion}`)).toBe(false);
 
     const stored = await readStoredSession();
@@ -302,7 +346,7 @@ describe('tokenStore', () => {
       expect(stored?.refreshToken).toBe('legacy-r');
       expect(stored?.identity?.displayName).toBe('Freddie');
 
-      expect(mockMemory.get(key('refreshToken'))).toBe('legacy-r');
+      expect(JSON.parse(mockMemory.get(key('grant')) ?? '{}')).toMatchObject({ refreshToken: 'legacy-r' });
       expect(mockMemory.has(legacyKey('refreshToken'))).toBe(false);
 
       await expect(readStoredSession()).resolves.toMatchObject({ refreshToken: 'legacy-r' });
@@ -321,6 +365,56 @@ describe('tokenStore', () => {
       await clearStoredSession();
       expect(mockMemory.has(legacyKey('refreshToken'))).toBe(false);
       await expect(readStoredSession()).resolves.toBeNull();
+    });
+  });
+
+  describe('predecessor grant shapes', () => {
+    it('migrates a #1491 origin-scoped per-field grant to the atomic key', async () => {
+      await SecureStore.setItemAsync(key('accessToken'), 'scoped-a');
+      await SecureStore.setItemAsync(key('refreshToken'), 'scoped-r');
+      await SecureStore.setItemAsync(key('accessExpiresAt'), '67890');
+      await SecureStore.setItemAsync(
+        key('identityShell'),
+        JSON.stringify({ displayName: 'Freddie', memberId: 'member-1' }),
+      );
+
+      const stored = await readStoredSession();
+      expect(stored?.accessToken).toBe('scoped-a');
+      expect(stored?.refreshToken).toBe('scoped-r');
+      expect(stored?.expiresAt).toBe(67890);
+      expect(stored?.identity?.displayName).toBe('Freddie');
+
+      expect(mockMemory.get(key('grant'))).toBe(
+        JSON.stringify({ accessToken: 'scoped-a', refreshToken: 'scoped-r', expiresAt: 67890 }),
+      );
+      expect(mockMemory.has(key('accessToken'))).toBe(false);
+      expect(mockMemory.has(key('refreshToken'))).toBe(false);
+      expect(mockMemory.has(key('accessExpiresAt'))).toBe(false);
+    });
+
+    it('adopts an unscoped atomic grant into the running origin so nobody is signed out', async () => {
+      mockMemory.set(
+        legacyKey('grant'),
+        JSON.stringify({ accessToken: 'atomic-a', refreshToken: 'atomic-r', expiresAt: 111 }),
+      );
+
+      const stored = await readStoredSession();
+      expect(stored?.refreshToken).toBe('atomic-r');
+      expect(mockMemory.get(key('grant'))).toBe(
+        JSON.stringify({ accessToken: 'atomic-a', refreshToken: 'atomic-r', expiresAt: 111 }),
+      );
+      expect(mockMemory.has(legacyKey('grant'))).toBe(false);
+    });
+
+    it('does not migrate a staging scoped per-field grant into a production build', async () => {
+      mockApiBaseUrl = stagingBaseUrl;
+      await SecureStore.setItemAsync(key('accessToken'), 'staging-a');
+      await SecureStore.setItemAsync(key('refreshToken'), 'staging-r');
+
+      mockApiBaseUrl = productionBaseUrl;
+      await expect(readStoredSession()).resolves.toBeNull();
+      expect(mockMemory.has(key('grant', stagingBaseUrl))).toBe(false);
+      expect(mockMemory.get(key('refreshToken', stagingBaseUrl))).toBe('staging-r');
     });
   });
 });

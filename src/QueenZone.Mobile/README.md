@@ -393,17 +393,20 @@ render a `MemberGate` so they stay closed while signed out.
 ### Stored sessions are scoped to the API origin
 
 `src/session/tokenStore.ts` keys the SecureStore grant by the build's
-`apiBaseUrl` (`queenzone.mobile.<origin>.refreshToken`, …). A refresh token is
-only valid at the host that issued it, and TestFlight ships staging and
+`apiBaseUrl` as one JSON value (`queenzone.mobile.<origin>.grant`). A refresh
+token is only valid at the host that issued it, and TestFlight ships staging and
 production builds under the same `org.queenzone.mobile` bundle id — before
 scoping, updating from a `staging` build to a `production` one presented a
 `dev.queenzone.org` grant to `www.queenzone.org`, which answers `invalid_grant`
 and silently signed the member out on the next launch. Scoping keeps one session
-per origin, so switching builds restores whichever session that build owns.
+per origin, so switching builds restores whichever session that build owns. One
+key also means a killed process cannot tear the grant into a partial state.
 
 Do not reintroduce an unscoped key, and do not add the app version to the scope —
 a store or TestFlight update must not sign members out. A grant written before
-scoping is adopted into the running build's scope once, then deleted.
+this shape — unscoped per-field keys, origin-scoped per-field keys, or an
+unscoped `queenzone.mobile.grant` — is adopted into the running build's scoped
+grant once, then deleted.
 
 Only a token-endpoint response that actually says the grant is dead
 (`invalid_grant` / `invalid_token`, or a 401) ends a session. A 429 from the
