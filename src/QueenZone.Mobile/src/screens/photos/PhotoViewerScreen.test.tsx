@@ -718,24 +718,29 @@ describe('PhotoViewerScreen Android wallpaper', () => {
   });
 
   it('sets lock and both from the sheet', async () => {
-    await loadPhoto();
-    fireEvent.press(screen.getByTestId(testIds.photoViewerWallpaper));
-    fireEvent.press(screen.getByTestId(testIds.photoViewerWallpaperLock));
-    await waitFor(() =>
-      expect(setWallpaper).toHaveBeenCalledWith(
-        'https://cdn.queenzone.org/brian-may/img-101.jpg',
-        'lock',
-      ),
-    );
+    await withFakeTimers(async () => {
+      await loadPhoto();
+      fireEvent.press(screen.getByTestId(testIds.photoViewerWallpaper));
+      fireEvent.press(screen.getByTestId(testIds.photoViewerWallpaperLock));
+      await waitFor(() =>
+        expect(setWallpaper).toHaveBeenCalledWith(
+          'https://cdn.queenzone.org/brian-may/img-101.jpg',
+          'lock',
+        ),
+      );
 
-    fireEvent.press(screen.getByTestId(testIds.photoViewerWallpaper));
-    fireEvent.press(screen.getByTestId(testIds.photoViewerWallpaperBoth));
-    await waitFor(() =>
-      expect(setWallpaper).toHaveBeenCalledWith(
-        'https://cdn.queenzone.org/brian-may/img-101.jpg',
-        'both',
-      ),
-    );
+      await act(async () => {
+        jest.advanceTimersByTime(photoViewerStatusTiming.cooldownMs);
+      });
+      fireEvent.press(screen.getByTestId(testIds.photoViewerWallpaper));
+      fireEvent.press(screen.getByTestId(testIds.photoViewerWallpaperBoth));
+      await waitFor(() =>
+        expect(setWallpaper).toHaveBeenCalledWith(
+          'https://cdn.queenzone.org/brian-may/img-101.jpg',
+          'both',
+        ),
+      );
+    });
   });
 
   it('shows a lock-target error instead of a silent no-op', async () => {

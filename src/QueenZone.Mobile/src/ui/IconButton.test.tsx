@@ -21,7 +21,7 @@ describe('IconButton', () => {
     const onPress = renderButton({ busy: true });
     const button = screen.getByRole('button', { name: 'Save to Photos' });
     expect(button.props.accessibilityState).toEqual({ disabled: true, busy: true });
-    expect(screen.UNSAFE_getByType(ActivityIndicator)).toBeOnTheScreen();
+    expect(screen.UNSAFE_getByType(ActivityIndicator)).toBeTruthy();
     fireEvent.press(button);
     expect(onPress).not.toHaveBeenCalled();
   });
