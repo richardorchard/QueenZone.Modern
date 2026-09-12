@@ -221,6 +221,13 @@ function Invoke-SqlPackageProcess {
                 -RedirectStandardError $stderrPath
         }
 
+        # Windows PowerShell 5.1 can lose the native process handle after a
+        # polled process exits. ExitCode then resolves to $null even when the
+        # command succeeded, and the fallback below reports a false exit 1.
+        # Materialise the handle while the process is alive so its real exit
+        # code remains available after the polling loop.
+        $null = $process.Handle
+
         while (-not $process.HasExited) {
             $stdout = Read-SqlPackageRedirectedChunk -Path $stdoutPath -Offset ([ref]$stdoutOffset)
             $stderr = Read-SqlPackageRedirectedChunk -Path $stderrPath -Offset ([ref]$stderrOffset)
@@ -436,20 +443,15 @@ function Invoke-SyncLegacyDbSelfTest {
         throw "Nightly Sync wrapper must annotate the script's named TCP/transport failure."
     }
 
-    $smokeOut = Join-Path ([System.IO.Path]::GetTempPath()) ("queenzone-dotnet-smoke-out-{0}.log" -f [Guid]::NewGuid().ToString("N"))
-    $smokeErr = Join-Path ([System.IO.Path]::GetTempPath()) ("queenzone-dotnet-smoke-err-{0}.log" -f [Guid]::NewGuid().ToString("N"))
-    try {
-        $smoke = Start-Process -FilePath "dotnet" -ArgumentList @('--version') -NoNewWindow -PassThru -Wait -RedirectStandardOutput $smokeOut -RedirectStandardError $smokeErr
-        if ($smoke.ExitCode -ne 0) {
-            throw "Process-launch smoke failed with exit $($smoke.ExitCode)."
-        }
-        $versionText = (Get-Content -LiteralPath $smokeOut -Raw -ErrorAction SilentlyContinue)
-        if ($versionText -notmatch '\d+\.\d+') {
-            throw "Process-launch smoke did not print a dotnet version."
-        }
+    # Exercise the same polled Start-Process path as Extract and Publish. A
+    # previous smoke test used Start-Process -Wait, which concealed the
+    # Windows PowerShell 5.1 null-ExitCode failure seen by the nightly runner.
+    $smoke = Invoke-SqlPackageProcess -SqlPackageArguments @('/Version')
+    if ($smoke.ExitCode -ne 0) {
+        throw "Polled process-launch smoke failed with exit $($smoke.ExitCode)."
     }
-    finally {
-        Remove-Item -LiteralPath $smokeOut, $smokeErr -Force -ErrorAction SilentlyContinue
+    if ([string]$smoke.Output -notmatch '\d+\.\d+') {
+        throw "Polled process-launch smoke did not print a sqlpackage version."
     }
 
     Write-Host "Sync-LegacyDbToSqlExpress.ps1 self-test passed."
