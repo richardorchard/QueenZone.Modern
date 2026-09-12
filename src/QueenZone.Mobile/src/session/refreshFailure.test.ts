@@ -46,6 +46,13 @@ describe('refresh failure classification', () => {
     );
   });
 
+  it('keeps the session for a plain 429 or 5xx ApiError from any caller', () => {
+    for (const err of [ApiError.http(429, 'Too Many Requests'), ApiError.http(503, 'Service Unavailable')]) {
+      assert.equal(isDefiniteAuthRefreshFailure(err), false);
+      assert.equal(isTransientRefreshFailure(err), true);
+    }
+  });
+
   it('keeps the session for rate limits, outages, and unconfigured auth', () => {
     // Each of these used to fall through to clearLocal() and sign the member
     // out on the next launch after an overnight idle.
