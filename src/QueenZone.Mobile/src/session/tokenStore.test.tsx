@@ -59,8 +59,8 @@ describe('tokenStore', () => {
     expect(roundTrip?.refreshToken).toBe('r');
     expect(roundTrip?.expiresAt).toBe(stored.expiresAt);
     expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
-      'queenzone.mobile.accessToken',
-      'a',
+      'queenzone.mobile.grant',
+      JSON.stringify({ accessToken: 'a', refreshToken: 'r', expiresAt: stored.expiresAt }),
       sessionStoreOptions,
     );
   });
@@ -94,13 +94,7 @@ describe('tokenStore', () => {
     });
 
     await writeStoredSession({ accessToken: 'a', refreshToken: 'r', expiresIn: 900 });
-    for (const key of [
-      'queenzone.mobile.accessToken',
-      'queenzone.mobile.refreshToken',
-      'queenzone.mobile.accessExpiresAt',
-    ]) {
-      expect(order.filter((entry) => entry.endsWith(key))).toEqual([`delete:${key}`, `set:${key}`]);
-    }
+    expect(order).toEqual(['delete:queenzone.mobile.grant', 'set:queenzone.mobile.grant']);
 
     order.length = 0;
     await writeStoredIdentityShell({ displayName: 'Freddie', memberId: 'member-1' });
@@ -110,9 +104,50 @@ describe('tokenStore', () => {
     ]);
   });
 
-  it('returns null when either token is missing', async () => {
-    await SecureStore.setItemAsync('queenzone.mobile.accessToken', 'a');
+  it('returns null when there is no grant', async () => {
     await expect(readStoredSession()).resolves.toBeNull();
+  });
+
+  it('never leaves an access token without a refresh token when the write is interrupted mid-flight', async () => {
+    await writeStoredSession({ accessToken: 'old-a', refreshToken: 'old-r', expiresIn: 900 });
+
+    (SecureStore.setItemAsync as jest.Mock).mockImplementationOnce(async () => {
+      throw new Error('process killed mid-write');
+    });
+    await expect(
+      writeStoredSession({ accessToken: 'new-a', refreshToken: 'new-r', expiresIn: 900 }),
+    ).rejects.toThrow('process killed mid-write');
+
+    // The delete half of the torn write already ran, so the grant is gone entirely —
+    // never left with a new access token and the old (or no) refresh token.
+    await expect(readStoredSession()).resolves.toBeNull();
+  });
+
+  it('migrates a legacy per-field grant to the combined key without signing the member out', async () => {
+    await SecureStore.setItemAsync('queenzone.mobile.accessToken', 'legacy-a');
+    await SecureStore.setItemAsync('queenzone.mobile.refreshToken', 'legacy-r');
+    await SecureStore.setItemAsync('queenzone.mobile.accessExpiresAt', '12345');
+
+    const stored = await readStoredSession();
+    expect(stored?.accessToken).toBe('legacy-a');
+    expect(stored?.refreshToken).toBe('legacy-r');
+    expect(stored?.expiresAt).toBe(12345);
+
+    expect(mockMemory.has('queenzone.mobile.accessToken')).toBe(false);
+    expect(mockMemory.has('queenzone.mobile.refreshToken')).toBe(false);
+    expect(mockMemory.has('queenzone.mobile.accessExpiresAt')).toBe(false);
+    expect(mockMemory.get('queenzone.mobile.grant')).toBe(
+      JSON.stringify({ accessToken: 'legacy-a', refreshToken: 'legacy-r', expiresAt: 12345 }),
+    );
+
+    const again = await readStoredSession();
+    expect(again?.accessToken).toBe('legacy-a');
+  });
+
+  it('does not migrate a legacy grant missing either field', async () => {
+    await SecureStore.setItemAsync('queenzone.mobile.accessToken', 'legacy-a');
+    await expect(readStoredSession()).resolves.toBeNull();
+    expect(mockMemory.has('queenzone.mobile.grant')).toBe(false);
   });
 
   it('clears stored tokens', async () => {
@@ -220,8 +255,8 @@ describe('tokenStore', () => {
     const previousVersion = '0.1.0';
     const nextVersion = '0.1.214';
     expect(previousVersion).not.toBe(nextVersion);
-    expect(mockMemory.has('queenzone.mobile.accessToken')).toBe(true);
-    expect(mockMemory.has(`queenzone.mobile.accessToken.${nextVersion}`)).toBe(false);
+    expect(mockMemory.has('queenzone.mobile.grant')).toBe(true);
+    expect(mockMemory.has(`queenzone.mobile.grant.${nextVersion}`)).toBe(false);
     expect(mockMemory.has(`queenzone.mobile.identityShell.${nextVersion}`)).toBe(false);
 
     const stored = await readStoredSession();

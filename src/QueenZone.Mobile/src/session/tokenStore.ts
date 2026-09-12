@@ -1,13 +1,22 @@
 import * as SecureStore from 'expo-secure-store';
 import type { AuthTokens } from '../api/auth';
 
-const accessKey = 'queenzone.mobile.accessToken';
-const refreshKey = 'queenzone.mobile.refreshToken';
-const expiryKey = 'queenzone.mobile.accessExpiresAt';
+/** Single key for the whole grant so a killed process can never tear it into a partial state. */
+const grantKey = 'queenzone.mobile.grant';
+/** Legacy per-field keys, read once for migration and then deleted. Do not write to these. */
+const legacyAccessKey = 'queenzone.mobile.accessToken';
+const legacyRefreshKey = 'queenzone.mobile.refreshToken';
+const legacyExpiryKey = 'queenzone.mobile.accessExpiresAt';
 /** Sibling of the grant. Stable across store/TestFlight binaries — not version-namespaced. */
 const identityKey = 'queenzone.mobile.identityShell';
 
-/** Shared iOS accessibility for the four session keys. Do not add requireAuthentication. */
+type StoredGrant = {
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: number;
+};
+
+/** Shared iOS accessibility for the session keys. Do not add requireAuthentication. */
 const sessionStoreOptions: SecureStore.SecureStoreOptions = {
   keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK,
 };
@@ -65,24 +74,77 @@ async function writeSessionItem(key: string, value: string): Promise<void> {
   await SecureStore.setItemAsync(key, value, sessionStoreOptions);
 }
 
-export async function readStoredSession(): Promise<StoredSession | null> {
+/**
+ * Reads the legacy per-field grant and, if present, migrates it to the combined
+ * key so a torn write can no longer happen. Returns null if there is no legacy
+ * grant to migrate. Callers must already hold the read/write try block for
+ * Keychain-locked handling.
+ */
+async function migrateLegacyGrant(): Promise<StoredGrant | null> {
+  const [accessToken, refreshToken, expiry] = await Promise.all([
+    SecureStore.getItemAsync(legacyAccessKey, sessionStoreOptions),
+    SecureStore.getItemAsync(legacyRefreshKey, sessionStoreOptions),
+    SecureStore.getItemAsync(legacyExpiryKey, sessionStoreOptions),
+  ]);
+  if (!accessToken || !refreshToken) {
+    return null;
+  }
+
+  const parsedExpiry = expiry ? Number.parseInt(expiry, 10) : 0;
+  const grant: StoredGrant = {
+    accessToken,
+    refreshToken,
+    expiresAt: Number.isFinite(parsedExpiry) ? parsedExpiry : 0,
+  };
+  await writeSessionItem(grantKey, JSON.stringify(grant));
+  await Promise.all([
+    SecureStore.deleteItemAsync(legacyAccessKey, sessionStoreOptions),
+    SecureStore.deleteItemAsync(legacyRefreshKey, sessionStoreOptions),
+    SecureStore.deleteItemAsync(legacyExpiryKey, sessionStoreOptions),
+  ]);
+  return grant;
+}
+
+function parseGrant(raw: string | null): StoredGrant | null {
+  if (!raw) {
+    return null;
+  }
+
   try {
-    const [accessToken, refreshToken, expiry, identityRaw] = await Promise.all([
-      SecureStore.getItemAsync(accessKey, sessionStoreOptions),
-      SecureStore.getItemAsync(refreshKey, sessionStoreOptions),
-      SecureStore.getItemAsync(expiryKey, sessionStoreOptions),
-      SecureStore.getItemAsync(identityKey, sessionStoreOptions),
-    ]);
-    if (!accessToken || !refreshToken) {
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') {
       return null;
     }
 
-    const expiresAt = expiry ? Number.parseInt(expiry, 10) : 0;
+    const rec = parsed as Record<string, unknown>;
+    if (typeof rec.accessToken !== 'string' || typeof rec.refreshToken !== 'string') {
+      return null;
+    }
+
+    const expiresAt = typeof rec.expiresAt === 'number' && Number.isFinite(rec.expiresAt) ? rec.expiresAt : 0;
+    return { accessToken: rec.accessToken, refreshToken: rec.refreshToken, expiresAt };
+  } catch {
+    return null;
+  }
+}
+
+export async function readStoredSession(): Promise<StoredSession | null> {
+  try {
+    const [grantRaw, identityRaw] = await Promise.all([
+      SecureStore.getItemAsync(grantKey, sessionStoreOptions),
+      SecureStore.getItemAsync(identityKey, sessionStoreOptions),
+    ]);
+
+    const grant = parseGrant(grantRaw) ?? (await migrateLegacyGrant());
+    if (!grant) {
+      return null;
+    }
+
     return {
-      accessToken,
-      refreshToken,
+      accessToken: grant.accessToken,
+      refreshToken: grant.refreshToken,
       expiresIn: 900,
-      expiresAt: Number.isFinite(expiresAt) ? expiresAt : 0,
+      expiresAt: grant.expiresAt,
       identity: parseIdentityShell(identityRaw),
     };
   } catch (error) {
@@ -92,12 +154,9 @@ export async function readStoredSession(): Promise<StoredSession | null> {
 
 export async function writeStoredSession(tokens: AuthTokens): Promise<StoredSession> {
   const expiresAt = Date.now() + Math.max(tokens.expiresIn - 30, 30) * 1000;
+  const grant: StoredGrant = { accessToken: tokens.accessToken, refreshToken: tokens.refreshToken, expiresAt };
   try {
-    await Promise.all([
-      writeSessionItem(accessKey, tokens.accessToken),
-      writeSessionItem(refreshKey, tokens.refreshToken),
-      writeSessionItem(expiryKey, String(expiresAt)),
-    ]);
+    await writeSessionItem(grantKey, JSON.stringify(grant));
   } catch (error) {
     rethrowKeychainError(error);
   }
@@ -121,9 +180,10 @@ export async function writeStoredIdentityShell(shell: StoredIdentityShell): Prom
 
 export async function clearStoredSession(): Promise<void> {
   await Promise.all([
-    SecureStore.deleteItemAsync(accessKey, sessionStoreOptions),
-    SecureStore.deleteItemAsync(refreshKey, sessionStoreOptions),
-    SecureStore.deleteItemAsync(expiryKey, sessionStoreOptions),
+    SecureStore.deleteItemAsync(grantKey, sessionStoreOptions),
+    SecureStore.deleteItemAsync(legacyAccessKey, sessionStoreOptions),
+    SecureStore.deleteItemAsync(legacyRefreshKey, sessionStoreOptions),
+    SecureStore.deleteItemAsync(legacyExpiryKey, sessionStoreOptions),
     SecureStore.deleteItemAsync(identityKey, sessionStoreOptions),
   ]);
 }
